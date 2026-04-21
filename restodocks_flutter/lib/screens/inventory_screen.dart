@@ -226,6 +226,33 @@ bool _inventoryDraftSnapshotHasRows(Map<String, dynamic>? d) {
   return rows is List && rows.isNotEmpty;
 }
 
+/// Строки с привязкой к номенклатуре / свободным названиям или ненулевыми количествами.
+int _inventoryDraftMeaningfulRowCount(Map<String, dynamic>? d) {
+  if (d == null || d.isEmpty) return 0;
+  final rows = d['rows'];
+  if (rows is! List) return 0;
+  var n = 0;
+  for (final raw in rows) {
+    if (raw is! Map) continue;
+    final m = Map<String, dynamic>.from(raw);
+    final pid = m['productId']?.toString().trim() ?? '';
+    final tid = m['techCardId']?.toString().trim() ?? '';
+    final fn = m['freeName']?.toString().trim() ?? '';
+    var hasQty = false;
+    final qty = m['quantities'];
+    if (qty is List) {
+      for (final q in qty) {
+        if (q is num && q > 0) {
+          hasQty = true;
+          break;
+        }
+      }
+    }
+    if (pid.isNotEmpty || tid.isNotEmpty || fn.isNotEmpty || hasQty) n++;
+  }
+  return n;
+}
+
 DateTime? _inventoryDraftSavedAt(Map<String, dynamic>? d) {
   if (d == null || d.isEmpty) return null;
   final raw = d['draftSavedAt']?.toString().trim();
@@ -242,12 +269,26 @@ Map<String, dynamic>? _pickNewerInventoryDraft(
   if (!localOk && !serverOk) return null;
   if (localOk && !serverOk) return local;
   if (!localOk && serverOk) return server;
+  final lc = _inventoryDraftMeaningfulRowCount(local);
+  final sc = _inventoryDraftMeaningfulRowCount(server);
+  if (lc != sc) return lc > sc ? local : server;
   final localAt = _inventoryDraftSavedAt(local);
   final serverAt = _inventoryDraftSavedAt(server);
   if (localAt == null && serverAt == null) return local;
   if (localAt == null) return server;
   if (serverAt == null) return local;
   return serverAt.isAfter(localAt) ? server : local;
+}
+
+Map<String, dynamic>? _forceInventoryDraftMode(
+  Map<String, dynamic>? draft, {
+  required bool selective,
+}) {
+  if (draft == null) return null;
+  final out = Map<String, dynamic>.from(draft);
+  out['inventoryMode'] = selective ? 'selective' : 'standard';
+  out['isSelective'] = selective;
+  return out;
 }
 
 enum _InventorySort { alphabetAsc, alphabetDesc, lastAdded }
@@ -285,7 +326,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _draftHydrationFinished = false;
 
   @override
-  bool get canPersistDraft => _draftHydrationFinished;
+  bool get canPersistDraft =>
+      _draftHydrationFinished && (_isSelectiveInventory || _rows.isNotEmpty);
 
   /// Весь ввод по бланку — без debounce: сразу кэш устройства/браузера и очередь на сервер.
   @override
@@ -665,7 +707,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       // iiko нет — тихо восстанавливаем один из черновиков (если есть)
       if (hasStdDraft) {
         _stateRestored = false;
-        await restoreState(stdDraftToRestore);
+        await restoreState(
+          _forceInventoryDraftMode(stdDraftToRestore, selective: false) ??
+              stdDraftToRestore!,
+        );
         return;
       }
 
@@ -682,7 +727,10 @@ class _InventoryScreenState extends State<InventoryScreen>
 
       if (hasSelectiveDraft && allowSelectiveInventory) {
         _stateRestored = false;
-        await restoreState(selectiveDraftToRestore);
+        await restoreState(
+          _forceInventoryDraftMode(selectiveDraftToRestore, selective: true) ??
+              selectiveDraftToRestore!,
+        );
         return;
       }
 
@@ -960,13 +1008,29 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!mounted) return;
         final serverStd = await _loadDraftFromServer();
         if (!mounted) return;
-        final preferredStdDraft = _pickNewerInventoryDraft(
+        var preferredStdDraft = _pickNewerInventoryDraft(
           _pickNewerInventoryDraft(resolvedStdDraft, savedDraft),
           serverStd,
         );
+        if (preferredStdDraft == null && hasStdDraft) {
+          if (_inventoryDraftSnapshotHasRows(resolvedStdDraft)) {
+            preferredStdDraft = resolvedStdDraft;
+          } else if (_inventoryDraftSnapshotHasRows(savedDraft)) {
+            preferredStdDraft = savedDraft;
+          } else if (_inventoryDraftSnapshotHasRows(serverStd)) {
+            preferredStdDraft = serverStd;
+          }
+        }
         if (preferredStdDraft != null) {
+          // Явный выбор "Стандартная" должен оставаться стандартной даже для старых/битых снимков.
+          preferredStdDraft =
+              _forceInventoryDraftMode(preferredStdDraft, selective: false)!;
           _stateRestored = false;
           await restoreState(preferredStdDraft);
+          if (!mounted) return;
+          if (_rows.isEmpty) {
+            await _loadNomenclature(fillAllProducts: true);
+          }
           return;
         }
       }
@@ -979,11 +1043,22 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!mounted) return;
         final serverSel = await _loadSelectiveDraftFromServer();
         if (!mounted) return;
-        final preferredSelectiveDraft = _pickNewerInventoryDraft(
+        var preferredSelectiveDraft = _pickNewerInventoryDraft(
           _pickNewerInventoryDraft(resolvedSelectiveDraft, savedDraft),
           serverSel,
         );
+        if (preferredSelectiveDraft == null && hasSelectiveDraft) {
+          if (_inventoryDraftSnapshotHasRows(resolvedSelectiveDraft)) {
+            preferredSelectiveDraft = resolvedSelectiveDraft;
+          } else if (_inventoryDraftSnapshotHasRows(savedDraft)) {
+            preferredSelectiveDraft = savedDraft;
+          } else if (_inventoryDraftSnapshotHasRows(serverSel)) {
+            preferredSelectiveDraft = serverSel;
+          }
+        }
         if (preferredSelectiveDraft != null) {
+          preferredSelectiveDraft =
+              _forceInventoryDraftMode(preferredSelectiveDraft, selective: true)!;
           _stateRestored = false;
           await restoreState(preferredSelectiveDraft);
           return;
@@ -1014,13 +1089,65 @@ class _InventoryScreenState extends State<InventoryScreen>
       final est = account.establishment;
       final estId = est?.dataEstablishmentId;
       if (estId == null) return;
-      // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
-      // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
-      await store.loadProducts();
-      await store.loadNomenclature(estId);
-      final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+      Future<void> loadCatalogAndNomenclature() async {
+        // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
+        // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
+        await store.loadProducts();
+        await store.loadNomenclature(estId);
+      }
+
+      try {
+        await loadCatalogAndNomenclature();
+      } catch (e) {
+        final authErr = e is PostgrestException &&
+            (e.code == '401' || e.code == '403' || e.code == '42501');
+        devLog('⚠️ Inventory: _loadNomenclature primary failed: $e');
+        if (authErr) {
+          try {
+            await Supabase.instance.client.auth.refreshSession();
+            await Future<void>.delayed(const Duration(milliseconds: 450));
+          } catch (_) {}
+        }
+        // Второй шанс после refreshSession/временных сетевых сбоев.
+        try {
+          await loadCatalogAndNomenclature();
+        } catch (e2) {
+          // Не роняем Continue: используем то, что уже есть в памяти.
+          devLog('⚠️ Inventory: _loadNomenclature retry failed: $e2');
+        }
+      }
+
+      List<TechCard> techCards = const <TechCard>[];
+      try {
+        techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+      } catch (e) {
+        // ТТК не должны блокировать открытие бланка инвентаризации.
+        devLog('⚠️ Inventory: getTechCardsForEstablishment failed: $e');
+      }
       if (!mounted) return;
-      final products = store.getNomenclatureProducts(estId);
+      var products = store.getNomenclatureProducts(estId);
+      if (products.isEmpty && fillAllProducts && _rows.isEmpty) {
+        // Номенклатура могла отдаться пустой из-за transient ошибки:
+        // не оставляем бланк полностью пустым после Continue.
+        try {
+          await store.loadNomenclatureForce(estId);
+          products = store.getNomenclatureProducts(estId);
+        } catch (e) {
+          devLog('⚠️ Inventory: loadNomenclatureForce failed: $e');
+        }
+        if (products.isEmpty && store.allProducts.isNotEmpty) {
+          products = List<Product>.from(store.allProducts);
+          devLog(
+              '⚠️ Inventory: using catalog fallback (${products.length}) while nomenclature is empty');
+        }
+      }
+      // Для восстановленного черновика с productId: даже если номенклатура пуста,
+      // пробуем резолвить строки из полного каталога, чтобы не показывать пустые имена.
+      if (products.isEmpty &&
+          _rows.any((r) => (r.productId?.isNotEmpty ?? false)) &&
+          store.allProducts.isNotEmpty) {
+        products = List<Product>.from(store.allProducts);
+      }
       final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
       if (!mounted) return;
       setState(() => _isLoadingProducts = false);

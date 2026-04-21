@@ -8,6 +8,58 @@ class InboxService {
 
   InboxService(this._supabase);
 
+  bool _isAuthLikeError(Object e) {
+    final s = e.toString().toLowerCase();
+    return s.contains('401') ||
+        s.contains('403') ||
+        s.contains('42501') ||
+        s.contains('jwt') ||
+        s.contains('not authorized') ||
+        s.contains('permission denied');
+  }
+
+  Future<void> _refreshSessionQuietly() async {
+    try {
+      if (_supabase.client.auth.currentSession != null) {
+        await _supabase.client.auth.refreshSession();
+      }
+    } catch (_) {}
+  }
+
+  Future<T> _withAuthRetry<T>(String tag, Future<T> Function() run) async {
+    final retryDelays = <Duration>[
+      const Duration(milliseconds: 250),
+      const Duration(milliseconds: 700),
+    ];
+    try {
+      return await run();
+    } catch (e) {
+      if (!_isAuthLikeError(e)) rethrow;
+      devLog('InboxService: $tag auth-like error, retry after refresh');
+      await _refreshSessionQuietly();
+      for (var i = 0; i <= retryDelays.length; i++) {
+        try {
+          return await run();
+        } catch (e2) {
+          final canRetry = _isAuthLikeError(e2) && i < retryDelays.length;
+          if (!canRetry) rethrow;
+          await Future<void>.delayed(retryDelays[i]);
+          await _refreshSessionQuietly();
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<T> _safe<T>(String tag, Future<T> Function() run, T fallback) async {
+    try {
+      return await _withAuthRetry(tag, run);
+    } catch (e) {
+      devLog('InboxService: $tag failed: $e');
+      return fallback;
+    }
+  }
+
   /// Получить документы во входящих: для шефа — полученные им инвентаризации, для собственника/управления — все по заведению.
   Future<List<InboxDocument>> getInboxDocuments(String establishmentId, Employee? currentEmployee) async {
     final documents = <InboxDocument>[];
@@ -19,7 +71,8 @@ class InboxService {
       final isOwnerOrMgmt = currentEmployee.hasRole('owner') || currentEmployee.department == 'management';
       final isChefOrOwner = currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') || isOwnerOrMgmt;
 
-      // Параллельная загрузка: инвентаризации, чеклисты, просрочки, заказы
+      // Параллельная загрузка: инвентаризации, чеклисты, просрочки, заказы.
+      // Важно: падение одного источника не должно обнулять все входящие.
       final inventoryFuture = () async {
         List<Map<String, dynamic>> rawList;
         if (isOwnerOrMgmt) {
@@ -70,16 +123,22 @@ class InboxService {
           ProcurementPriceApprovalService.instance.listPending(establishmentId);
 
       final results = await Future.wait([
-        inventoryFuture,
-        checklistFuture,
-        missedFuture,
-        ordersFuture,
-        receiptsFuture,
-        priceApprovalFuture,
+        _safe<List<Map<String, dynamic>>>(
+            'inventory', () async => await inventoryFuture, <Map<String, dynamic>>[]),
+        _safe<List<dynamic>>(
+            'checklist_submissions', () async => await checklistFuture, <dynamic>[]),
+        _safe<List<dynamic>>(
+            'checklist_missed', () async => await missedFuture, <dynamic>[]),
+        _safe<List<Map<String, dynamic>>>(
+            'orders', () async => await ordersFuture, <Map<String, dynamic>>[]),
+        _safe<List<Map<String, dynamic>>>(
+            'procurement_receipts', () async => await receiptsFuture, <Map<String, dynamic>>[]),
+        _safe<List<Map<String, dynamic>>>(
+            'price_approvals', () async => await priceApprovalFuture, <Map<String, dynamic>>[]),
       ]);
       final rawList = results[0] as List<Map<String, dynamic>>;
-      final subList = results[1];
-      final missed = results[2];
+      final subList = results[1] as List<dynamic>;
+      final missed = results[2] as List<dynamic>;
       final orderDocs = results[3] as List<Map<String, dynamic>>;
       final receiptDocs = results[4] as List<Map<String, dynamic>>;
       final priceApprovalRows = results[5] as List<Map<String, dynamic>>;

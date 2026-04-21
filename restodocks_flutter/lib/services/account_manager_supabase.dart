@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show AuthException, PostgrestException;
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
@@ -15,6 +16,7 @@ import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import '../utils/employee_row_pick.dart';
 import 'account_ui_sync_service.dart';
 import 'ai_service_supabase.dart';
 import 'establishment_data_warmup_service.dart';
@@ -2256,17 +2258,72 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       // Fallback: прямой UPDATE по строке сотрудника (RLS), если RPC 400/др.
       try {
-        final authId = _supabase.currentUser?.id;
-        if (authId == null) return;
         final rows = await _supabase.client
             .from('employees')
             .update({'preferred_language': code})
-            .or('id.eq.$authId,auth_user_id.eq.$authId')
+            .eq('id', emp.id)
             .select();
         await applyRpcOrRows(null, rows);
       } catch (e2, st2) {
         devLog('AccountManager: savePreferredLanguage fallback UPDATE: $e2 $st2');
       }
+    }
+
+    // Пост-проверка: сразу читаем фактическое preferred_language с сервера,
+    // чтобы в web/incognito не терять выбор при закрытии вкладки.
+    try {
+      final rowId = _currentEmployee?.id ?? emp.id;
+      final row = await _supabase.client
+          .from('employees')
+          .select('preferred_language')
+          .eq('id', rowId)
+          .maybeSingle();
+      if (row == null) return;
+      final m = Map<String, dynamic>.from(row as Map);
+      final serverCode =
+          (m['preferred_language']?.toString().trim().toLowerCase() ?? '');
+      devLog(
+          'AccountManager: preferred_language verify requested=$code server=$serverCode');
+
+      if (serverCode == code || serverCode.isEmpty) {
+        // Сервер подтвердил язык — снимаем «pin» локали, чтобы web/incognito и другие
+        // устройства брали язык только из БД (одинаково везде).
+        if (serverCode == code && code.isNotEmpty) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove(LocalizationService.prefsKeyLocaleUserSet);
+          } catch (_) {}
+        }
+        return;
+      }
+
+      devLog(
+          'AccountManager: preferred_language mismatch, retrying direct UPDATE to $code');
+      await _supabase.client
+          .from('employees')
+          .update({'preferred_language': code})
+          .eq('id', rowId)
+          .select('id')
+          .maybeSingle();
+      try {
+        final row2 = await _supabase.client
+            .from('employees')
+            .select('preferred_language')
+            .eq('id', rowId)
+            .maybeSingle();
+        if (row2 != null) {
+          final s2 = (row2['preferred_language']?.toString().trim().toLowerCase() ??
+              '');
+          if (s2 == code) {
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove(LocalizationService.prefsKeyLocaleUserSet);
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+    } catch (e, st) {
+      devLog('AccountManager: savePreferredLanguage verify readback: $e $st');
     }
   }
 
@@ -2309,17 +2366,10 @@ class AccountManagerSupabase extends ChangeNotifier {
         return false;
       }
 
-      Map<String, dynamic> picked;
-      if (rows.length == 1) {
-        picked = Map<String, dynamic>.from(rows.first as Map);
-      } else {
-        final preferred = rows
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .where((m) => m['id']?.toString() == authUserId)
-            .toList();
-        picked = preferred.isNotEmpty
-            ? preferred.first
-            : Map<String, dynamic>.from(rows.first as Map);
+      final Map<String, dynamic> picked = rows.length == 1
+          ? Map<String, dynamic>.from(rows.first as Map)
+          : pickEmployeeRowForAuthUid(rows, authUserId);
+      if (rows.length > 1) {
         devLog(
           '🔐 AccountManager: ${rows.length} employee rows for auth user — '
           'using id=${picked['id']}',
