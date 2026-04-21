@@ -8,9 +8,38 @@ class InboxService {
 
   InboxService(this._supabase);
 
-  Future<T> _safe<T>(String tag, Future<T> Function() run, T fallback) async {
+  bool _isAuthLikeError(Object e) {
+    final s = e.toString().toLowerCase();
+    return s.contains('401') ||
+        s.contains('403') ||
+        s.contains('42501') ||
+        s.contains('jwt') ||
+        s.contains('not authorized') ||
+        s.contains('permission denied');
+  }
+
+  Future<void> _refreshSessionQuietly() async {
+    try {
+      if (_supabase.client.auth.currentSession != null) {
+        await _supabase.client.auth.refreshSession();
+      }
+    } catch (_) {}
+  }
+
+  Future<T> _withAuthRetry<T>(String tag, Future<T> Function() run) async {
     try {
       return await run();
+    } catch (e) {
+      if (!_isAuthLikeError(e)) rethrow;
+      devLog('InboxService: $tag auth-like error, retry after refresh');
+      await _refreshSessionQuietly();
+      return await run();
+    }
+  }
+
+  Future<T> _safe<T>(String tag, Future<T> Function() run, T fallback) async {
+    try {
+      return await _withAuthRetry(tag, run);
     } catch (e) {
       devLog('InboxService: $tag failed: $e');
       return fallback;
