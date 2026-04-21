@@ -315,7 +315,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _draftHydrationFinished = false;
 
   @override
-  bool get canPersistDraft => _draftHydrationFinished;
+  bool get canPersistDraft =>
+      _draftHydrationFinished && (_isSelectiveInventory || _rows.isNotEmpty);
 
   /// Весь ввод по бланку — без debounce: сразу кэш устройства/браузера и очередь на сервер.
   @override
@@ -1004,8 +1005,16 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
         if (preferredStdDraft != null) {
+          // Явный выбор "Стандартная" должен оставаться стандартной даже для старых/битых снимков.
+          preferredStdDraft = Map<String, dynamic>.from(preferredStdDraft);
+          preferredStdDraft['inventoryMode'] = 'standard';
+          preferredStdDraft['isSelective'] = false;
           _stateRestored = false;
           await restoreState(preferredStdDraft);
+          if (!mounted) return;
+          if (_rows.isEmpty) {
+            await _loadNomenclature(fillAllProducts: true);
+          }
           return;
         }
       }
@@ -1032,6 +1041,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
         if (preferredSelectiveDraft != null) {
+          preferredSelectiveDraft =
+              Map<String, dynamic>.from(preferredSelectiveDraft);
+          preferredSelectiveDraft['inventoryMode'] = 'selective';
+          preferredSelectiveDraft['isSelective'] = true;
           _stateRestored = false;
           await restoreState(preferredSelectiveDraft);
           return;
