@@ -311,6 +311,18 @@ class LocalizationService extends ChangeNotifier {
       await prefs.setString(prefsKeyLocale, _currentLocale.languageCode);
       if (userChoice) {
         await prefs.setBool(prefsKeyLocaleUserSet, true);
+        final sync = onPinnedLocaleNeedsServerSync;
+        if (sync != null) {
+          unawaited(
+            Future<void>(() async {
+              try {
+                await sync(_currentLocale.languageCode);
+              } catch (e, st) {
+                devLog('onPinnedLocaleNeedsServerSync(userChoice): $e $st');
+              }
+            }),
+          );
+        }
       }
     } catch (_) {}
     // Прогрев ТТК/продуктов после смены языка не должен блокировать UI (в т.ч. закрытие диалога выбора языка).
