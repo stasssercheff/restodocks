@@ -1089,13 +1089,47 @@ class _InventoryScreenState extends State<InventoryScreen>
       final est = account.establishment;
       final estId = est?.dataEstablishmentId;
       if (estId == null) return;
-      // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
-      // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
-      await store.loadProducts();
-      await store.loadNomenclature(estId);
+      Future<void> loadCatalogAndNomenclature() async {
+        // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
+        // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
+        await store.loadProducts();
+        await store.loadNomenclature(estId);
+      }
+
+      try {
+        await loadCatalogAndNomenclature();
+      } catch (e) {
+        final authErr = e is PostgrestException &&
+            (e.code == '401' || e.code == '403' || e.code == '42501');
+        devLog('⚠️ Inventory: _loadNomenclature primary failed: $e');
+        if (authErr) {
+          try {
+            await Supabase.instance.client.auth.refreshSession();
+            await Future<void>.delayed(const Duration(milliseconds: 450));
+          } catch (_) {}
+        }
+        // Второй шанс после refreshSession/временных сетевых сбоев.
+        await loadCatalogAndNomenclature();
+      }
+
       final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
       if (!mounted) return;
-      final products = store.getNomenclatureProducts(estId);
+      var products = store.getNomenclatureProducts(estId);
+      if (products.isEmpty && fillAllProducts && _rows.isEmpty) {
+        // Номенклатура могла отдаться пустой из-за transient ошибки:
+        // не оставляем бланк полностью пустым после Continue.
+        try {
+          await store.loadNomenclatureForce(estId);
+          products = store.getNomenclatureProducts(estId);
+        } catch (e) {
+          devLog('⚠️ Inventory: loadNomenclatureForce failed: $e');
+        }
+        if (products.isEmpty && store.allProducts.isNotEmpty) {
+          products = List<Product>.from(store.allProducts);
+          devLog(
+              '⚠️ Inventory: using catalog fallback (${products.length}) while nomenclature is empty');
+        }
+      }
       final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
       if (!mounted) return;
       setState(() => _isLoadingProducts = false);
