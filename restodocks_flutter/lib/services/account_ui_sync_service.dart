@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/employee.dart';
 import '../utils/dev_log.dart';
+import '../utils/employee_row_pick.dart';
 import 'localization_service.dart';
 import 'owner_view_preference_service.dart';
 import 'supabase_service.dart';
@@ -112,14 +113,18 @@ class AccountUiSyncService {
     final uid = _supabase.currentUser?.id;
     if (uid == null) return;
     try {
-      final rows = await _supabase.client
+      final rawList = await _supabase.client
           .from('employees')
           .select()
           .or('id.eq.$uid,auth_user_id.eq.$uid')
-          .eq('is_active', true)
-          .limit(1);
+          .eq('is_active', true);
+      final rows = rawList is List ? rawList : <dynamic>[];
       if (rows.isEmpty) return;
-      final m = Map<String, dynamic>.from(rows.first as Map);
+      final m = Map<String, dynamic>.from(
+        rows.length == 1
+            ? rows.first as Map
+            : pickEmployeeRowForAuthUid(rows, uid),
+      );
       m['password'] = m['password_hash'] ?? '';
       final emp = Employee.fromJson(m);
       onEmployeeMerged?.call(emp);

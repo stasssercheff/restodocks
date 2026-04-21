@@ -15,6 +15,7 @@ import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import '../utils/employee_row_pick.dart';
 import 'account_ui_sync_service.dart';
 import 'ai_service_supabase.dart';
 import 'establishment_data_warmup_service.dart';
@@ -2256,12 +2257,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       // Fallback: прямой UPDATE по строке сотрудника (RLS), если RPC 400/др.
       try {
-        final authId = _supabase.currentUser?.id;
-        if (authId == null) return;
         final rows = await _supabase.client
             .from('employees')
             .update({'preferred_language': code})
-            .or('id.eq.$authId,auth_user_id.eq.$authId')
+            .eq('id', emp.id)
             .select();
         await applyRpcOrRows(null, rows);
       } catch (e2, st2) {
@@ -2272,18 +2271,16 @@ class AccountManagerSupabase extends ChangeNotifier {
     // Пост-проверка: сразу читаем фактическое preferred_language с сервера,
     // чтобы в web/incognito не терять выбор при закрытии вкладки.
     try {
-      final authId = _supabase.currentUser?.id;
-      if (authId == null) return;
-      final rows = await _supabase.client
+      final rowId = _currentEmployee?.id ?? emp.id;
+      final row = await _supabase.client
           .from('employees')
           .select('preferred_language')
-          .or('id.eq.$authId,auth_user_id.eq.$authId')
-          .limit(1);
-      final list = rows is List ? rows : <dynamic>[];
-      if (list.isEmpty) return;
-      final row = Map<String, dynamic>.from(list.first as Map);
+          .eq('id', rowId)
+          .maybeSingle();
+      if (row == null) return;
+      final m = Map<String, dynamic>.from(row as Map);
       final serverCode =
-          (row['preferred_language']?.toString().trim().toLowerCase() ?? '');
+          (m['preferred_language']?.toString().trim().toLowerCase() ?? '');
       devLog(
           'AccountManager: preferred_language verify requested=$code server=$serverCode');
 
@@ -2296,9 +2293,9 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _supabase.client
           .from('employees')
           .update({'preferred_language': code})
-          .or('id.eq.$authId,auth_user_id.eq.$authId')
+          .eq('id', rowId)
           .select('id')
-          .limit(1);
+          .maybeSingle();
     } catch (e, st) {
       devLog('AccountManager: savePreferredLanguage verify readback: $e $st');
     }
@@ -2343,17 +2340,10 @@ class AccountManagerSupabase extends ChangeNotifier {
         return false;
       }
 
-      Map<String, dynamic> picked;
-      if (rows.length == 1) {
-        picked = Map<String, dynamic>.from(rows.first as Map);
-      } else {
-        final preferred = rows
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .where((m) => m['id']?.toString() == authUserId)
-            .toList();
-        picked = preferred.isNotEmpty
-            ? preferred.first
-            : Map<String, dynamic>.from(rows.first as Map);
+      final Map<String, dynamic> picked = rows.length == 1
+          ? Map<String, dynamic>.from(rows.first as Map)
+          : pickEmployeeRowForAuthUid(rows, authUserId);
+      if (rows.length > 1) {
         devLog(
           '🔐 AccountManager: ${rows.length} employee rows for auth user — '
           'using id=${picked['id']}',
