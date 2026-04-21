@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show AuthException, PostgrestException;
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
@@ -2285,6 +2286,14 @@ class AccountManagerSupabase extends ChangeNotifier {
           'AccountManager: preferred_language verify requested=$code server=$serverCode');
 
       if (serverCode == code || serverCode.isEmpty) {
+        // Сервер подтвердил язык — снимаем «pin» локали, чтобы web/incognito и другие
+        // устройства брали язык только из БД (одинаково везде).
+        if (serverCode == code && code.isNotEmpty) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove(LocalizationService.prefsKeyLocaleUserSet);
+          } catch (_) {}
+        }
         return;
       }
 
@@ -2296,6 +2305,23 @@ class AccountManagerSupabase extends ChangeNotifier {
           .eq('id', rowId)
           .select('id')
           .maybeSingle();
+      try {
+        final row2 = await _supabase.client
+            .from('employees')
+            .select('preferred_language')
+            .eq('id', rowId)
+            .maybeSingle();
+        if (row2 != null) {
+          final s2 = (row2['preferred_language']?.toString().trim().toLowerCase() ??
+              '');
+          if (s2 == code) {
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove(LocalizationService.prefsKeyLocaleUserSet);
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
     } catch (e, st) {
       devLog('AccountManager: savePreferredLanguage verify readback: $e $st');
     }
