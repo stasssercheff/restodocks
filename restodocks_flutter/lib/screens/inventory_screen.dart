@@ -280,6 +280,17 @@ Map<String, dynamic>? _pickNewerInventoryDraft(
   return serverAt.isAfter(localAt) ? server : local;
 }
 
+Map<String, dynamic>? _forceInventoryDraftMode(
+  Map<String, dynamic>? draft, {
+  required bool selective,
+}) {
+  if (draft == null) return null;
+  final out = Map<String, dynamic>.from(draft);
+  out['inventoryMode'] = selective ? 'selective' : 'standard';
+  out['isSelective'] = selective;
+  return out;
+}
+
 enum _InventorySort { alphabetAsc, alphabetDesc, lastAdded }
 
 /// Фильтр по типу строк: все, только продукты, только ПФ.
@@ -696,7 +707,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       // iiko нет — тихо восстанавливаем один из черновиков (если есть)
       if (hasStdDraft) {
         _stateRestored = false;
-        await restoreState(stdDraftToRestore);
+        await restoreState(
+          _forceInventoryDraftMode(stdDraftToRestore, selective: false) ??
+              stdDraftToRestore!,
+        );
         return;
       }
 
@@ -713,7 +727,10 @@ class _InventoryScreenState extends State<InventoryScreen>
 
       if (hasSelectiveDraft && allowSelectiveInventory) {
         _stateRestored = false;
-        await restoreState(selectiveDraftToRestore);
+        await restoreState(
+          _forceInventoryDraftMode(selectiveDraftToRestore, selective: true) ??
+              selectiveDraftToRestore!,
+        );
         return;
       }
 
@@ -1006,9 +1023,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
         if (preferredStdDraft != null) {
           // Явный выбор "Стандартная" должен оставаться стандартной даже для старых/битых снимков.
-          preferredStdDraft = Map<String, dynamic>.from(preferredStdDraft);
-          preferredStdDraft['inventoryMode'] = 'standard';
-          preferredStdDraft['isSelective'] = false;
+          preferredStdDraft =
+              _forceInventoryDraftMode(preferredStdDraft, selective: false)!;
           _stateRestored = false;
           await restoreState(preferredStdDraft);
           if (!mounted) return;
@@ -1042,9 +1058,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
         if (preferredSelectiveDraft != null) {
           preferredSelectiveDraft =
-              Map<String, dynamic>.from(preferredSelectiveDraft);
-          preferredSelectiveDraft['inventoryMode'] = 'selective';
-          preferredSelectiveDraft['isSelective'] = true;
+              _forceInventoryDraftMode(preferredSelectiveDraft, selective: true)!;
           _stateRestored = false;
           await restoreState(preferredSelectiveDraft);
           return;
