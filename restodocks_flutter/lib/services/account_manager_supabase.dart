@@ -2268,6 +2268,40 @@ class AccountManagerSupabase extends ChangeNotifier {
         devLog('AccountManager: savePreferredLanguage fallback UPDATE: $e2 $st2');
       }
     }
+
+    // Пост-проверка: сразу читаем фактическое preferred_language с сервера,
+    // чтобы в web/incognito не терять выбор при закрытии вкладки.
+    try {
+      final authId = _supabase.currentUser?.id;
+      if (authId == null) return;
+      final rows = await _supabase.client
+          .from('employees')
+          .select('preferred_language')
+          .or('id.eq.$authId,auth_user_id.eq.$authId')
+          .limit(1);
+      final list = rows is List ? rows : <dynamic>[];
+      if (list.isEmpty) return;
+      final row = Map<String, dynamic>.from(list.first as Map);
+      final serverCode =
+          (row['preferred_language']?.toString().trim().toLowerCase() ?? '');
+      devLog(
+          'AccountManager: preferred_language verify requested=$code server=$serverCode');
+
+      if (serverCode == code || serverCode.isEmpty) {
+        return;
+      }
+
+      devLog(
+          'AccountManager: preferred_language mismatch, retrying direct UPDATE to $code');
+      await _supabase.client
+          .from('employees')
+          .update({'preferred_language': code})
+          .or('id.eq.$authId,auth_user_id.eq.$authId')
+          .select('id')
+          .limit(1);
+    } catch (e, st) {
+      devLog('AccountManager: savePreferredLanguage verify readback: $e $st');
+    }
   }
 
   /// Загрузка employee и establishment по Supabase Auth (auth_user_id = auth.uid())
