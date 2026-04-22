@@ -1639,6 +1639,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           store.getNomenclatureProducts(est.dataEstablishmentId);
       final allProducts = store.allProducts;
 
+      // Индекс для быстрого exact-match по нормализованным именам.
+      // Это убирает квадратичную сложность при импорте больших списков.
+      final normalizedNameToProduct = <String, Product>{};
+      for (final p in existingProducts) {
+        final pNames = [p.name, ...(p.names?.values ?? [])];
+        for (final n in pNames) {
+          final key = _normalizeForMatch(n);
+          if (key.isEmpty) continue;
+          normalizedNameToProduct.putIfAbsent(key, () => p);
+        }
+      }
+
       if (!loadedFromServer && mounted) {
         final fallbackMsg = loc.currentLanguageCode == 'ru'
             ? 'Сеть нестабильна: продолжаем импорт по локальному кэшу.'
@@ -1668,8 +1680,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (mounted && (i == 0 || i % 12 == 0 || i == parsed.length - 1)) {
           setState(() => _loadingProgress = i + 1);
         }
-        final match = await _findMatch(p.name, p.price, existingProducts,
-            allProducts, est.dataEstablishmentId, store);
+        final match = _findMatchFromLookup(
+          name: p.name,
+          price: p.price,
+          normalizedNameToProduct: normalizedNameToProduct,
+          establishmentId: est.dataEstablishmentId,
+          store: store,
+        );
         if (match.existingId != null) {
           moderationItems.add(ModerationItem(
             name: p.name,
@@ -1739,44 +1756,37 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         .trim();
   }
 
-  Future<
-      ({
-        String? existingId,
-        String? existingName,
-        double? existingPrice,
-        bool existingPriceFromEstablishment,
-        bool priceDiff
-      })> _findMatch(
-    String name,
-    double? price,
-    List<Product> nomenclature,
-    List<Product> allProducts,
-    String establishmentId,
-    ProductStoreSupabase store,
-  ) async {
+  ({
+    String? existingId,
+    String? existingName,
+    double? existingPrice,
+    bool existingPriceFromEstablishment,
+    bool priceDiff
+  }) _findMatchFromLookup({
+    required String name,
+    required double? price,
+    required Map<String, Product> normalizedNameToProduct,
+    required String establishmentId,
+    required ProductStoreSupabase store,
+  }) {
     final normalized = _normalizeForMatch(name);
-    for (final p in nomenclature) {
-      final pNames = [p.name, ...(p.names?.values ?? [])];
-      for (final n in pNames) {
-        final nNorm = _normalizeForMatch(n);
-        if (nNorm == normalized) {
-          // Цена только из establishment_products (номенклатура заведения)
-          final ep = store.getEstablishmentPrice(p.id, establishmentId);
-          final existingPrice = ep?.$1;
-          final fromEstablishment = existingPrice != null;
+    final p = normalizedNameToProduct[normalized];
+    if (p != null) {
+      // Цена только из establishment_products (номенклатура заведения)
+      final ep = store.getEstablishmentPrice(p.id, establishmentId);
+      final existingPrice = ep?.$1;
+      final fromEstablishment = existingPrice != null;
 
-          final priceDiff = price != null &&
-              existingPrice != null &&
-              (existingPrice - price).abs() > 0.01;
-          return (
-            existingId: p.id,
-            existingName: p.name,
-            existingPrice: existingPrice,
-            existingPriceFromEstablishment: fromEstablishment,
-            priceDiff: priceDiff
-          );
-        }
-      }
+      final priceDiff = price != null &&
+          existingPrice != null &&
+          (existingPrice - price).abs() > 0.01;
+      return (
+        existingId: p.id,
+        existingName: p.name,
+        existingPrice: existingPrice,
+        existingPriceFromEstablishment: fromEstablishment,
+        priceDiff: priceDiff
+      );
     }
     return (
       existingId: null,
