@@ -82,6 +82,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   bool _supportSessionActive = false;
   bool _supportAccessTablesUnavailable = false;
   bool _checkEstablishmentAccessRpcUnavailable = false;
+  bool _trialUsageTableUnavailable = false;
 
   bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
     final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
@@ -672,6 +673,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String kind,
     int delta = 1,
   }) async {
+    if (_trialUsageTableUnavailable) {
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
+      return;
+    }
     try {
       await _supabase.client.rpc(
         'trial_increment_usage',
@@ -686,6 +693,12 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
     } on PostgrestException catch (e) {
       // На старой/частично мигрированной БД не блокируем экспорт/импорт из-за счётчиков триала.
+      final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+      if (e.code == '42P01' ||
+          msg.contains('establishment_trial_usage') ||
+          msg.contains('trial_increment_usage')) {
+        _trialUsageTableUnavailable = true;
+      }
       devLog(
         'trial_increment_usage: PostgREST error code=${e.code} '
         'message=${e.message}; skip trial usage increment',
@@ -699,6 +712,9 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
   Future<int> fetchTrialTtkImportCardsUsed(String establishmentId) async {
+    if (_trialUsageTableUnavailable) {
+      return _getLocalTrialTtkImportCards(establishmentId);
+    }
     try {
       final row = await _supabase.client
           .from('establishment_trial_usage')
@@ -715,6 +731,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     } on PostgrestException catch (e) {
       // Совместимость со старыми/частично мигрированными БД:
       // отсутствие таблицы trial usage не должно ломать сохранение ТТК.
+      final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+      if (e.code == '42P01' || msg.contains('establishment_trial_usage')) {
+        _trialUsageTableUnavailable = true;
+      }
       devLog(
         'fetchTrialTtkImportCardsUsed: PostgREST error code=${e.code} '
         'message=${e.message}; fallback to 0',

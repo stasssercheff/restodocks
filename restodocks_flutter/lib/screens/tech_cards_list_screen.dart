@@ -3700,9 +3700,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 mutable[key] = cnt - 1;
               }
             }
-            list = filtered;
-          } else if (selectedTrialCandidates.isNotEmpty) {
-            list = const [];
+            if (filtered.isNotEmpty) {
+              list = filtered;
+            } else {
+              // Если имена после AI-парсинга не совпали с локальным предсписком,
+              // не блокируем импорт полностью: берём первые N выбранных из файла.
+              final selectedTotal =
+                  selectedByName.values.fold<int>(0, (a, b) => a + b);
+              if (selectedTotal > 0 && list.isNotEmpty) {
+                list = list.take(selectedTotal).toList();
+              }
+            }
           }
         }
         if (list.length > remainingSlots) {
