@@ -545,7 +545,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = acc.establishment;
     if (est == null) return 0;
     final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-    return (10 - used).clamp(0, 10);
+    // Migration safeguard: for legacy sessions without a proper trial counter,
+    // treat an already large TTK list as exhausted trial import quota.
+    final inferredUsed = used <= 0 && _list.length >= 10 ? 10 : used;
+    return (10 - inferredUsed).clamp(0, 10);
   }
 
   Future<void> _showTrialImportCapDialog(LocalizationService loc) async {
