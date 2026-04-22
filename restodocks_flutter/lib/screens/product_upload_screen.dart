@@ -1582,8 +1582,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final store = context.read<ProductStoreSupabase>();
       var loadedFromServer = true;
       try {
-        await store.loadProducts(force: true);
-        await store.loadNomenclature(est.dataEstablishmentId);
+        // Web: не форсируем сеть в критичном импорте (может зависнуть на нестабильном соединении/CORS).
+        // Берём кэш и мягко пытаемся обновиться в пределах таймаута.
+        await store
+            .loadProducts(force: !kIsWeb)
+            .timeout(const Duration(seconds: 12));
+        await store
+            .loadNomenclature(est.dataEstablishmentId)
+            .timeout(const Duration(seconds: 12));
       } catch (e) {
         loadedFromServer = false;
         _addDebugLog(
