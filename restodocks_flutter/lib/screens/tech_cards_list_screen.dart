@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
@@ -337,6 +338,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   int? _tabIndexFromUrl;
   bool _tabIndexResolvedFromUrl = false;
   int? _aiTtkRemainingQuota;
+  int? _trialTtkImportRemainingQuota;
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
   bool _ttkInitialBootstrapDone = false;
@@ -466,6 +468,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       _tryReconcileTechCards(force: false);
     });
     unawaited(_refreshAiTtkRemainingQuota());
+    unawaited(_refreshTrialImportRemainingQuota());
     _tryReconcileTechCards(force: false);
   }
 
@@ -590,6 +593,67 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return _trialImportRemaining();
   }
 
+  Future<void> _refreshTrialImportRemainingQuota() async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!_shouldApplyUnpaidImportCap(acc)) {
+      if (mounted && _trialTtkImportRemainingQuota != null) {
+        setState(() => _trialTtkImportRemainingQuota = null);
+      }
+      return;
+    }
+    final remaining = await _trialImportRemaining();
+    if (mounted) {
+      setState(() => _trialTtkImportRemainingQuota = remaining ?? 0);
+    }
+  }
+
+  String _localAiTtkUsageKey({
+    required String establishmentId,
+    required String periodType,
+    required String periodKey,
+  }) {
+    return 'ai_ttk_usage_${establishmentId.trim().toLowerCase()}_${periodType.trim().toLowerCase()}_${periodKey.trim().toLowerCase()}';
+  }
+
+  Future<int> _getLocalAiTtkUsage({
+    required String establishmentId,
+    required String periodType,
+    required String periodKey,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(
+            _localAiTtkUsageKey(
+              establishmentId: establishmentId,
+              periodType: periodType,
+              periodKey: periodKey,
+            ),
+          ) ??
+          0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> _incrementLocalAiTtkUsage({
+    required String establishmentId,
+    required String periodType,
+    required String periodKey,
+    required int delta,
+  }) async {
+    if (delta <= 0) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _localAiTtkUsageKey(
+        establishmentId: establishmentId,
+        periodType: periodType,
+        periodKey: periodKey,
+      );
+      final current = prefs.getInt(key) ?? 0;
+      await prefs.setInt(key, current + delta);
+    } catch (_) {}
+  }
+
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -609,11 +673,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           .eq('period_type', quotaWindow.periodType)
           .eq('period_key', quotaWindow.periodKey)
           .maybeSingle();
-      final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
+      final serverUsed = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
+      final localUsed = await _getLocalAiTtkUsage(
+        establishmentId: establishmentId,
+        periodType: quotaWindow.periodType,
+        periodKey: quotaWindow.periodKey,
+      );
+      final used = serverUsed >= localUsed ? serverUsed : localUsed;
       final remaining = (quotaWindow.limit - used).clamp(0, quotaWindow.limit);
       if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
     } catch (_) {
-      if (mounted) setState(() => _aiTtkRemainingQuota = null);
+      final localUsed = await _getLocalAiTtkUsage(
+        establishmentId: establishmentId,
+        periodType: quotaWindow.periodType,
+        periodKey: quotaWindow.periodKey,
+      );
+      final remaining =
+          (quotaWindow.limit - localUsed).clamp(0, quotaWindow.limit);
+      if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
     }
   }
 
@@ -631,6 +708,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         text,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildTrialImportQuotaBadge() {
+    final text = (_trialTtkImportRemainingQuota ?? 10).toString();
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondary,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSecondary,
               fontWeight: FontWeight.w700,
             ),
       ),
@@ -674,6 +771,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     // Список не прячем — RefreshIndicator крутится; сеть идёт страницами.
     await _load(showLoading: false);
+    unawaited(_refreshTrialImportRemainingQuota());
+    unawaited(_refreshAiTtkRemainingQuota());
   }
 
   @override
@@ -3497,6 +3596,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             kind: 'ttk_import_cards',
             delta: allCards.length,
           );
+          final next = ((trialRemaining ?? 10) - allCards.length).clamp(0, 10);
+          if (mounted) {
+            setState(() => _trialTtkImportRemainingQuota = next);
+          }
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -3564,6 +3667,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
+      unawaited(_refreshTrialImportRemainingQuota());
     }
   }
 
@@ -3795,9 +3899,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         );
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
+          final quotaWindow = _aiTtkQuotaWindow(acc);
+          if (establishmentId != null && establishmentId.isNotEmpty) {
+            await _incrementLocalAiTtkUsage(
+              establishmentId: establishmentId,
+              periodType: quotaWindow.periodType,
+              periodKey: quotaWindow.periodKey,
+              delta: createdCards.length,
+            );
+          }
           if (_aiTtkRemainingQuota != null) {
             final next = (_aiTtkRemainingQuota! - createdCards.length)
-                .clamp(0, _aiTtkQuotaWindow(acc).limit);
+                .clamp(0, quotaWindow.limit);
             if (mounted) setState(() => _aiTtkRemainingQuota = next);
             if (next == 0) {
               await _showAiCreateLimitDialog(loc);
@@ -3862,6 +3975,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             kind: 'ttk_import_cards',
             delta: list.length,
           );
+          final next = (trialRemaining - list.length).clamp(0, 10);
+          if (mounted) {
+            setState(() => _trialTtkImportRemainingQuota = next);
+          }
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -3942,6 +4059,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           _loadingTtkIsAiPrompt = false;
         });
       }
+      unawaited(_refreshTrialImportRemainingQuota());
       if (allowPromptFallback) {
         unawaited(_refreshAiTtkRemainingQuota());
       }
@@ -4028,6 +4146,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             kind: 'ttk_import_cards',
             delta: list.length,
           );
+          final next = (trialRemaining - list.length).clamp(0, 10);
+          if (mounted) {
+            setState(() => _trialTtkImportRemainingQuota = next);
+          }
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -4389,6 +4511,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final ctrl = _ttkTourController;
     final account = context.read<AccountManagerSupabase>();
     final canCreateAi = _canCreateTtkWithAi(account);
+    final showTrialImportQuotaBadge =
+        _shouldApplyUnpaidImportCap(account) && hasProSubscription;
     Widget wrap(String id, Widget w) =>
         ctrl != null ? SpotlightTarget(id: id, controller: ctrl, child: w) : w;
 
@@ -4475,25 +4599,49 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               if (importAllowed)
                 PopupMenuItem(
                   value: 'import_excel',
-                  child: Text(
-                    loc.t('ttk_import_file'),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          loc.t('ttk_import_file'),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                         ),
+                      ),
+                      if (showTrialImportQuotaBadge) ...[
+                        const SizedBox(width: 10),
+                        _buildTrialImportQuotaBadge(),
+                      ],
+                    ],
                   ),
                 ),
               if (importAllowed)
                 PopupMenuItem(
                     value: 'import_text',
-                    child: Text(
-                      loc.t('ttk_import_paste_text').trim().isEmpty
-                          ? 'Вставить текст'
-                          : loc.t('ttk_import_paste_text'),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w500,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            loc.t('ttk_import_paste_text').trim().isEmpty
+                                ? 'Вставить текст'
+                                : loc.t('ttk_import_paste_text'),
+                            style:
+                                Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.onSurface,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                           ),
+                        ),
+                        if (showTrialImportQuotaBadge) ...[
+                          const SizedBox(width: 10),
+                          _buildTrialImportQuotaBadge(),
+                        ],
+                      ],
                     )),
             ],
           )
