@@ -3852,7 +3852,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         }
         return;
       }
-      final aiRemaining = _aiTtkRemainingQuota;
+      final aiRemaining = _aiTtkRemainingQuota!;
       if (aiRemaining <= 0) {
         await _showAiCreateLimitDialog(loc);
         return;
