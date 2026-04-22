@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/cyrillic_transliteration.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -96,7 +97,7 @@ class LocalizationService extends ChangeNotifier {
   static bool isSupportedLanguageCode(String code) =>
       supportedLocales.any((l) => l.languageCode == code);
 
-  Locale _currentLocale = const Locale('ru', 'RU');
+  Locale _currentLocale = _defaultStartupLocale();
   Map<String, Map<String, String>> _translations = {};
   TranslationManager? _translationManager;
   final Map<String, Map<String, String>> _autoUiTranslations = {};
@@ -127,6 +128,16 @@ class LocalizationService extends ChangeNotifier {
   static Future<void> initialize() async {
     await _instance._loadTranslations();
     await _instance._loadSavedLocale();
+  }
+
+  static Locale _defaultStartupLocale() {
+    if (kIsWeb) {
+      final host = Uri.base.host.toLowerCase();
+      if (host == 'restodocks.ru' || host == 'www.restodocks.ru') {
+        return const Locale('ru', 'RU');
+      }
+    }
+    return const Locale('en', 'US');
   }
 
   /// Загрузка переводов
@@ -206,7 +217,10 @@ class LocalizationService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final code = prefs.getString(prefsKeyLocale);
-      if (code == null) return;
+      if (code == null) {
+        _currentLocale = _defaultStartupLocale();
+        return;
+      }
       for (final l in supportedLocales) {
         if (l.languageCode == code) {
           _currentLocale = l;
