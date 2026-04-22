@@ -755,28 +755,14 @@ class _TechCardsImportReviewScreenState
     }
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    final trialOnly = acc.isTrialOnlyWithoutPaid;
 
     if (!acc.hasProSubscription) {
       if (mounted) await showSubscriptionRequiredDialog(context);
       return;
     }
 
-    if (trialOnly) {
-      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-      final toCreate = _items.where((i) => !i.alreadySaved).length;
-      if (used + toCreate > 10) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(loc.t('trial_ttk_import_cap')),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
-        return;
-      }
-    }
+    // Важно: лимит trial импорта ТТК учитывается на этапе импорта/парсинга до этого экрана.
+    // На этапе сохранения повторно НЕ блокируем, чтобы избежать двойного расхода/ложного отказа.
 
     setState(() => _saving = true);
     try {
