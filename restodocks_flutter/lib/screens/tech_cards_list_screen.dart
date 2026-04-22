@@ -587,14 +587,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       return 0;
     }
-    final remaining = await _trialImportRemaining();
-    if (remaining == null) return null;
-    if (remaining <= 0 && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_trialImportCapMessage(loc))),
-      );
-    }
-    return remaining;
+    return _trialImportRemaining();
   }
 
   Future<void> _refreshAiTtkRemainingQuota() async {
@@ -3096,7 +3089,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final trialOnly = _shouldApplyUnpaidImportCap(acc);
     final trialRemaining =
         trialOnly ? (await _trialImportRemainingOrNotify(loc) ?? 0) : 0;
-    if (trialOnly && trialRemaining <= 0) return;
+    if (trialOnly && trialRemaining <= 0) {
+      await _showTrialImportCapDialog(loc);
+      return;
+    }
     _TtkImportMode dialogMode = _TtkImportMode.single;
     // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
     // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
