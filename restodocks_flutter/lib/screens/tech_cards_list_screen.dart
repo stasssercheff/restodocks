@@ -472,6 +472,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _canCreateTtkWithAi(AccountManagerSupabase account) =>
       account.subscriptionEntitlements.hasProLevelOrTrial;
 
+  bool _shouldApplyUnpaidImportCap(AccountManagerSupabase account) =>
+      account.hasProSubscription && !account.hasPaidProSubscription;
+
   ({int limit, String periodType, String periodKey}) _aiTtkQuotaWindow(
     AccountManagerSupabase account,
   ) {
@@ -537,7 +540,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<int?> _trialImportRemainingOrNotify(LocalizationService loc) async {
     final acc = context.read<AccountManagerSupabase>();
-    if (!acc.isTrialOnlyWithoutPaid) return null;
+    if (!_shouldApplyUnpaidImportCap(acc)) return null;
     final est = acc.establishment;
     if (est == null) {
       if (mounted) {
@@ -3055,7 +3058,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       await showSubscriptionRequiredDialog(context);
       return;
     }
-    final trialOnly = acc.isTrialOnlyWithoutPaid;
+    final trialOnly = _shouldApplyUnpaidImportCap(acc);
     final trialRemaining =
         trialOnly ? (await _trialImportRemainingOrNotify(loc) ?? 0) : 0;
     if (trialOnly && trialRemaining <= 0) return;

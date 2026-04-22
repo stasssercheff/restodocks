@@ -3133,7 +3133,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
-        if (isImportedTtkSave && acc.isTrialOnlyWithoutPaid) {
+        if (isImportedTtkSave &&
+            acc.hasProSubscription &&
+            !acc.hasPaidProSubscription) {
           final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
           if (used >= 10) {
             if (mounted) {
@@ -3218,7 +3220,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
-        if (isImportedTtkSave && acc.isTrialOnlyWithoutPaid) {
+        if (isImportedTtkSave &&
+            acc.hasProSubscription &&
+            !acc.hasPaidProSubscription) {
           try {
             await acc.trialIncrementUsageOrThrow(
               establishmentId: est.id,
