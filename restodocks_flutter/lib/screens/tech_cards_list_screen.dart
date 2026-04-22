@@ -529,20 +529,49 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   String _trialImportPreLimitNotice(LocalizationService loc, int remaining) {
     final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
-    return _localizedOrFallback(
+    final message = _localizedOrFallback(
       loc,
       'trial_ttk_import_pre_limit_notice',
       isRu
           ? 'Пробный период: импорт и парсинг ограничен 10 ТТК на весь период. Осталось: $remaining.'
           : 'Trial period: import and parsing are limited to 10 tech cards total. Remaining: $remaining.',
     );
+    return message.replaceAll('%s', '$remaining');
+  }
+
+  Future<int?> _trialImportRemaining() async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!_shouldApplyUnpaidImportCap(acc)) return null;
+    final est = acc.establishment;
+    if (est == null) return 0;
+    final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
+    return (10 - used).clamp(0, 10);
+  }
+
+  Future<void> _showTrialImportCapDialog(LocalizationService loc) async {
+    if (!mounted) return;
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final title = isRu ? 'Лимит импорта исчерпан' : 'Import limit reached';
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(_trialImportCapMessage(loc)),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok') ?? 'OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<int?> _trialImportRemainingOrNotify(LocalizationService loc) async {
     final acc = context.read<AccountManagerSupabase>();
     if (!_shouldApplyUnpaidImportCap(acc)) return null;
-    final est = acc.establishment;
-    if (est == null) {
+    if (acc.establishment == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -552,8 +581,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       return 0;
     }
-    final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-    final remaining = (10 - used).clamp(0, 10);
+    final remaining = await _trialImportRemaining();
+    if (remaining == null) return null;
     if (remaining <= 0 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_trialImportCapMessage(loc))),
@@ -3149,6 +3178,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 ),
                 FilledButton(
                   onPressed: () async {
+                    final remainingNow = await _trialImportRemaining();
+                    if (remainingNow != null && remainingNow <= 0) {
+                      await _showTrialImportCapDialog(l);
+                      if (ctx.mounted) Navigator.of(ctx).pop(null);
+                      return;
+                    }
                     // Вызов pickFiles напрямую из tap — без pop до него — сохраняет user gesture (мобильные).
                     // На мобильных FileType.any избегает бага с allowedExtensions (каталоги не открываются).
                     final pickResult = kIsWeb
