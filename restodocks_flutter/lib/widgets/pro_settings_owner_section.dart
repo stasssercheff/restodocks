@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -870,6 +871,12 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
   bool _establishmentsExpanded = true;
   bool _employeesExpanded = true;
 
+  Future<void> _openLegalRoute(String route) async {
+    Navigator.pop(context);
+    if (!mounted) return;
+    context.push(route);
+  }
+
   ({int? count, bool establishments}) _parseAddonId(String productId) {
     final m = RegExp(r'^(\d+)_extra_(establishment|employee)_monthly$')
         .firstMatch(productId.trim());
@@ -1189,6 +1196,22 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               color: cs.onSurfaceVariant,
                               height: 1.35,
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 0,
+                            children: [
+                              TextButton(
+                                onPressed: () => _openLegalRoute('/legal/offer'),
+                                child: Text(loc.t('public_offer')),
+                              ),
+                              TextButton(
+                                onPressed: () => _openLegalRoute('/legal/privacy'),
+                                child: Text(loc.t('privacy_policy')),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                         ],

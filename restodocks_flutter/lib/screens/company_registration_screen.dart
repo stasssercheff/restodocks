@@ -9,7 +9,6 @@ import '../models/models.dart';
 import '../services/countries_cities_data.dart';
 import '../services/services.dart';
 import '../utils/dev_log.dart';
-import '../widgets/app_bar_home_button.dart';
 
 /// Регистрация компании: язык, название, страна/город (выпадающие с поиском), PIN автоген + копирование.
 /// [ownerFirst] — шаг после регистрации владельца (сессия auth); RPC register_first_establishment_*.
@@ -233,7 +232,16 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/login');
+            }
+          },
+        ),
         title: Text(loc.t('register_company')),
         actions: [
           // Кнопка очистки тестовых данных (только для разработки)

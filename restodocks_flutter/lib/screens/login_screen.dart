@@ -485,10 +485,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result == null) {
         if (mounted) {
           final am = context.read<AccountManagerSupabase>();
-          if (am.lastLoginError == 'needs_company_registration') {
-            context.go('/register-company-details?ownerFirst=1');
-            return;
-          }
           final detail = am.lastLoginError ?? '';
           final unconfirmed = _isUnconfirmedError(detail);
           final serviceDown = _isServiceUnavailableError(detail);
