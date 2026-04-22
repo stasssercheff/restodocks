@@ -1756,14 +1756,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         .trim();
   }
 
-  Future<
-      ({
-        String? existingId,
-        String? existingName,
-        double? existingPrice,
-        bool existingPriceFromEstablishment,
-        bool priceDiff
-      })> _findMatchFromLookup({
+  ({
+    String? existingId,
+    String? existingName,
+    double? existingPrice,
+    bool existingPriceFromEstablishment,
+    bool priceDiff
+  }) _findMatchFromLookup({
     required String name,
     required double? price,
     required Map<String, Product> normalizedNameToProduct,
