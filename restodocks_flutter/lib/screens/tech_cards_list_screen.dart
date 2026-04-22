@@ -535,6 +535,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
+  Future<int?> _trialImportRemainingOrNotify(LocalizationService loc) async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!acc.isTrialOnlyWithoutPaid) return null;
+    final est = acc.establishment;
+    if (est == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
+        );
+      }
+      return 0;
+    }
+    final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
+    final remaining = (10 - used).clamp(0, 10);
+    if (remaining <= 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_trialImportCapMessage(loc))),
+      );
+    }
+    return remaining;
+  }
+
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -3032,26 +3056,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     final trialOnly = acc.isTrialOnlyWithoutPaid;
-    var trialRemaining = 0;
-    if (trialOnly) {
-      final est = acc.establishment;
-      if (est == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
-        );
-        return;
-      }
-      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-      trialRemaining = (10 - used).clamp(0, 10);
-      if (trialRemaining <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_trialImportCapMessage(loc))),
-        );
-        return;
-      }
-    }
+    final trialRemaining =
+        trialOnly ? (await _trialImportRemainingOrNotify(loc) ?? 0) : 0;
+    if (trialOnly && trialRemaining <= 0) return;
     _TtkImportMode dialogMode = _TtkImportMode.single;
     // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
     // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
@@ -3479,6 +3486,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     bool allowPromptFallback = false,
   }) async {
     final acc = context.read<AccountManagerSupabase>();
+    int? trialRemaining;
     if (allowPromptFallback) {
       if (!_canCreateTtkWithAi(acc)) {
         await showSubscriptionRequiredDialog(context);
@@ -3487,6 +3495,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     } else if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
       return;
+    } else {
+      trialRemaining = await _trialImportRemainingOrNotify(loc);
+      if (trialRemaining != null && trialRemaining <= 0) return;
     }
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
     final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
@@ -3719,10 +3730,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         }
       }
 
-      final list = await aiService.parseTechCardsFromText(
+      var list = await aiService.parseTechCardsFromText(
         result,
         establishmentId: establishmentId,
       );
+      if (!allowPromptFallback &&
+          trialRemaining != null &&
+          list.length > trialRemaining) {
+        list = list.take(trialRemaining).toList();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_trialImportCapMessage(loc))),
+          );
+        }
+      }
       if (!mounted) return;
       if (list.isEmpty) {
         if (allowPromptFallback) {
@@ -3807,6 +3828,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       await showSubscriptionRequiredDialog(context);
       return;
     }
+    final trialRemaining = await _trialImportRemainingOrNotify(loc);
+    if (trialRemaining != null && trialRemaining <= 0) return;
     if (kIsWeb || !OnDeviceOcrService.isSupported) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3860,9 +3883,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         return;
       }
       final establishmentId = acc.establishment?.dataEstablishmentId;
-      final list = await context
+      var list = await context
           .read<AiService>()
           .parseTechCardsFromText(text, establishmentId: establishmentId);
+      if (trialRemaining != null && list.length > trialRemaining) {
+        list = list.take(trialRemaining).toList();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_trialImportCapMessage(loc))),
+          );
+        }
+      }
       if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
