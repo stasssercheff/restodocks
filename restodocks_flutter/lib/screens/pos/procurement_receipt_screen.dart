@@ -70,6 +70,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   bool _saving = false;
   /// Дата фактической приёмки (вне системы), опционально.
   DateTime? _externalReceiptDate;
+  String? _translatedForLang;
 
   String get _nomenclatureDepartment =>
       widget.department == 'bar' ? 'bar' : 'kitchen';
@@ -132,13 +133,67 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
       final payload = doc['payload'] as Map<String, dynamic>? ?? {};
       final header = payload['header'] as Map<String, dynamic>? ?? {};
       final items = payload['items'] as List<dynamic>? ?? [];
-      _supplierCtrl.text = (header['supplierName'] ?? '').toString();
+      final loc = context.read<LocalizationService>();
+      final ts = context.read<TranslationService>();
+      final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+      final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
+      final targetLang = loc.currentLanguageCode;
+      final rawSupplier = (header['supplierName'] ?? '').toString().trim();
+      if (rawSupplier.isNotEmpty && sourceLang != targetLang) {
+        try {
+          final translatedSupplier = await ts.translate(
+            entityType: TranslationEntityType.ui,
+            entityId: 'procurement_supplier_${doc['id'] ?? rawSupplier.hashCode}',
+            fieldName: 'supplier_name',
+            text: rawSupplier,
+            from: sourceLang,
+            to: targetLang,
+          );
+          _supplierCtrl.text = (translatedSupplier != null &&
+                  translatedSupplier.trim().isNotEmpty)
+              ? translatedSupplier.trim()
+              : rawSupplier;
+        } catch (_) {
+          _supplierCtrl.text = rawSupplier;
+        }
+      } else {
+        _supplierCtrl.text = rawSupplier;
+      }
+
+      final store = context.read<ProductStoreSupabase>();
+      if (store.allProducts.isEmpty) {
+        await store.loadProducts();
+      }
 
       final newLines = <_ReceiptLineEdit>[];
       for (final it in items) {
         if (it is! Map) continue;
         final pid = it['productId']?.toString();
-        final name = (it['productName'] ?? '').toString();
+        final rawName = (it['productName'] ?? '').toString().trim();
+        var name = rawName;
+        if (rawName.isNotEmpty && sourceLang != targetLang) {
+          if (pid != null && pid.isNotEmpty) {
+            final product = store.allProducts.where((p) => p.id == pid).firstOrNull;
+            if (product != null) {
+              name = product.getLocalizedName(targetLang);
+            }
+          }
+          if (name == rawName) {
+            try {
+              final translatedName = await ts.translate(
+                entityType: TranslationEntityType.product,
+                entityId: (pid != null && pid.isNotEmpty) ? pid : rawName,
+                fieldName: 'name',
+                text: rawName,
+                from: sourceLang,
+                to: targetLang,
+              );
+              if (translatedName != null && translatedName.trim().isNotEmpty) {
+                name = translatedName.trim();
+              }
+            } catch (_) {}
+          }
+        }
         final unit = (it['unit'] ?? 'kg').toString();
         final q = (it['quantity'] as num?)?.toDouble() ?? 0;
         final ref = (it['pricePerUnit'] as num?)?.toDouble() ?? 0;
@@ -159,6 +214,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
       setState(() {
         _orderDoc = doc;
         _lines = newLines;
+        _translatedForLang = targetLang;
         _loading = false;
       });
     } catch (e) {
@@ -168,6 +224,19 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           _error = e.toString();
         });
       }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (!widget.manualOffSystem &&
+        widget.orderDocumentId != null &&
+        _translatedForLang != null &&
+        _translatedForLang != lang &&
+        !_loading) {
+      _load();
     }
   }
 

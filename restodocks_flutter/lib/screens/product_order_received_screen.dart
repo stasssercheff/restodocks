@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../utils/employee_name_translation_utils.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
@@ -21,6 +22,10 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
   List<Map<String, dynamic>> _orders = [];
   bool _loading = true;
   String? _error;
+  final Map<String, String> _translatedEmployeeByDocId = {};
+  final Map<String, String> _translatedSupplierByDocId = {};
+  final Map<String, String> _translatedItemNames = {};
+  String? _translatedForLang;
 
   @override
   void initState() {
@@ -51,6 +56,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
           _orders = docs;
           _loading = false;
         });
+        _translateOrderData();
       }
     } catch (e) {
       if (mounted) {
@@ -60,6 +66,148 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
         });
       }
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_translatedForLang != lang && _orders.isNotEmpty) {
+      _translateOrderData();
+    }
+  }
+
+  Future<void> _translateOrderData() async {
+    if (!mounted || _orders.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final store = context.read<ProductStoreSupabase>();
+    final ts = context.read<TranslationService>();
+
+    if (store.allProducts.isEmpty) {
+      await store.loadProducts();
+    }
+
+    final employees = <String, String>{};
+    final suppliers = <String, String>{};
+    final items = <String, String>{};
+
+    for (final doc in _orders) {
+      final docId = doc['id']?.toString() ?? '';
+      if (docId.isEmpty) continue;
+      final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+      final header = payload['header'] as Map<String, dynamic>? ?? {};
+      final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+      final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
+
+      final employeeName = (header['employeeName'] ?? '').toString().trim();
+      if (employeeName.isNotEmpty && employeeName != '—') {
+        employees[docId] =
+            await translateAdHocPersonName(ts, employeeName, targetLang);
+      }
+
+      final supplierName = (header['supplierName'] ?? '').toString().trim();
+      if (supplierName.isNotEmpty && supplierName != '—') {
+        if (sourceLang == targetLang) {
+          suppliers[docId] = supplierName;
+        } else {
+          try {
+            final translated = await ts.translate(
+              entityType: TranslationEntityType.ui,
+              entityId: 'order_supplier_$docId',
+              fieldName: 'supplier_name',
+              text: supplierName,
+              from: sourceLang,
+              to: targetLang,
+            );
+            suppliers[docId] = (translated != null && translated.trim().isNotEmpty)
+                ? translated.trim()
+                : supplierName;
+          } catch (_) {
+            suppliers[docId] = supplierName;
+          }
+        }
+      }
+
+      final rows = payload['items'] as List<dynamic>? ??
+          payload['rows'] as List<dynamic>? ??
+          [];
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final row = Map<String, dynamic>.from(raw as Map);
+        final productId = (row['productId'] as String?)?.trim() ?? '';
+        final productName = (row['productName'] as String?)?.trim() ?? '';
+        if (productName.isEmpty) continue;
+        final itemKey = '$docId::${productId.isNotEmpty ? productId : productName}';
+        if (sourceLang == targetLang) {
+          items[itemKey] = productName;
+          continue;
+        }
+        if (productId.isNotEmpty) {
+          final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
+          if (product != null) {
+            final locName = product.getLocalizedName(targetLang);
+            if (locName.trim().isNotEmpty) {
+              items[itemKey] = locName;
+              continue;
+            }
+          }
+        }
+        try {
+          final translated = await ts.translate(
+            entityType: TranslationEntityType.product,
+            entityId: productId.isNotEmpty ? productId : productName,
+            fieldName: 'name',
+            text: productName,
+            from: sourceLang,
+            to: targetLang,
+          );
+          items[itemKey] = (translated != null && translated.trim().isNotEmpty)
+              ? translated.trim()
+              : productName;
+        } catch (_) {
+          items[itemKey] = productName;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _translatedForLang = targetLang;
+      _translatedEmployeeByDocId
+        ..clear()
+        ..addAll(employees);
+      _translatedSupplierByDocId
+        ..clear()
+        ..addAll(suppliers);
+      _translatedItemNames
+        ..clear()
+        ..addAll(items);
+    });
+  }
+
+  String _employeeNameForDoc(Map<String, dynamic> doc) {
+    final docId = doc['id']?.toString() ?? '';
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final fallback = (header['employeeName'] ?? '—').toString();
+    return _translatedEmployeeByDocId[docId] ?? fallback;
+  }
+
+  String _supplierNameForDoc(Map<String, dynamic> doc) {
+    final docId = doc['id']?.toString() ?? '';
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final fallback = (header['supplierName'] ?? '—').toString();
+    return _translatedSupplierByDocId[docId] ?? fallback;
+  }
+
+  String _itemNameForDocRow(Map<String, dynamic> doc, Map<String, dynamic> row) {
+    final docId = doc['id']?.toString() ?? '';
+    final productId = (row['productId'] as String?)?.trim() ?? '';
+    final productName = (row['productName'] as String?)?.trim() ?? '';
+    final key = '$docId::${productId.isNotEmpty ? productId : productName}';
+    return _translatedItemNames[key] ?? productName;
   }
 
   @override
@@ -144,6 +292,8 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
                 return _OrderCard(
                   order: order,
                   establishmentName: establishmentName,
+                  employeeName: _employeeNameForDoc(order),
+                  supplierName: _supplierNameForDoc(order),
                   loc: loc,
                   onTap: () => _showOrderDetails(context, order, loc),
                 );
@@ -160,9 +310,9 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['items'] as List<dynamic>? ?? payload['rows'] as List<dynamic>? ?? [];
     final createdAt = DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now();
-    final employeeName = header['employeeName'] ?? '—';
+    final employeeName = _employeeNameForDoc(doc);
     final establishmentName = header['establishmentName'] ?? '—';
-    final supplierName = header['supplierName'] ?? '—';
+    final supplierName = _supplierNameForDoc(doc);
 
     showModalBottomSheet<void>(
       context: context,
@@ -187,7 +337,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  child: _buildOrderTable(ctx, loc, rows),
+                  child: _buildOrderTable(ctx, loc, doc, rows),
                 ),
               ),
               const SizedBox(height: 8),
@@ -216,7 +366,8 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     );
   }
 
-  Widget _buildOrderTable(BuildContext context, LocalizationService loc, List<dynamic> rows) {
+  Widget _buildOrderTable(
+      BuildContext context, LocalizationService loc, Map<String, dynamic> doc, List<dynamic> rows) {
     final theme = Theme.of(context);
     final hasPrices = rows.isNotEmpty && (rows.first as Map<String, dynamic>).containsKey('pricePerUnit');
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
@@ -240,7 +391,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
             final m = r as Map<String, dynamic>;
             return TableRow(
               children: [
-                _tableCell(theme, (m['productName'] ?? '').toString()),
+                _tableCell(theme, _itemNameForDocRow(doc, m)),
                 _tableCell(theme, (m['unit'] ?? '').toString()),
                 _tableCell(theme, _fmtNum(m['quantity'])),
                 _tableCell(theme, _fmtSum(m['pricePerUnit'], currency)),
@@ -267,7 +418,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
           final m = r as Map<String, dynamic>;
           return TableRow(
             children: [
-              _tableCell(theme, (m['productName'] ?? '').toString()),
+              _tableCell(theme, _itemNameForDocRow(doc, m)),
               _tableCell(theme, (m['unit'] ?? '').toString()),
               _tableCell(theme, _fmtNum(m['quantity'])),
             ],
@@ -351,12 +502,16 @@ class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
     required this.establishmentName,
+    required this.employeeName,
+    required this.supplierName,
     required this.loc,
     required this.onTap,
   });
 
   final Map<String, dynamic> order;
   final String establishmentName;
+  final String employeeName;
+  final String supplierName;
   final LocalizationService loc;
   final VoidCallback onTap;
 
@@ -366,8 +521,7 @@ class _OrderCard extends StatelessWidget {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '') ?? DateTime.now();
     final dateStr = DateFormat('dd.MM.yyyy').format(createdAt);
-    final employeeName = header['employeeName'] ?? '—';
-    final supplier = header['supplierName'] ?? '—';
+    final supplier = supplierName;
     final estName = header['establishmentName'] ?? establishmentName;
 
     return Card(
