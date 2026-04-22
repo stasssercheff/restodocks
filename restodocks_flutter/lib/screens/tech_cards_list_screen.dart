@@ -1763,21 +1763,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     var saving = false;
 
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
+      barrierDismissible: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setStateDlg) {
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 12,
-                  right: 12,
-                  top: 12,
-                  bottom: 12 + MediaQuery.of(ctx2).viewInsets.bottom,
-                ),
-                child: Column(
+            final media = MediaQuery.of(ctx2);
+            final maxDialogWidth = media.size.width > 860 ? 820.0 : media.size.width - 24;
+            final maxDialogHeight = media.size.height * 0.78;
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+              child: SizedBox(
+                width: maxDialogWidth,
+                height: maxDialogHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    bottom: 12 + media.viewInsets.bottom,
+                  ),
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1804,7 +1811,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Flexible(
+                    Expanded(
                       child: ListView(
                         shrinkWrap: true,
                         children: [
@@ -2026,7 +2033,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -2113,7 +2120,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           ),
                       ],
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
