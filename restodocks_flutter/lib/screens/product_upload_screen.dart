@@ -1549,19 +1549,35 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             .toList();
       } else {
         if (rows != null && rows.isNotEmpty) {
-          parsed = await ai.parseProductList(
-            rows: rows,
-            source: source ?? 'строки',
-            userLocale: userLocale,
-            mode: mode,
-          );
+          try {
+            parsed = await ai
+                .parseProductList(
+                  rows: rows,
+                  source: source ?? 'строки',
+                  userLocale: userLocale,
+                  mode: mode,
+                )
+                .timeout(const Duration(seconds: 20));
+          } on TimeoutException {
+            _addDebugLog(
+                'WARN: ai.parseProductList timeout for rows input, switching to local parser');
+            parsed = [];
+          }
         } else if (text != null && text.trim().isNotEmpty) {
-          parsed = await ai.parseProductList(
-            text: text,
-            source: source ?? 'вставленный текст',
-            userLocale: userLocale,
-            mode: mode,
-          );
+          try {
+            parsed = await ai
+                .parseProductList(
+                  text: text,
+                  source: source ?? 'вставленный текст',
+                  userLocale: userLocale,
+                  mode: mode,
+                )
+                .timeout(const Duration(seconds: 20));
+          } on TimeoutException {
+            _addDebugLog(
+                'WARN: ai.parseProductList timeout for text input, switching to local parser');
+            parsed = [];
+          }
         }
 
         if (parsed.isEmpty) {
