@@ -501,6 +501,40 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return 'AI TTK limit: $remaining of $total left';
   }
 
+  String _localizedOrFallback(
+    LocalizationService loc,
+    String key,
+    String fallback,
+  ) {
+    final value = loc.t(key);
+    if (value == null) return fallback;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == key) return fallback;
+    return value;
+  }
+
+  String _trialImportCapMessage(LocalizationService loc) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    return _localizedOrFallback(
+      loc,
+      'trial_ttk_import_cap',
+      isRu
+          ? 'Лимит импорта ТТК в пробный период исчерпан (10 на весь период). Дальше можно создавать ТТК вручную или оформить подписку.'
+          : 'Trial TTK import limit is reached (10 total for the trial period). You can continue with manual creation or subscribe.',
+    );
+  }
+
+  String _trialImportPreLimitNotice(LocalizationService loc, int remaining) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    return _localizedOrFallback(
+      loc,
+      'trial_ttk_import_pre_limit_notice',
+      isRu
+          ? 'Пробный период: импорт и парсинг ограничен 10 ТТК на весь период. Осталось: $remaining.'
+          : 'Trial period: import and parsing are limited to 10 tech cards total. Remaining: $remaining.',
+    );
+  }
+
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -3013,7 +3047,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       trialRemaining = (10 - used).clamp(0, 10);
       if (trialRemaining <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('trial_ttk_import_cap'))),
+          SnackBar(content: Text(_trialImportCapMessage(loc))),
         );
         return;
       }
@@ -3090,9 +3124,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           ),
                         ),
                         child: Text(
-                          (l.t('trial_ttk_import_pre_limit_notice') ??
-                                  'Пробный период: импорт и парсинг ограничен 10 ТТК на весь период.')
-                              .replaceAll('%s', '$trialRemaining'),
+                          _trialImportPreLimitNotice(l, trialRemaining),
                           style: Theme.of(ctx).textTheme.bodySmall,
                         ),
                       ),
@@ -3179,8 +3211,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ? _maxCardsFromSingleFileImport
             : _maxCardsFromMultiFileImport);
     final cardLimitMessage = trialOnly
-        ? (loc.t('trial_ttk_import_cap') ??
-            'В пробной версии можно импортировать не более 10 ТТК.')
+        ? _trialImportCapMessage(loc)
         : (files.length <= 1
             ? (loc.t('ttk_import_max_cards_single_file') ??
                 'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
@@ -3649,6 +3680,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         );
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
+          await _refreshAiTtkRemainingQuota();
+          if (mounted && _aiTtkRemainingQuota != null && _aiTtkRemainingQuota == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_aiTtkLimitMessage('limit_3_per_day', loc))),
+            );
+          }
           if (createdCards.length == 1) {
             context.push(
               widget.department == 'bar'
