@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inbox_viewed_service.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/employee_name_translation_utils.dart';
 import '../services/inventory_download.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -28,6 +29,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   final Map<String, String> _localizedNames = {};
   // Переведённый комментарий (DeepL)
   String? _translatedComment;
+  String? _translatedEmployeeName;
+  String? _translatedSupplierName;
+  String? _translatedForLang;
 
   @override
   void initState() {
@@ -53,7 +57,67 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       context.read<InboxViewedService>().addViewed(estId, widget.documentId);
       _loadLocalizedNames(doc);
       _translateComment(doc);
+      _translateHeaderFields(doc);
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_doc != null && _translatedForLang != lang) {
+      _translateHeaderFields(_doc!);
+    }
+  }
+
+  Future<void> _translateHeaderFields(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final ts = context.read<TranslationService>();
+    final targetLang = loc.currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
+
+    final rawEmployee = (header['employeeName'] ?? '').toString().trim();
+    final rawSupplier = (header['supplierName'] ?? '').toString().trim();
+    String? employeeOut;
+    String? supplierOut;
+
+    if (rawEmployee.isNotEmpty && rawEmployee != '—') {
+      employeeOut = sourceLang == targetLang
+          ? rawEmployee
+          : await translateAdHocPersonName(ts, rawEmployee, targetLang);
+    }
+    if (rawSupplier.isNotEmpty && rawSupplier != '—') {
+      if (sourceLang == targetLang) {
+        supplierOut = rawSupplier;
+      } else {
+        try {
+          final translated = await ts.translate(
+            entityType: TranslationEntityType.ui,
+            entityId: 'order_supplier_${doc['id'] ?? rawSupplier.hashCode}',
+            fieldName: 'supplier_name',
+            text: rawSupplier,
+            from: sourceLang,
+            to: targetLang,
+          );
+          supplierOut = (translated != null && translated.trim().isNotEmpty)
+              ? translated.trim()
+              : rawSupplier;
+        } catch (_) {
+          supplierOut = rawSupplier;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _translatedForLang = targetLang;
+      _translatedEmployeeName = employeeOut;
+      _translatedSupplierName = supplierOut;
+    });
   }
 
   Future<void> _translateComment(Map<String, dynamic> doc) async {
@@ -538,14 +602,14 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _row(loc.t('inbox_header_employee') ?? 'Кто отправил',
-            header['employeeName'] ?? '—'),
+            _translatedEmployeeName ?? (header['employeeName'] ?? '—')),
         _row(
             loc.t('order_export_date_time') ?? 'Дата отправки',
             createdAt != null
                 ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt)
                 : '—'),
         _row(loc.t('order_export_to') ?? 'Поставщик',
-            header['supplierName'] ?? '—'),
+            _translatedSupplierName ?? (header['supplierName'] ?? '—')),
         _row(loc.t('order_export_from') ?? 'Заведение',
             header['establishmentName'] ?? '—'),
         _row(loc.t('order_export_order_for') ?? 'На дату',

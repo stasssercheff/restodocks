@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 
@@ -35,6 +36,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   String? _establishmentId;
   final TextEditingController _orderSearchController = TextEditingController();
   String _orderSearchQuery = '';
+  final Map<String, String> _translatedOrderNames = {};
+  final Map<String, String> _translatedSupplierNames = {};
+  String? _translatedForLang;
 
   /// Поставщики — шаблоны (нет savedAt)
   List<OrderList> get _suppliers =>
@@ -66,6 +70,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
           _allLists = list;
           _loading = false;
         });
+        _translateVisibleOrderTexts();
       }
     } catch (_) {
       if (mounted) {
@@ -88,6 +93,122 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     _orderSearchController.dispose();
     super.dispose();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_allLists.isNotEmpty && _translatedForLang != lang) {
+      _translateVisibleOrderTexts();
+    }
+  }
+
+  String _guessSourceLang(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return 'ru';
+    if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+    if (RegExp(r'[àáạảãâăèéẹẻẽêìíịỉĩòóọỏõôơùúụủũưỳýỵỷỹđ]')
+        .hasMatch(t.toLowerCase())) {
+      return 'vi';
+    }
+    return 'en';
+  }
+
+  Future<void> _translateVisibleOrderTexts() async {
+    if (!mounted || _allLists.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final ts = context.read<TranslationService>();
+    final targetLang = loc.currentLanguageCode;
+
+    final names = <String, String>{};
+    final suppliers = <String, String>{};
+    for (final order in _allLists.where((o) => o.isSavedWithQuantities)) {
+      final rawName = order.name.trim();
+      if (rawName.isNotEmpty && rawName != '—') {
+        final from = _guessSourceLang(rawName);
+        if (from == targetLang) {
+          names[order.id] = rawName;
+        } else {
+          try {
+            final translated = await ts.translate(
+              entityType: TranslationEntityType.ui,
+              entityId: 'order_list_name_${order.id}',
+              fieldName: 'name',
+              text: rawName,
+              from: from,
+              to: targetLang,
+            );
+            if (translated != null && translated.trim().isNotEmpty) {
+              names[order.id] = translated.trim();
+            } else {
+              names[order.id] = targetLang == 'ru'
+                  ? rawName
+                  : (RegExp(r'[\u0400-\u04FF]').hasMatch(rawName)
+                      ? cyrillicToLatin(rawName)
+                      : rawName);
+            }
+          } catch (_) {
+            names[order.id] = targetLang == 'ru'
+                ? rawName
+                : (RegExp(r'[\u0400-\u04FF]').hasMatch(rawName)
+                    ? cyrillicToLatin(rawName)
+                    : rawName);
+          }
+        }
+      }
+
+      final rawSupplier = order.supplierName.trim();
+      if (rawSupplier.isNotEmpty && rawSupplier != '—') {
+        final from = _guessSourceLang(rawSupplier);
+        if (from == targetLang) {
+          suppliers[order.id] = rawSupplier;
+        } else {
+          try {
+            final translated = await ts.translate(
+              entityType: TranslationEntityType.ui,
+              entityId: 'order_supplier_${order.id}',
+              fieldName: 'supplier_name',
+              text: rawSupplier,
+              from: from,
+              to: targetLang,
+            );
+            if (translated != null && translated.trim().isNotEmpty) {
+              suppliers[order.id] = translated.trim();
+            } else {
+              suppliers[order.id] = targetLang == 'ru'
+                  ? rawSupplier
+                  : (RegExp(r'[\u0400-\u04FF]').hasMatch(rawSupplier)
+                      ? cyrillicToLatin(rawSupplier)
+                      : rawSupplier);
+            }
+          } catch (_) {
+            suppliers[order.id] = targetLang == 'ru'
+                ? rawSupplier
+                : (RegExp(r'[\u0400-\u04FF]').hasMatch(rawSupplier)
+                    ? cyrillicToLatin(rawSupplier)
+                    : rawSupplier);
+          }
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _translatedForLang = targetLang;
+      _translatedOrderNames
+        ..clear()
+        ..addAll(names);
+      _translatedSupplierNames
+        ..clear()
+        ..addAll(suppliers);
+    });
+  }
+
+  String _displayOrderName(OrderList order) =>
+      _translatedOrderNames[order.id] ?? order.name;
+
+  String _displaySupplierName(OrderList order) =>
+      _translatedSupplierNames[order.id] ?? order.supplierName;
 
   List<OrderList> get _filteredOrders {
     if (_orderSearchQuery.isEmpty) return _savedOrders;
@@ -148,6 +269,8 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                           }
                           if (mounted) _load();
                         },
+                        displayOrderName: _displayOrderName,
+                        displaySupplierName: _displaySupplierName,
                         loc: loc,
                       );
     if (widget.embeddedInTab) {
@@ -194,6 +317,8 @@ class _OrderListsTab extends StatelessWidget {
     required this.loc,
     required this.searchController,
     required this.onSearchChanged,
+    required this.displayOrderName,
+    required this.displaySupplierName,
   });
 
   final List<OrderList> orders;
@@ -203,13 +328,16 @@ class _OrderListsTab extends StatelessWidget {
   final LocalizationService loc;
   final TextEditingController searchController;
   final void Function(String) onSearchChanged;
+  final String Function(OrderList) displayOrderName;
+  final String Function(OrderList) displaySupplierName;
 
   @override
   Widget build(BuildContext context) {
     // Group orders by supplierName, build flat list (header, item, item, header, item...)
     final supplierGroups = <String, List<OrderList>>{};
     for (final o in orders) {
-      final key = o.supplierName.trim().isEmpty ? '—' : o.supplierName;
+      final supplier = displaySupplierName(o);
+      final key = supplier.trim().isEmpty ? '—' : supplier;
       supplierGroups.putIfAbsent(key, () => []).add(o);
     }
     final supplierNames = supplierGroups.keys.toList()..sort((a, b) => a.compareTo(b));
@@ -298,14 +426,14 @@ class _OrderListsTab extends StatelessWidget {
                           child: Icon(Icons.check_circle,
                               color: Colors.amber.shade800),
                         ),
-                        title: Text(order.name,
+                        title: Text(displayOrderName(order),
                             style:
                                 const TextStyle(fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(order.supplierName,
+                            Text(displaySupplierName(order),
                                 overflow: TextOverflow.ellipsis),
                             if (dateStr != null)
                               Text(dateStr,

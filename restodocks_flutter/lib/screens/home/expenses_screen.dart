@@ -1259,7 +1259,11 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                 final header = payload['header'] as Map<String, dynamic>? ?? {};
                 final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '') ?? DateTime.now();
                 final dateStr = DateFormat('dd.MM.yyyy').format(createdAt);
-                final employeeName = header['employeeName'] ?? '—';
+                final rawEmployeeName = (header['employeeName'] ?? '—').toString();
+                final employeeName = loc.displayPersonNameForLanguage(
+                  rawEmployeeName,
+                  loc.currentLanguageCode,
+                );
                 final supplier = header['supplierName'] ?? '—';
                 final grandTotal = (payload['grandTotal'] as num?)?.toDouble();
                 final sumStr = grandTotal != null
