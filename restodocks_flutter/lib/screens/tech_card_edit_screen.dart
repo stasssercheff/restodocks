@@ -1052,7 +1052,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _ingredients
           ..clear()
           ..addAll(hydratedCurrent2.ingredients);
-        _applyChecklistViewTargetOutputIfNeeded();
         _ensurePlaceholderRowAtEnd();
       });
     } finally {
@@ -2151,7 +2150,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             _ingredients
               ..clear()
               ..addAll(_ensureOutputWeights(tc.ingredients));
-            _applyChecklistViewTargetOutputIfNeeded();
+            final targetFromChecklist = widget.initialViewTargetOutputGrams;
+            if (widget.forceViewMode &&
+                targetFromChecklist != null &&
+                targetFromChecklist > 0) {
+              final currentTotal = _ingredients
+                  .where((i) => i.productName.trim().isNotEmpty)
+                  .fold<double>(0, (s, i) => s + i.outputWeight);
+              if (currentTotal > 0) {
+                final factor = targetFromChecklist / currentTotal;
+                if ((factor - 1.0).abs() > 0.0001) {
+                  final scaled = _ingredients.map((i) => i.scaleBy(factor)).toList();
+                  _ingredients
+                    ..clear()
+                    ..addAll(scaled);
+                }
+              }
+              // Для переходов из чеклиста целевой выход — источник истины UI.
+              _portionWeight = targetFromChecklist;
+            }
             _ensurePlaceholderRowAtEnd();
           }
           _contentPhase =
@@ -2769,7 +2786,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _ingredients
           ..clear()
           ..addAll(hydratedTc.ingredients);
-        _applyChecklistViewTargetOutputIfNeeded();
         _ensurePlaceholderRowAtEnd();
       });
     } catch (_) {
@@ -4021,34 +4037,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       return i;
     }).toList();
-  }
-
-  /// После любой подмены состава: снова применить целевой выход из чеклиста (?view=1&targetOutputG=).
-  /// Иначе фоновая гидратация ПФ / reconcile перетирают уже отмасштабированные веса.
-  void _applyChecklistViewTargetOutputIfNeeded() {
-    final targetFromChecklist = widget.initialViewTargetOutputGrams;
-    if (!widget.forceViewMode ||
-        targetFromChecklist == null ||
-        targetFromChecklist <= 0) {
-      return;
-    }
-    final ensured = _ensureOutputWeights(_ingredients);
-    _ingredients
-      ..clear()
-      ..addAll(ensured);
-    final currentTotal = _ingredients
-        .where((i) => i.productName.trim().isNotEmpty)
-        .fold<double>(0, (s, i) => s + i.outputWeight);
-    if (currentTotal > 0) {
-      final factor = targetFromChecklist / currentTotal;
-      if ((factor - 1.0).abs() > 0.0001) {
-        final scaled = _ingredients.map((i) => i.scaleBy(factor)).toList();
-        _ingredients
-          ..clear()
-          ..addAll(scaled);
-      }
-    }
-    _portionWeight = targetFromChecklist;
   }
 
   /// Масштабировать все ингредиенты под целевой выход — в реальном времени без подтверждения.
