@@ -81,6 +81,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   /// Без процентов: сеть/ИИ без измеримого прогресса.
   bool _loadingIndeterminate = false;
   Timer? _loadingTimeoutTimer; // Таймер для предотвращения зависания загрузки
+  Timer? _loadingElapsedTimer;
+  int _loadingElapsedSec = 0;
 
   void _setLoadingMsg(String key, {Map<String, String>? args}) {
     if (!mounted) return;
@@ -91,15 +93,22 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   // Предотвращает зависание интерфейса в состоянии загрузки
   void _startLoadingTimeout() {
     _loadingTimeoutTimer?.cancel();
+    _loadingElapsedTimer?.cancel();
+    _loadingElapsedSec = 0;
+    _loadingElapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_isLoading) return;
+      setState(() => _loadingElapsedSec += 1);
+    });
     _loadingTimeoutTimer = Timer(const Duration(seconds: 90), () {
       if (mounted && _isLoading) {
-        _addDebugLog('Loading timeout reached, resetting loading state');
+        _addDebugLog('Loading timeout reached, keep waiting with explicit status');
+        final loc = context.read<LocalizationService>();
+        final longWaitMsg = loc.currentLanguageCode == 'ru'
+            ? 'Обработка занимает больше обычного, но продолжается. Пожалуйста, подождите...'
+            : 'Processing is taking longer than usual but is still running. Please wait...';
         setState(() {
-          _isLoading = false;
-          _loadingMessage = '';
+          _loadingMessage = longWaitMsg;
           _loadingIndeterminate = false;
-          _loadingProgress = 0;
-          _loadingTotal = 0;
         });
       }
     });
@@ -109,6 +118,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   void _cancelLoadingTimeout() {
     _loadingTimeoutTimer?.cancel();
     _loadingTimeoutTimer = null;
+    _loadingElapsedTimer?.cancel();
+    _loadingElapsedTimer = null;
+    _loadingElapsedSec = 0;
   }
 
   /// Исключаем из списка «изменённых» no_change и «обновление» с той же ценой (не показываем «старая → новая»).
@@ -471,6 +483,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                                 ?.copyWith(color: Colors.blue.shade700),
                           );
                         },
+                      ),
+                    ],
+                    if (_loadingElapsedSec > 0) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        loc.currentLanguageCode == 'ru'
+                            ? 'Время обработки: ${_loadingElapsedSec}s'
+                            : 'Processing time: ${_loadingElapsedSec}s',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.blue.shade700),
                       ),
                     ],
                   ],
