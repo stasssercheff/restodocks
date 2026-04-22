@@ -1093,28 +1093,7 @@ class _TechCardsImportReviewScreenState
       }
       if (abortAfterDuplicateAction) return;
 
-      if (created > 0 && trialOnly) {
-        try {
-          await acc.trialIncrementUsageOrThrow(
-            establishmentId: est.id,
-            kind: 'ttk_import_cards',
-            delta: created,
-          );
-        } catch (e) {
-          if (!mounted) return;
-          final es = e.toString();
-          if (es.contains('TRIAL_TTK_IMPORT_CAP')) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(loc.t('trial_ttk_import_cap')),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
-          } else {
-            rethrow;
-          }
-        }
-      }
+      // Лимит trial import учитывается на этапе парсинга/импорта до экрана проверки.
 
       // Обучение: обратный маппинг по скорректированным данным. Таймаут 10 с — при плохой сети не блокируем.
       final sig =

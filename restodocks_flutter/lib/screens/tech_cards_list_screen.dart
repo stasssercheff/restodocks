@@ -473,7 +473,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       account.subscriptionEntitlements.hasProLevelOrTrial;
 
   bool _shouldApplyUnpaidImportCap(AccountManagerSupabase account) =>
-      account.hasProSubscription && !account.hasPaidProSubscription;
+      account.isTrialOnlyWithoutPaid;
 
   ({int limit, String periodType, String periodKey}) _aiTtkQuotaWindow(
     AccountManagerSupabase account,
@@ -3457,6 +3457,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           return;
         }
       }
+      if (trialOnly && allCards.isNotEmpty) {
+        try {
+          await acc.trialIncrementUsageOrThrow(
+            establishmentId: est!.id,
+            kind: 'ttk_import_cards',
+            delta: allCards.length,
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_trialImportCapMessage(loc))),
+            );
+          }
+          return;
+        }
+      }
       if (!mounted) return;
       if (failedCount > 0 && allCards.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -3782,6 +3798,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           );
         }
       }
+      if (!allowPromptFallback && trialRemaining != null && list.isNotEmpty) {
+        try {
+          await acc.trialIncrementUsageOrThrow(
+            establishmentId: est!.id,
+            kind: 'ttk_import_cards',
+            delta: list.length,
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_trialImportCapMessage(loc))),
+            );
+          }
+          return;
+        }
+      }
       if (!mounted) return;
       if (list.isEmpty) {
         if (allowPromptFallback) {
@@ -3930,6 +3962,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(_trialImportCapMessage(loc))),
           );
+        }
+      }
+      if (trialRemaining != null && list.isNotEmpty) {
+        try {
+          await acc.trialIncrementUsageOrThrow(
+            establishmentId: acc.establishment!.id,
+            kind: 'ttk_import_cards',
+            delta: list.length,
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_trialImportCapMessage(loc))),
+            );
+          }
+          return;
         }
       }
       if (!mounted) return;

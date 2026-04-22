@@ -3127,26 +3127,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       techMap.putIfAbsent(c, () => '');
     }
     final svc = context.read<TechCardServiceSupabase>();
-    final isImportedTtkSave =
-        !widget.fromAiGeneration && _hasImportVerificationContext;
 
     final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
-        if (isImportedTtkSave &&
-            acc.hasProSubscription &&
-            !acc.hasPaidProSubscription) {
-          final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-          if (used >= 10) {
-            if (mounted) {
-              setState(() => _saving = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(loc.t('trial_ttk_import_cap'))),
-              );
-            }
-            return;
-          }
-        }
         final targetEstablishmentId =
             est.isBranch ? est.id : est.dataEstablishmentId;
         final duplicateName = await _buildDuplicateNameIfNeeded(
@@ -3220,17 +3204,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
-        if (isImportedTtkSave &&
-            acc.hasProSubscription &&
-            !acc.hasPaidProSubscription) {
-          try {
-            await acc.trialIncrementUsageOrThrow(
-              establishmentId: est.id,
-              kind: 'ttk_import_cards',
-              delta: 1,
-            );
-          } catch (_) {}
-        }
         unawaited(
           ProductCookingLossLearning.recordSamplesFromIngredients(
             establishmentId: targetEstablishmentId,
