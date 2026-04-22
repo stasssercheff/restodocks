@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -3235,6 +3236,144 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     'doc'
   ];
 
+  List<({int fileIndex, String fileName, String name})>
+      _collectTrialTtkCandidates(
+    List<PlatformFile> files,
+  ) {
+    final out = <({int fileIndex, String fileName, String name})>[];
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final ext = (file.extension ?? '').toLowerCase();
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) continue;
+      if (ext == 'xlsx' || ext == 'xls') {
+        final list = _parseSimpleExcelNames(Uint8List.fromList(bytes));
+        for (final c in list) {
+          final n = (c.dishName ?? '').trim();
+          if (n.isEmpty) continue;
+          out.add((fileIndex: i, fileName: file.name, name: n));
+        }
+      } else if (ext == 'csv') {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        final lines = text
+            .split(RegExp(r'\r?\n'))
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        for (final n in lines) {
+          out.add((fileIndex: i, fileName: file.name, name: n));
+        }
+      }
+    }
+    return out;
+  }
+
+  Future<Map<int, Map<String, int>>?> _pickTrialImportCandidates(
+    LocalizationService loc,
+    List<({int fileIndex, String fileName, String name})> candidates,
+    int maxSelected,
+  ) async {
+    if (candidates.isEmpty) return null;
+    final picked = <int>{};
+    for (var i = 0; i < candidates.length && picked.length < maxSelected; i++) {
+      picked.add(i);
+    }
+    return showDialog<Map<int, Map<String, int>>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            final selected = picked.length;
+            return AlertDialog(
+              title: Text(loc.t('ttk_import_file') ?? 'Импорт ТТК'),
+              content: SizedBox(
+                width: 560,
+                height: 420,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Выберите ТТК для парсинга (до $maxSelected). Парсинг начнется только после подтверждения.',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Выбрано: $selected / $maxSelected',
+                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: candidates.length,
+                        itemBuilder: (ctx, i) {
+                          final c = candidates[i];
+                          final checked = picked.contains(i);
+                          return CheckboxListTile(
+                            dense: true,
+                            value: checked,
+                            onChanged: (v) {
+                              setStateDialog(() {
+                                if (v == true) {
+                                  if (picked.length < maxSelected) {
+                                    picked.add(i);
+                                  }
+                                } else {
+                                  picked.remove(i);
+                                }
+                              });
+                            },
+                            title: Text(
+                              c.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              c.fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: EdgeInsets.zero,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                ),
+                FilledButton(
+                  onPressed: selected <= 0
+                      ? null
+                      : () {
+                          final byFile = <int, Map<String, int>>{};
+                          for (final idx in picked) {
+                            final c = candidates[idx];
+                            final key = _normalizeForTechCardName(c.name);
+                            if (key.isEmpty) continue;
+                            final perFile =
+                                byFile.putIfAbsent(c.fileIndex, () => {});
+                            perFile[key] = (perFile[key] ?? 0) + 1;
+                          }
+                          Navigator.of(ctx).pop(byFile);
+                        },
+                  child: Text(loc.t('ok') ?? 'OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _createFromExcel(
       BuildContext context, LocalizationService loc) async {
     final acc = context.read<AccountManagerSupabase>();
@@ -3420,6 +3559,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
             : (loc.t('ttk_import_max_cards_multi_files') ??
                 'Можно импортировать не более $_maxCardsFromMultiFileImport ТТК при загрузке из нескольких файлов.'));
+    Map<int, Map<String, int>>? selectedTrialCandidates;
+    if (trialOnly) {
+      final candidates = _collectTrialTtkCandidates(files);
+      if (candidates.isNotEmpty) {
+        selectedTrialCandidates =
+            await _pickTrialImportCandidates(loc, candidates, cardLimit);
+        if (!mounted) return;
+        if (selectedTrialCandidates == null ||
+            selectedTrialCandidates.values
+                .every((m) => m.values.fold<int>(0, (a, b) => a + b) <= 0)) {
+          return;
+        }
+      }
+    }
     setState(() {
       _loadingExcel = true;
       _loadingTtkIsPdf =
@@ -3450,7 +3603,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       var allCards = <TechCardRecognitionResult>[];
       int failedCount = 0;
       var hitCardLimit = false;
-      for (final file in files) {
+      for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        final file = files[fileIndex];
         final remainingSlots = cardLimit - allCards.length;
         if (remainingSlots <= 0) {
           hitCardLimit = true;
@@ -3531,6 +3685,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   .replaceFirst('%s', file.name)),
               duration: const Duration(seconds: 4),
             ));
+          }
+        }
+        if (trialOnly && selectedTrialCandidates != null) {
+          final selectedByName = selectedTrialCandidates[fileIndex];
+          if (selectedByName != null && selectedByName.isNotEmpty) {
+            final filtered = <TechCardRecognitionResult>[];
+            final mutable = Map<String, int>.from(selectedByName);
+            for (final card in list) {
+              final key = _normalizeForTechCardName(card.dishName ?? '');
+              final cnt = mutable[key] ?? 0;
+              if (cnt > 0) {
+                filtered.add(card);
+                mutable[key] = cnt - 1;
+              }
+            }
+            list = filtered;
+          } else if (selectedTrialCandidates.isNotEmpty) {
+            list = const [];
           }
         }
         if (list.length > remainingSlots) {
