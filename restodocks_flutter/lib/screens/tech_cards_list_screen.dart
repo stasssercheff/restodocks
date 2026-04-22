@@ -2978,6 +2978,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   static const _maxFilesSingleTtk = 10;
   static const _maxFilesMultiTtk = 10;
+  static const _maxCardsFromSingleFileImport = 100;
+  static const _maxCardsFromMultiFileImport = 10;
 
   static const _allowedTtkExtensions = [
     'xlsx',
@@ -3124,6 +3126,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       ));
       return;
     }
+    final cardLimit = files.length <= 1
+        ? _maxCardsFromSingleFileImport
+        : _maxCardsFromMultiFileImport;
+    final cardLimitMessage = files.length <= 1
+        ? (loc.t('ttk_import_max_cards_single_file') ??
+            'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
+        : (loc.t('ttk_import_max_cards_multi_files') ??
+            'Можно импортировать не более $_maxCardsFromMultiFileImport ТТК при загрузке из нескольких файлов.');
     setState(() {
       _loadingExcel = true;
       _loadingTtkIsPdf =
@@ -3230,6 +3240,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               duration: const Duration(seconds: 4),
             ));
           }
+        }
+        if (allCards.length + list.length > cardLimit) {
+          if (mounted) setState(() => _loadingExcel = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(cardLimitMessage),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
         }
         allCards.addAll(list);
       }

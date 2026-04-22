@@ -693,16 +693,29 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
   Future<int> fetchTrialTtkImportCardsUsed(String establishmentId) async {
-    final row = await _supabase.client
-        .from('establishment_trial_usage')
-        .select('ttk_import_cards')
-        .eq('establishment_id', establishmentId)
-        .maybeSingle();
-    if (row == null) return 0;
-    final v = row['ttk_import_cards'];
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return 0;
+    try {
+      final row = await _supabase.client
+          .from('establishment_trial_usage')
+          .select('ttk_import_cards')
+          .eq('establishment_id', establishmentId)
+          .maybeSingle();
+      if (row == null) return 0;
+      final v = row['ttk_import_cards'];
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return 0;
+    } on PostgrestException catch (e) {
+      // Совместимость со старыми/частично мигрированными БД:
+      // отсутствие таблицы trial usage не должно ломать сохранение ТТК.
+      devLog(
+        'fetchTrialTtkImportCardsUsed: PostgREST error code=${e.code} '
+        'message=${e.message}; fallback to 0',
+      );
+      return 0;
+    } catch (e) {
+      devLog('fetchTrialTtkImportCardsUsed: unexpected error: $e; fallback to 0');
+      return 0;
+    }
   }
 
   /// Лимит «сохранение на устройстве» в первые 72 ч: 3 на каждый вид документа.
