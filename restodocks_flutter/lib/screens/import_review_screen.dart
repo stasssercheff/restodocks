@@ -147,6 +147,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             .where((i) => i.approved && i.existingProductId == null)
             .toList()
         : _items.where((i) => i.approved).toList();
+    final skipNutritionEnrichment = toSave.length >= 40;
     setState(() {
       _saving = true;
       _saveTotal = toSave.length;
@@ -154,112 +155,122 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
     var created = 0;
     var updated = 0;
+    var failed = 0;
+    String? firstError;
 
     devLog(
         '💾 ImportReview: starting save, ${toSave.length} items, est=${est.id}');
     try {
       for (final item in toSave) {
         if (!mounted) return;
-
-        if (item.existingProductId != null) {
-          final newPrice = item.displayPrice ?? item.price;
-          final ep =
-              store.getEstablishmentPrice(item.existingProductId!, est.id);
-          final price = newPrice ?? ep?.$1;
-          final cur = item.currency ?? defCur;
-          // Связь продукт ↔ заведение — чтобы ТТК подтягивала цену
-          await store.addToNomenclature(
-            est.id,
-            item.existingProductId!,
-            price: price,
-            currency: cur,
-          );
-          if (item.linkAliasFromImportName) {
-            final key = normalizeProductAliasKey(item.name);
-            if (key.isNotEmpty) {
-              await store.saveProductAlias(
-                key,
-                item.existingProductId!,
-                establishmentId: est.dataEstablishmentId,
+        try {
+          if (item.existingProductId != null) {
+            final newPrice = item.displayPrice ?? item.price;
+            final ep =
+                store.getEstablishmentPrice(item.existingProductId!, est.id);
+            final price = newPrice ?? ep?.$1;
+            final cur = item.currency ?? defCur;
+            // Связь продукт ↔ заведение — чтобы ТТК подтягивала цену
+            await store.addToNomenclature(
+              est.id,
+              item.existingProductId!,
+              price: price,
+              currency: cur,
+            );
+            if (item.linkAliasFromImportName) {
+              final key = normalizeProductAliasKey(item.name);
+              if (key.isNotEmpty) {
+                await store.saveProductAlias(
+                  key,
+                  item.existingProductId!,
+                  establishmentId: est.dataEstablishmentId,
+                );
+              }
+            }
+            await _appendToSupplierIfNeeded(
+              store: store,
+              loc: loc,
+              productId: item.existingProductId!,
+              fallbackName: item.existingProductName ?? item.name,
+              unit: item.unit,
+            );
+            if (newPrice != null) updated++;
+          } else {
+            final cur = item.currency ?? defCur;
+            devLog('💾 ImportReview: creating new product "${item.displayName}"');
+            double? calories;
+            double? protein;
+            double? fat;
+            double? carbs;
+            bool? containsGluten;
+            bool? containsLactose;
+            if (!skipNutritionEnrichment) {
+              try {
+                final nutrition = await NutritionApiService
+                    .fetchNutrition(item.name)
+                    .timeout(const Duration(seconds: 2));
+                if (nutrition != null && nutrition.hasData) {
+                  calories = nutrition.calories;
+                  protein = nutrition.protein;
+                  fat = nutrition.fat;
+                  carbs = nutrition.carbs;
+                  containsGluten = nutrition.containsGluten;
+                  containsLactose = nutrition.containsLactose;
+                }
+              } catch (_) {}
+            }
+            final product = Product.create(
+              name: item.displayName,
+              category: 'imported',
+              calories: calories,
+              protein: protein,
+              fat: fat,
+              carbs: carbs,
+              containsGluten: containsGluten,
+              containsLactose: containsLactose,
+              basePrice: null,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            devLog('💾 ImportReview: addProduct id=${product.id}');
+            final savedProduct = await store.addProduct(product);
+            devLog('💾 ImportReview: addToNomenclature id=${savedProduct.id}');
+            await store.addToNomenclature(
+              est.id,
+              savedProduct.id,
+              price: item.displayPrice,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            if (widget.generateTranslationsForNewProducts) {
+              final tm = TranslationManager(
+                aiService: context.read<AiServiceSupabase>(),
+                translationService: TranslationService(
+                  aiService: context.read<AiServiceSupabase>(),
+                  supabase: context.read<SupabaseService>(),
+                ),
+                getSupportedLanguages: () =>
+                    LocalizationService.productLanguageCodes,
+              );
+              await tm.handleEntitySave(
+                entityType: TranslationEntityType.product,
+                entityId: savedProduct.id,
+                textFields: {'name': item.displayName},
+                sourceLanguage: widget.importSourceLanguage ?? 'en',
               );
             }
-          }
-          await _appendToSupplierIfNeeded(
-            store: store,
-            loc: loc,
-            productId: item.existingProductId!,
-            fallbackName: item.existingProductName ?? item.name,
-            unit: item.unit,
-          );
-          if (newPrice != null) updated++;
-        } else {
-          final cur = item.currency ?? defCur;
-          devLog('💾 ImportReview: creating new product "${item.displayName}"');
-          double? calories;
-          double? protein;
-          double? fat;
-          double? carbs;
-          bool? containsGluten;
-          bool? containsLactose;
-          try {
-            final nutrition =
-                await NutritionApiService.fetchNutrition(item.name);
-            if (nutrition != null && nutrition.hasData) {
-              calories = nutrition.calories;
-              protein = nutrition.protein;
-              fat = nutrition.fat;
-              carbs = nutrition.carbs;
-              containsGluten = nutrition.containsGluten;
-              containsLactose = nutrition.containsLactose;
-            }
-          } catch (_) {}
-          final product = Product.create(
-            name: item.displayName,
-            category: 'imported',
-            calories: calories,
-            protein: protein,
-            fat: fat,
-            carbs: carbs,
-            containsGluten: containsGluten,
-            containsLactose: containsLactose,
-            basePrice: null,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          devLog('💾 ImportReview: addProduct id=${product.id}');
-          final savedProduct = await store.addProduct(product);
-          devLog('💾 ImportReview: addToNomenclature id=${savedProduct.id}');
-          await store.addToNomenclature(
-            est.id,
-            savedProduct.id,
-            price: item.displayPrice,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          if (widget.generateTranslationsForNewProducts) {
-            final tm = TranslationManager(
-              aiService: context.read<AiServiceSupabase>(),
-              translationService: TranslationService(
-                aiService: context.read<AiServiceSupabase>(),
-                supabase: context.read<SupabaseService>(),
-              ),
-              getSupportedLanguages: () =>
-                  LocalizationService.productLanguageCodes,
-            );
-            await tm.handleEntitySave(
-              entityType: TranslationEntityType.product,
-              entityId: savedProduct.id,
-              textFields: {'name': item.displayName},
-              sourceLanguage: widget.importSourceLanguage ?? 'en',
+            devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
+            created++;
+            await _appendToSupplierIfNeeded(
+              store: store,
+              loc: loc,
+              productId: savedProduct.id,
+              fallbackName: item.displayName,
+              unit: item.unit ?? savedProduct.unit,
             );
           }
-          devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
-          created++;
-          await _appendToSupplierIfNeeded(
-            store: store,
-            loc: loc,
-            productId: savedProduct.id,
-            fallbackName: item.displayName,
-            unit: item.unit ?? savedProduct.unit,
-          );
+        } catch (itemError, itemSt) {
+          failed++;
+          firstError ??= itemError.toString();
+          devLog('❌ ImportReview: item save failed "${item.displayName}": $itemError\n$itemSt');
         }
 
         if (mounted) setState(() => _saveProgress++);
@@ -267,9 +278,18 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
       devLog(
           '💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
-      await store.loadProducts(force: true);
-      await store.loadNomenclature(est.dataEstablishmentId);
-      devLog('💾 ImportReview: reload done, navigating to nomenclature');
+      var reloadErrorText = '';
+      try {
+        // Не блокируем успешное сохранение из‑за нестабильной сети в финальном refresh.
+        await store.loadProducts().timeout(const Duration(seconds: 12));
+        await store
+            .loadNomenclature(est.dataEstablishmentId)
+            .timeout(const Duration(seconds: 12));
+        devLog('💾 ImportReview: reload done, navigating to nomenclature');
+      } catch (reloadError, reloadSt) {
+        reloadErrorText = reloadError.toString();
+        devLog('⚠️ ImportReview: post-save reload failed: $reloadError\n$reloadSt');
+      }
 
       if (mounted) {
         setState(() {
@@ -280,15 +300,21 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              created > 0 || updated > 0
-                  ? loc.t(
-                      'import_review_saved_counts',
-                      args: {
-                        'created': '$created',
-                        'updated': '$updated',
-                      },
-                    )
-                  : loc.t('no_changes'),
+              [
+                created > 0 || updated > 0
+                    ? loc.t(
+                        'import_review_saved_counts',
+                        args: {
+                          'created': '$created',
+                          'updated': '$updated',
+                        },
+                      )
+                    : loc.t('no_changes'),
+                if (failed > 0)
+                  'Не удалось сохранить: $failed. ${firstError ?? ''}'.trim(),
+                if (reloadErrorText.isNotEmpty)
+                  'Сохранено, но обновление списка заняло слишком долго. Обновите экран.',
+              ].join(' '),
             ),
           ),
         );

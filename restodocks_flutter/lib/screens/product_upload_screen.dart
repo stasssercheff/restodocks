@@ -1533,6 +1533,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final ai = context.read<AiService>();
       final userLocale =
           WidgetsBinding.instance.platformDispatcher.locale.toString();
+      final rawLineCount = rows?.length ??
+          (text == null
+              ? 0
+              : text
+                  .split(RegExp(r'\r?\n'))
+                  .where((s) => s.trim().isNotEmpty)
+                  .length);
+      final preferLocalParserForLargeBatch = rawLineCount >= 80;
 
       if (useRawIikoNames) {
         _setLoadingMsg('product_upload_loading_match_db');
@@ -1547,6 +1555,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               ),
             )
             .toList();
+      } else if (preferLocalParserForLargeBatch) {
+        _setLoadingMsg('product_upload_loading_parse_local');
+        _addDebugLog(
+          'INFO: large batch detected ($rawLineCount lines), using local parser first',
+        );
       } else {
         if (rows != null && rows.isNotEmpty) {
           try {
