@@ -3126,14 +3126,38 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       ));
       return;
     }
-    final cardLimit = files.length <= 1
-        ? _maxCardsFromSingleFileImport
-        : _maxCardsFromMultiFileImport;
-    final cardLimitMessage = files.length <= 1
-        ? (loc.t('ttk_import_max_cards_single_file') ??
-            'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
-        : (loc.t('ttk_import_max_cards_multi_files') ??
-            'Можно импортировать не более $_maxCardsFromMultiFileImport ТТК при загрузке из нескольких файлов.');
+    final trialOnly = acc.isTrialOnlyWithoutPaid;
+    var trialRemaining = 0;
+    if (trialOnly) {
+      final est = acc.establishment;
+      if (est == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
+        );
+        return;
+      }
+      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
+      trialRemaining = (10 - used).clamp(0, 10);
+      if (trialRemaining <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('trial_ttk_import_cap'))),
+        );
+        return;
+      }
+    }
+    final cardLimit = trialOnly
+        ? trialRemaining
+        : (files.length <= 1
+            ? _maxCardsFromSingleFileImport
+            : _maxCardsFromMultiFileImport);
+    final cardLimitMessage = trialOnly
+        ? (loc.t('trial_ttk_import_cap') ??
+            'В пробной версии можно импортировать не более 10 ТТК.')
+        : (files.length <= 1
+            ? (loc.t('ttk_import_max_cards_single_file') ??
+                'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
+            : (loc.t('ttk_import_max_cards_multi_files') ??
+                'Можно импортировать не более $_maxCardsFromMultiFileImport ТТК при загрузке из нескольких файлов.'));
     setState(() {
       _loadingExcel = true;
       _loadingTtkIsPdf =
@@ -3163,7 +3187,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       var allCards = <TechCardRecognitionResult>[];
       int failedCount = 0;
+      var hitCardLimit = false;
       for (final file in files) {
+        final remainingSlots = cardLimit - allCards.length;
+        if (remainingSlots <= 0) {
+          hitCardLimit = true;
+          break;
+        }
         final bytes = file.bytes!;
         final uBytes = Uint8List.fromList(bytes);
         final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
@@ -3241,17 +3271,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ));
           }
         }
-        if (allCards.length + list.length > cardLimit) {
-          if (mounted) setState(() => _loadingExcel = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(cardLimitMessage),
-              duration: const Duration(seconds: 5),
-            ),
-          );
-          return;
+        if (list.length > remainingSlots) {
+          list = list.take(remainingSlots).toList();
+          hitCardLimit = true;
         }
         allCards.addAll(list);
+      }
+      if (hitCardLimit && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(cardLimitMessage),
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
       // При пустом parse но с rows — создаём placeholder и ведём на проверку для ручного ввода и обучения
       if (allCards.isEmpty) {
