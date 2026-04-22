@@ -1644,9 +1644,6 @@ class _SplashScreenState extends State<SplashScreen> {
         devLog(
             '[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
         context.go(target ?? '/home');
-      } else if (Supabase.instance.client.auth.currentSession != null &&
-          accountManager.needsCompanyRegistration) {
-        context.go('/register-company-details?ownerFirst=1');
       } else {
         context.go('/login');
       }

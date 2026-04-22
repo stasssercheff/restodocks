@@ -1307,21 +1307,10 @@ class AccountManagerSupabase extends ChangeNotifier {
           devLog('🔐 pending_owner_registrations select: $e');
         }
 
-        // Админка удалила заведение: сотрудник исчез, pending мог уже не существовать — восстановить owner-first.
-        try {
-          final ensured = await _supabase.client
-              .rpc('ensure_owner_first_pending_after_admin_wipe');
-          if (ensured == true) {
-            _needsCompanyRegistration = true;
-            lastLoginError = 'needs_company_registration';
-            devLog(
-              '🔐 Login: restored pending after admin wipe — company registration',
-            );
-            return null;
-          }
-        } catch (e) {
-          devLog('🔐 ensure_owner_first_pending_after_admin_wipe: $e');
-        }
+        // Важно: не восстанавливаем pending автоматически.
+        // Иначе после удаления аккаунта пользователь может снова попасть в owner-first
+        // вместо ожидаемого "аккаунт не найден / неверные данные".
+        // Для ручного восстановления owner-first следует использовать отдельный админ-процесс.
 
         await _supabase.signOut();
         throw Exception('employee_not_found');
