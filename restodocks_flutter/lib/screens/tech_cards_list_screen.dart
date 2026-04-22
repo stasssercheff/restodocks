@@ -637,6 +637,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
+  Future<void> _showAiCreateLimitDialog(LocalizationService loc) async {
+    if (!mounted) return;
+    final title = _localizedOrFallback(
+      loc,
+      'ai_ttk_limit_title',
+      'Лимит ИИ исчерпан',
+    );
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(_aiTtkLimitMessage('limit_3_per_day', loc)),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok') ?? 'OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pullToRefresh() async {
     _TtkListMemoryCache.invalidate();
     final acc = context.read<AccountManagerSupabase>();
@@ -3548,9 +3571,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         await showSubscriptionRequiredDialog(context);
         return;
       }
+      await _refreshAiTtkRemainingQuota();
+      final aiRemaining = _aiTtkRemainingQuota;
+      if (aiRemaining != null && aiRemaining <= 0) {
+        await _showAiCreateLimitDialog(loc);
+        return;
+      }
     } else if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
       return;
+    } else {
+      final remainingNow = await _trialImportRemaining();
+      if (remainingNow != null && remainingNow <= 0) {
+        await _showTrialImportCapDialog(loc);
+        return;
+      }
     }
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
     final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
@@ -3752,11 +3787,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         );
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
-          await _refreshAiTtkRemainingQuota();
-          if (mounted && _aiTtkRemainingQuota != null && _aiTtkRemainingQuota == 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(_aiTtkLimitMessage('limit_3_per_day', loc))),
-            );
+          if (_aiTtkRemainingQuota != null) {
+            final next = (_aiTtkRemainingQuota! - createdCards.length)
+                .clamp(0, _aiTtkQuotaWindow(acc).limit);
+            if (mounted) setState(() => _aiTtkRemainingQuota = next);
+            if (next == 0) {
+              await _showAiCreateLimitDialog(loc);
+            }
+          } else {
+            await _refreshAiTtkRemainingQuota();
+            if (mounted && _aiTtkRemainingQuota != null && _aiTtkRemainingQuota == 0) {
+              await _showAiCreateLimitDialog(loc);
+            }
           }
           if (createdCards.length == 1) {
             context.push(
