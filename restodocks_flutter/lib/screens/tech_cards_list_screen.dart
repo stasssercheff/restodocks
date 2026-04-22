@@ -757,6 +757,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
+  Future<void> _showAiCreateReasonDialog(
+    LocalizationService loc,
+    String reason,
+  ) async {
+    if (!mounted) return;
+    final title = _localizedOrFallback(
+      loc,
+      'ai_ttk_limit_title',
+      'Лимит ИИ исчерпан',
+    );
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(_aiTtkLimitMessage(reason, loc)),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok') ?? 'OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pullToRefresh() async {
     _TtkListMemoryCache.invalidate();
     final acc = context.read<AccountManagerSupabase>();
@@ -3947,9 +3973,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 reason == 'ai_ttk_no_access_lite' ||
                 reason == 'ai_limit_exceeded' ||
                 reason == 'limit_3_per_day')) {
-          await _showAiCreateLimitDialog(loc);
+          await _showAiCreateReasonDialog(loc, reason);
           return;
         }
+        // Если structured-create не вернул карточки и это не лимит,
+        // не оставляем пользователя без результата: открываем черновик
+        // по его тексту сразу, без повторного "тихого" парсинга.
+        final prompt = result.trim();
+        final firstLine = prompt.split('\n').first.trim();
+        final fallback = TechCardRecognitionResult(
+          dishName: firstLine.isEmpty ? prompt : firstLine,
+          technologyText: prompt,
+          ingredients: const [],
+          isSemiFinished: false,
+        );
+        context.push(
+          widget.department == 'bar'
+              ? '/tech-cards/new?department=bar'
+              : '/tech-cards/new',
+          extra: <String, Object?>{
+            'result': fallback,
+            'fromAiGeneration': true,
+          },
+        );
+        return;
       }
 
       var list = await aiService.parseTechCardsFromText(
