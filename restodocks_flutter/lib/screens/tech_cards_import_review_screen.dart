@@ -1172,15 +1172,9 @@ class _TechCardsImportReviewScreenState
               msg += ' ${err.substring(0, 117)}...';
             }
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(msg),
-              duration: AiServiceSupabase.lastLearningError != null
-                  ? const Duration(seconds: 8)
-                  : (AiServiceSupabase.lastLearningSuccess != null
-                      ? const Duration(seconds: 6)
-                      : const Duration(seconds: 4)),
-            ),
+          await _showCenteredImportResultMessage(
+            msg: msg,
+            errorStyle: AiServiceSupabase.lastLearningError != null,
           );
           context.go('/tech-cards/${widget.department}?refresh=1',
               extra: {'back': true});
@@ -1197,9 +1191,7 @@ class _TechCardsImportReviewScreenState
           final msg = created > 0
               ? '${loc.t('tech_cards_import_created').replaceAll('%s', '$created')}. Не удалось ${failed.length}: ${failed.map((f) => f.name).join(', ')}. Исправьте и повторите.'
               : 'Не удалось сохранить: ${failed.map((f) => f.name).join(', ')}$reason';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 8)),
-          );
+          await _showCenteredImportResultMessage(msg: msg, errorStyle: true);
         }
       }
     } catch (e) {
@@ -1212,6 +1204,33 @@ class _TechCardsImportReviewScreenState
         );
       }
     }
+  }
+
+  Future<void> _showCenteredImportResultMessage({
+    required String msg,
+    bool errorStyle = false,
+  }) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final cs = Theme.of(context).colorScheme;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        content: Text(
+          msg,
+          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                color: errorStyle ? cs.error : cs.onSurface,
+              ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok') ?? 'OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showEditDishNameDialog(int realIndex) async {

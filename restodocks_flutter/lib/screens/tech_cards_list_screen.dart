@@ -13,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
@@ -339,6 +338,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   int? _tabIndexFromUrl;
   bool _tabIndexResolvedFromUrl = false;
   int? _aiTtkRemainingQuota;
+  bool _aiQuotaServerUnavailable = false;
   int? _trialTtkImportRemainingQuota;
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
@@ -608,53 +608,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
   }
 
-  String _localAiTtkUsageKey({
-    required String establishmentId,
-    required String periodType,
-    required String periodKey,
-  }) {
-    return 'ai_ttk_usage_${establishmentId.trim().toLowerCase()}_${periodType.trim().toLowerCase()}_${periodKey.trim().toLowerCase()}';
-  }
-
-  Future<int> _getLocalAiTtkUsage({
-    required String establishmentId,
-    required String periodType,
-    required String periodKey,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getInt(
-            _localAiTtkUsageKey(
-              establishmentId: establishmentId,
-              periodType: periodType,
-              periodKey: periodKey,
-            ),
-          ) ??
-          0;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  Future<void> _incrementLocalAiTtkUsage({
-    required String establishmentId,
-    required String periodType,
-    required String periodKey,
-    required int delta,
-  }) async {
-    if (delta <= 0) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _localAiTtkUsageKey(
-        establishmentId: establishmentId,
-        periodType: periodType,
-        periodKey: periodKey,
-      );
-      final current = prefs.getInt(key) ?? 0;
-      await prefs.setInt(key, current + delta);
-    } catch (_) {}
-  }
-
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -674,24 +627,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           .eq('period_type', quotaWindow.periodType)
           .eq('period_key', quotaWindow.periodKey)
           .maybeSingle();
-      final serverUsed = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
-      final localUsed = await _getLocalAiTtkUsage(
-        establishmentId: establishmentId,
-        periodType: quotaWindow.periodType,
-        periodKey: quotaWindow.periodKey,
-      );
-      final used = serverUsed >= localUsed ? serverUsed : localUsed;
+      final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
       final remaining = (quotaWindow.limit - used).clamp(0, quotaWindow.limit);
-      if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
+      if (mounted) {
+        setState(() {
+          _aiTtkRemainingQuota = remaining;
+          _aiQuotaServerUnavailable = false;
+        });
+      }
     } catch (_) {
-      final localUsed = await _getLocalAiTtkUsage(
-        establishmentId: establishmentId,
-        periodType: quotaWindow.periodType,
-        periodKey: quotaWindow.periodKey,
-      );
-      final remaining =
-          (quotaWindow.limit - localUsed).clamp(0, quotaWindow.limit);
-      if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
+      if (mounted) {
+        setState(() {
+          _aiTtkRemainingQuota = null;
+          _aiQuotaServerUnavailable = true;
+        });
+      }
     }
   }
 
@@ -3890,8 +3840,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         return;
       }
       await _refreshAiTtkRemainingQuota();
+      if (_aiQuotaServerUnavailable || _aiTtkRemainingQuota == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Не удалось проверить ИИ-лимит на сервере. Повторите через минуту.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       final aiRemaining = _aiTtkRemainingQuota;
-      if (aiRemaining != null && aiRemaining <= 0) {
+      if (aiRemaining <= 0) {
         await _showAiCreateLimitDialog(loc);
         return;
       }
@@ -4106,14 +4068,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
           final quotaWindow = _aiTtkQuotaWindow(acc);
-          if (establishmentId != null && establishmentId.isNotEmpty) {
-            await _incrementLocalAiTtkUsage(
-              establishmentId: establishmentId,
-              periodType: quotaWindow.periodType,
-              periodKey: quotaWindow.periodKey,
-              delta: createdCards.length,
-            );
-          }
           if (_aiTtkRemainingQuota != null) {
             final next = (_aiTtkRemainingQuota! - createdCards.length)
                 .clamp(0, quotaWindow.limit);
