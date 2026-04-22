@@ -190,6 +190,10 @@ class ProductStoreSupabase {
   }
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
+    // Web: фоновые nutrition-запросы к product_nutrition_links часто дают 403
+    // (RLS/сессия ещё не готова) и зашумляют консоль в критичных сценариях импорта.
+    // На вебе отключаем этот необязательный фон, чтобы не мешать основному UX.
+    if (kIsWeb) return;
     await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!AccountManagerSupabase().isLoggedInSync) return;
     try {

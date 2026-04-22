@@ -1716,10 +1716,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   _showCreateProductDialog(loc);
                   return;
                 }
-                if (v == 'import_excel') {
-                  _importNomenclatureExcel(loc);
-                  return;
-                }
                 if (v == 'upload') {
                   context.push('/products/upload');
                   return;
@@ -1742,22 +1738,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       ],
                     ),
                   ),
-                  if (uploadAllowed)
-                    PopupMenuItem(
-                      value: 'import_excel',
-                      child: Row(
-                        children: [
-                          Icon(Icons.file_upload_outlined,
-                              size: 20, color: accent),
-                          const SizedBox(width: 10),
-                          Text(
-                            loc.t('nomenclature_excel_import_tooltip'),
-                            style: TextStyle(
-                                color: accent, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
                   if (uploadAllowed)
                     PopupMenuItem(
                       value: 'upload',
@@ -2506,8 +2486,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         result.files.isEmpty ||
         result.files.single.bytes == null) return;
 
-    final bytes = result.files.single.bytes!;
+    var bytes = result.files.single.bytes!;
     try {
+      bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) {
         if (!mounted) return;
@@ -2840,7 +2821,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   Future<void> _addProductsFromExcel(
       Uint8List bytes, LocalizationService loc) async {
     try {
-      final excel = Excel.decodeBytes(bytes);
+      final sanitized = IikoXlsxSanitizer.ensureDecodable(bytes);
+      final excel = Excel.decodeBytes(sanitized.toList());
       final sheet = excel.tables[excel.tables.keys.first];
       if (sheet == null) {
         if (!mounted) return;

@@ -1580,11 +1580,30 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       _setLoadingMsg('product_upload_loading_match_db');
       final store = context.read<ProductStoreSupabase>();
-      await store.loadProducts(force: true);
-      await store.loadNomenclature(est.dataEstablishmentId);
+      var loadedFromServer = true;
+      try {
+        await store.loadProducts(force: true);
+        await store.loadNomenclature(est.dataEstablishmentId);
+      } catch (e) {
+        loadedFromServer = false;
+        _addDebugLog(
+            'WARN: Failed to refresh products/nomenclature from server, using cached data: $e');
+      }
       final existingProducts =
           store.getNomenclatureProducts(est.dataEstablishmentId);
       final allProducts = store.allProducts;
+
+      if (!loadedFromServer && mounted) {
+        final fallbackMsg = loc.currentLanguageCode == 'ru'
+            ? 'Сеть нестабильна: продолжаем импорт по локальному кэшу.'
+            : 'Network is unstable: continuing import using local cache.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(fallbackMsg),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
 
       if (mounted) {
         setState(() {
