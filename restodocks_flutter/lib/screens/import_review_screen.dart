@@ -324,6 +324,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = context.watch<LocalizationService>();
+    final media = MediaQuery.of(context);
+    final compactChrome = media.size.width >= 900 || media.size.height <= 520;
 
     final approved = _items.where((i) => i.approved).length;
 
@@ -335,16 +337,24 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: compactChrome ? 12 : 16,
+              vertical: compactChrome ? 6 : 16,
+            ),
             child: Text(
               loc.t('import_review_hint'),
+              maxLines: compactChrome ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
           // Строка с кнопками цен (слева) + чекбокс "выбрать/снять все" (справа, над чекбоксами продуктов)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: EdgeInsets.symmetric(
+              horizontal: compactChrome ? 12 : 16,
+              vertical: compactChrome ? 0 : 4,
+            ),
             child: Row(
               children: [
                 if (_items.any(
@@ -438,10 +448,15 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: compactChrome ? 0 : 4),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+              padding: EdgeInsets.fromLTRB(
+                compactChrome ? 12 : 16,
+                0,
+                compactChrome ? 12 : 16,
+                compactChrome ? 56 : 80,
+              ),
               itemCount: _items.length,
               itemBuilder: (context, i) {
                 final item = _items[i];
@@ -511,7 +526,12 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+            compactChrome ? 12 : 16,
+            compactChrome ? 8 : 16,
+            compactChrome ? 12 : 16,
+            compactChrome ? 8 : 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -531,29 +551,66 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-              FilledButton(
-                onPressed: _saving || approved == 0 ? null : () => _save(),
-                child: _saving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(loc.t('save')),
-              ),
-              if (_items.any((i) => i.existingProductId == null)) ...[
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _saving ||
-                          _items
-                              .where((i) =>
-                                  i.approved && i.existingProductId == null)
-                              .isEmpty
-                      ? null
-                      : _saveOnlyNew,
-                  child: Text(loc.t('save_only_new_products')),
+              if (compactChrome)
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed:
+                            _saving || approved == 0 ? null : () => _save(),
+                        child: _saving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(loc.t('save')),
+                      ),
+                    ),
+                    if (_items.any((i) => i.existingProductId == null)) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _saving ||
+                                  _items
+                                      .where((i) =>
+                                          i.approved &&
+                                          i.existingProductId == null)
+                                      .isEmpty
+                              ? null
+                              : _saveOnlyNew,
+                          child: Text(loc.t('save_only_new_products')),
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              else ...[
+                FilledButton(
+                  onPressed: _saving || approved == 0 ? null : () => _save(),
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(loc.t('save')),
                 ),
+                if (_items.any((i) => i.existingProductId == null)) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _saving ||
+                            _items
+                                .where((i) =>
+                                    i.approved && i.existingProductId == null)
+                                .isEmpty
+                        ? null
+                        : _saveOnlyNew,
+                    child: Text(loc.t('save_only_new_products')),
+                  ),
+                ],
               ],
             ],
           ),
