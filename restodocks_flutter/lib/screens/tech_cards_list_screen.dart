@@ -3947,9 +3947,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 reason == 'ai_ttk_no_access_lite' ||
                 reason == 'ai_limit_exceeded' ||
                 reason == 'limit_3_per_day')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_aiTtkLimitMessage(reason, loc))),
-          );
+          await _showAiCreateLimitDialog(loc);
           return;
         }
       }
