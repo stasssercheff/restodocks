@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/translation.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../utils/employee_name_translation_utils.dart';
