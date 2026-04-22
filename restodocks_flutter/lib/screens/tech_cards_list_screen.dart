@@ -4297,9 +4297,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 await _createFromText(context, loc);
                 return;
               }
-              if (value == 'import_photo') {
-                await _createFromPhoto(context, loc);
-              }
             },
             itemBuilder: (_) => [
               PopupMenuItem(
@@ -4358,19 +4355,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                             fontWeight: FontWeight.w500,
                           ),
                     )),
-              if (importAllowed && !kIsWeb && OnDeviceOcrService.isSupported)
-                PopupMenuItem(
-                  value: 'import_photo',
-                  child: Text(
-                    loc.t('ai_tech_card_from_photo').trim().isEmpty
-                        ? 'ТТК из фото'
-                        : loc.t('ai_tech_card_from_photo'),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                  ),
-                ),
             ],
           )
         : null;

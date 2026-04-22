@@ -681,12 +681,18 @@ class AccountManagerSupabase extends ChangeNotifier {
           'p_delta': delta,
         },
       );
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
     } on PostgrestException catch (e) {
       // На старой/частично мигрированной БД не блокируем экспорт/импорт из-за счётчиков триала.
       devLog(
         'trial_increment_usage: PostgREST error code=${e.code} '
         'message=${e.message}; skip trial usage increment',
       );
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
       return;
     }
   }
@@ -701,9 +707,11 @@ class AccountManagerSupabase extends ChangeNotifier {
           .maybeSingle();
       if (row == null) return 0;
       final v = row['ttk_import_cards'];
-      if (v is int) return v;
-      if (v is num) return v.toInt();
-      return 0;
+      final serverValue =
+          v is int ? v : (v is num ? v.toInt() : 0);
+      final localValue =
+          await _getLocalTrialTtkImportCards(establishmentId);
+      return serverValue >= localValue ? serverValue : localValue;
     } on PostgrestException catch (e) {
       // Совместимость со старыми/частично мигрированными БД:
       // отсутствие таблицы trial usage не должно ломать сохранение ТТК.
@@ -711,11 +719,36 @@ class AccountManagerSupabase extends ChangeNotifier {
         'fetchTrialTtkImportCardsUsed: PostgREST error code=${e.code} '
         'message=${e.message}; fallback to 0',
       );
-      return 0;
+      return _getLocalTrialTtkImportCards(establishmentId);
     } catch (e) {
       devLog('fetchTrialTtkImportCardsUsed: unexpected error: $e; fallback to 0');
+      return _getLocalTrialTtkImportCards(establishmentId);
+    }
+  }
+
+  String _localTrialTtkImportCardsKey(String establishmentId) =>
+      'trial_ttk_import_cards_${establishmentId.trim().toLowerCase()}';
+
+  Future<int> _getLocalTrialTtkImportCards(String establishmentId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_localTrialTtkImportCardsKey(establishmentId)) ?? 0;
+    } catch (_) {
       return 0;
     }
+  }
+
+  Future<void> _incrementLocalTrialTtkImportCards(
+    String establishmentId,
+    int delta,
+  ) async {
+    if (delta <= 0) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _localTrialTtkImportCardsKey(establishmentId);
+      final current = prefs.getInt(key) ?? 0;
+      await prefs.setInt(key, current + delta);
+    } catch (_) {}
   }
 
   /// Лимит «сохранение на устройстве» в первые 72 ч: 3 на каждый вид документа.
