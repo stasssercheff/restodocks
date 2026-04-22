@@ -2997,6 +2997,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       await showSubscriptionRequiredDialog(context);
       return;
     }
+    final trialOnly = acc.isTrialOnlyWithoutPaid;
+    var trialRemaining = 0;
+    if (trialOnly) {
+      final est = acc.establishment;
+      if (est == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
+        );
+        return;
+      }
+      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
+      trialRemaining = (10 - used).clamp(0, 10);
+      if (trialRemaining <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('trial_ttk_import_cap'))),
+        );
+        return;
+      }
+    }
     _TtkImportMode dialogMode = _TtkImportMode.single;
     // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
     // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
@@ -3050,6 +3071,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ),
+                    if (trialOnly) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .errorContainer
+                              .withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Theme.of(ctx)
+                                .colorScheme
+                                .error
+                                .withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          (l.t('trial_ttk_import_pre_limit_notice') ??
+                                  'Пробный период: импорт и парсинг ограничен 10 ТТК на весь период.')
+                              .replaceAll('%s', '$trialRemaining'),
+                          style: Theme.of(ctx).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -3125,25 +3172,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 'Выберите до $_maxFilesMultiTtk файлов')),
       ));
       return;
-    }
-    final trialOnly = acc.isTrialOnlyWithoutPaid;
-    var trialRemaining = 0;
-    if (trialOnly) {
-      final est = acc.establishment;
-      if (est == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
-        );
-        return;
-      }
-      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-      trialRemaining = (10 - used).clamp(0, 10);
-      if (trialRemaining <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('trial_ttk_import_cap'))),
-        );
-        return;
-      }
     }
     final cardLimit = trialOnly
         ? trialRemaining

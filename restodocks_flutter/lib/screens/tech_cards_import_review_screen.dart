@@ -853,13 +853,13 @@ class _TechCardsImportReviewScreenState
         }
       }
 
-      _saveTotal = productNamesToCreate.length + _items.length + 1;
+      final cardsToCreate = _items.where((i) => !i.alreadySaved).length;
+      _saveTotal = cardsToCreate;
       _saveProgress = 0;
       if (mounted) setState(() {});
 
       // Создаём отсутствующие продукты в каталоге, подтягиваем КБЖУ, добавляем в номенклатуру
       for (final rawName in productNamesToCreate) {
-        if (mounted) setState(() => _saveProgress++);
         final normalizedName = stripIikoPrefix(rawName).trim();
         if (normalizedName.isEmpty) continue;
         final norm = _norm(normalizedName);
@@ -1087,8 +1087,7 @@ class _TechCardsImportReviewScreenState
           failedItems.add(item);
           devLog('[ttk_import] Ошибка сохранения "$name": $e');
         }
-        if (mounted)
-          setState(() => _saveProgress = productNamesToCreate.length + created);
+        if (mounted) setState(() => _saveProgress = created);
 
         if (abortAfterDuplicateAction) break;
       }
