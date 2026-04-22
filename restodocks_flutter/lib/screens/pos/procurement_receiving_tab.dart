@@ -311,54 +311,72 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Text(
-            loc.t('pos_procurement_receiving_hint'),
-            style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DropdownButtonFormField<String?>(
-                initialValue: _supplierFilter,
-                decoration: InputDecoration(
-                  labelText: loc.t('pos_procurement_filter_supplier'),
-                  isDense: true,
-                ),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(loc.t('pos_procurement_filter_all')),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: _supplierFilter,
+                      decoration: InputDecoration(
+                        labelText: loc.t('pos_procurement_filter_supplier'),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 10),
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(loc.t('pos_procurement_filter_all')),
+                        ),
+                        ..._supplierNamesSorted.map(
+                          (n) => DropdownMenuItem(value: n, child: Text(n)),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _supplierFilter = v),
+                    ),
                   ),
-                  ..._supplierNamesSorted
-                      .map((n) => DropdownMenuItem(value: n, child: Text(n))),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() {
+                      _supplierFilter = null;
+                      _orderDateFrom = null;
+                      _orderDateTo = null;
+                      _deliveryDateFrom = null;
+                      _deliveryDateTo = null;
+                      _dateFilterMode = 'order_range';
+                    }),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
+                      minimumSize: const Size(0, 40),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    label: Text(loc.t('pos_procurement_filter_clear')),
+                  ),
                 ],
-                onChanged: (v) => setState(() => _supplierFilter = v),
               ),
-              const SizedBox(height: 8),
-              Text(
-                loc.t('pos_procurement_filter_period'),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _selectDateMode('order_range'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
                           loc.t('pos_procurement_date_btn_order'),
                           textAlign: TextAlign.center,
-                          maxLines: 2,
+                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -367,63 +385,62 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _selectDateMode('delivery_range'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
                           loc.t('pos_procurement_date_btn_delivery'),
                           textAlign: TextAlign.center,
-                          maxLines: 2,
+                          maxLines: 1,
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton.icon(
-                  onPressed: () => setState(() {
-                    _supplierFilter = null;
-                    _orderDateFrom = null;
-                    _orderDateTo = null;
-                    _deliveryDateFrom = null;
-                    _deliveryDateTo = null;
-                    _dateFilterMode = 'order_range';
-                  }),
-                  icon: const Icon(Icons.clear_all, size: 20),
-                  label: Text(loc.t('pos_procurement_filter_clear')),
-                ),
-              ),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
           child: TextField(
             controller: _productSearchCtrl,
             decoration: InputDecoration(
               hintText: loc.t('pos_procurement_filter_product'),
-              prefixIcon: const Icon(Icons.search, size: 22),
+              prefixIcon: const Icon(Icons.search, size: 20),
               isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
           child: SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () => context.push(
                 '/procurement-receipt?department=${widget.department}&manual=1',
               ),
-              icon: const Icon(Icons.add_task_outlined),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: const Icon(Icons.add_task_outlined, size: 18),
               label: Text(loc.t('pos_procurement_receiving_create')),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
       ],
     );
 
@@ -432,7 +449,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       children: [
         if (isLandscape)
           SizedBox(
-            height: 260,
+            height: 210,
             child: SingleChildScrollView(child: headerContent),
           )
         else

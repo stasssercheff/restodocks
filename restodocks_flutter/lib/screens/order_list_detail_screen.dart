@@ -250,6 +250,15 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     }).toList();
   }
 
+  String _displayItemName(OrderListItem item, String lang) {
+    final store = context.read<ProductStoreSupabase>();
+    if (item.productId != null && item.productId!.isNotEmpty) {
+      final product = store.allProducts.where((p) => p.id == item.productId).firstOrNull;
+      if (product != null) return product.getLocalizedName(lang);
+    }
+    return item.productName;
+  }
+
   /// Сохранить текущий заказ во входящие (шефу и собственнику). Возвращает true при успехе.
   /// Цены подставляются на сервере через Edge Function.
   Future<bool> _saveOrderToInbox() async {
@@ -512,7 +521,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
-                              child: Text(item.productName,
+                              child: Text(_displayItemName(item, lang),
                                   overflow: TextOverflow.ellipsis),
                             ),
                             Padding(

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../utils/inventory_document_labels.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import 'inventory_inbox_detail_screen.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Кабинет шеф-повара: полученные документы инвентаризации.
@@ -157,9 +158,11 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
 
   void _openDetail(
       BuildContext context, Map<String, dynamic> doc, LocalizationService loc) {
+    final id = doc['id']?.toString() ?? '';
+    if (id.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => _InventoryDocumentDetailScreen(doc: doc, loc: loc),
+        builder: (_) => InventoryInboxDetailScreen(documentId: id),
       ),
     );
   }
@@ -178,7 +181,11 @@ class _DocCard extends StatelessWidget {
     final header = payload?['header'] as Map<String, dynamic>? ?? {};
     final date = doc['created_at']?.toString().substring(0, 10) ?? '—';
     final establishmentName = header['establishmentName'] ?? '—';
-    final employeeName = header['employeeName'] ?? '—';
+    final rawEmployeeName = (header['employeeName'] ?? '—').toString();
+    final employeeName = loc.displayPersonNameForLanguage(
+      rawEmployeeName,
+      loc.currentLanguageCode,
+    );
     final kind = inventoryDocKindSubtitle(payload, loc);
 
     return Card(

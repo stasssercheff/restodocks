@@ -32,6 +32,14 @@ const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const CLAUDE_URL = "https://api.anthropic.com/v1/messages";
 
 export type Message = { role: "system" | "user" | "assistant"; content: string };
+type UsageStats = { inputTokens: number; outputTokens: number; totalTokens: number };
+type ChatResult = {
+  content: string;
+  provider: TextProvider;
+  model: string;
+  usage: UsageStats;
+  latencyMs: number;
+};
 
 let gigachatToken: string | null = null;
 let gigachatExpiresAt = 0;
@@ -64,6 +72,107 @@ export type TextProvider = "deepseek" | "groq" | "gigachat" | "openai" | "gemini
 const PROVIDER_NAMES: TextProvider[] = ["deepseek", "groq", "openai", "gigachat", "gemini", "claude", "openrouter", "mistral", "cerebras"];
 
 export type AIContext = "ttk" | "ttk_parse" | "ttk_create" | "nutrition" | "product" | "checklist";
+
+function toInt(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function parseUsage(raw: unknown): UsageStats {
+  const usage = (raw && typeof raw === "object") ? raw as Record<string, unknown> : {};
+  const inputTokens = toInt(
+    usage.prompt_tokens ??
+      usage.input_tokens ??
+      usage.promptTokenCount ??
+      usage.inputTokenCount,
+  );
+  const outputTokens = toInt(
+    usage.completion_tokens ??
+      usage.output_tokens ??
+      usage.candidatesTokenCount ??
+      usage.outputTokenCount,
+  );
+  const totalTokens = toInt(
+    usage.total_tokens ??
+      usage.totalTokenCount ??
+      (inputTokens + outputTokens),
+  );
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: totalTokens > 0 ? totalTokens : inputTokens + outputTokens,
+  };
+}
+
+function defaultRatePerM(provider: TextProvider, model: string): { input: number; output: number } {
+  const key = `${provider}:${model}`.toLowerCase();
+  const exactMap: Record<string, { input: number; output: number }> = {
+    "deepseek:deepseek-chat": { input: 0.27, output: 1.10 },
+    "deepseek:deepseek-reasoner": { input: 0.55, output: 2.19 },
+  };
+  if (exactMap[key]) return exactMap[key];
+  if (provider === "deepseek") return exactMap["deepseek:deepseek-chat"];
+  return { input: 0, output: 0 };
+}
+
+function getRates(provider: TextProvider, model: string): { input: number; output: number } {
+  const modelKey = model.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const inputOverride = Deno.env.get(`AI_COST_${provider.toUpperCase()}_${modelKey}_INPUT_PER_M`);
+  const outputOverride = Deno.env.get(`AI_COST_${provider.toUpperCase()}_${modelKey}_OUTPUT_PER_M`);
+  if (inputOverride && outputOverride) {
+    return { input: Number(inputOverride) || 0, output: Number(outputOverride) || 0 };
+  }
+  return defaultRatePerM(provider, model);
+}
+
+function estimateCostUsd(provider: TextProvider, model: string, usage: UsageStats): number {
+  const rates = getRates(provider, model);
+  const usd = (usage.inputTokens / 1_000_000) * rates.input + (usage.outputTokens / 1_000_000) * rates.output;
+  return Number.isFinite(usd) ? Number(usd.toFixed(6)) : 0;
+}
+
+async function logAiUsage(payload: {
+  provider: TextProvider;
+  model: string;
+  context?: AIContext;
+  usage: UsageStats;
+  latencyMs: number;
+  status: "ok" | "error";
+  errorMessage?: string;
+}) {
+  const url = Deno.env.get("SUPABASE_URL")?.trim();
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!url || !serviceKey) return;
+
+  const functionName = Deno.env.get("SB_EXECUTION_ID")?.trim() || Deno.env.get("DENO_DEPLOYMENT_ID")?.trim() || null;
+  const body = {
+    provider: payload.provider,
+    model: payload.model,
+    context: payload.context ?? null,
+    function_name: functionName,
+    input_tokens: payload.usage.inputTokens,
+    output_tokens: payload.usage.outputTokens,
+    total_tokens: payload.usage.totalTokens,
+    estimated_cost_usd: estimateCostUsd(payload.provider, payload.model, payload.usage),
+    latency_ms: payload.latencyMs,
+    status: payload.status,
+    error_message: payload.errorMessage ?? null,
+  };
+  try {
+    await fetch(`${url}/rest/v1/ai_usage_logs`, {
+      method: "POST",
+      headers: {
+        "apikey": serviceKey,
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.warn("ai_usage_logs insert failed:", e);
+  }
+}
 
 /** Список провайдеров с ключами, в порядке приоритета (каскад при fallback) */
 function getAvailableProviders(context?: AIContext): TextProvider[] {
@@ -139,8 +248,10 @@ async function chatTextWithProvider(provider: TextProvider, options: {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-}): Promise<string> {
+  context?: AIContext;
+}): Promise<ChatResult> {
   const { messages, temperature = 0.3, maxTokens = 2048 } = options;
+  const startedAt = Date.now();
 
   if (provider === "deepseek") {
     const apiKey = Deno.env.get("DEEPSEEK_API_KEY")?.trim();
@@ -157,10 +268,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`DeepSeek: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("DeepSeek: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "groq") {
@@ -178,10 +292,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`Groq: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("Groq: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "gemini") {
@@ -208,10 +325,16 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`Gemini: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const data = (await res.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+      usageMetadata?: unknown;
+    };
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (text == null) throw new Error("Gemini: empty response");
-    return text;
+    const usage = parseUsage(data.usageMetadata);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content: text, provider, model, usage, latencyMs };
   }
 
   if (provider === "claude") {
@@ -239,11 +362,14 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`Claude: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+    const data = (await res.json()) as { content?: { type: string; text?: string }[]; usage?: unknown };
     const block = data.content?.find((c) => c.type === "text");
     const text = block && "text" in block ? block.text?.trim() : null;
     if (text == null) throw new Error("Claude: empty response");
-    return text;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content: text, provider, model, usage, latencyMs };
   }
 
   if (provider === "gigachat") {
@@ -269,10 +395,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`GigaChat: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("GigaChat: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "openrouter") {
@@ -290,10 +419,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`OpenRouter: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("OpenRouter: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "mistral") {
@@ -311,10 +443,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`Mistral: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("Mistral: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "cerebras") {
@@ -332,10 +467,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`Cerebras: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("Cerebras: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   if (provider === "openai") {
@@ -353,10 +491,13 @@ async function chatTextWithProvider(provider: TextProvider, options: {
       const err = await res.text();
       throw new Error(`OpenAI: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: unknown };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("OpenAI: empty response");
-    return content;
+    const usage = parseUsage(data.usage);
+    const latencyMs = Date.now() - startedAt;
+    await logAiUsage({ provider, model, context: options.context, usage, latencyMs, status: "ok" });
+    return { content, provider, model, usage, latencyMs };
   }
 
   throw new Error(`Unknown provider: ${provider}`);
@@ -378,9 +519,18 @@ export async function chatText(options: {
   for (const provider of providers) {
     try {
       const result = await chatTextWithProvider(provider, options);
-      if (result?.trim()) return result;
+      if (result.content?.trim()) return result.content;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      await logAiUsage({
+        provider,
+        model: options.model ?? "",
+        context: options.context,
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        latencyMs: 0,
+        status: "error",
+        errorMessage: lastError.message.slice(0, 500),
+      });
       console.warn(`AI provider ${provider} failed:`, lastError.message);
     }
   }

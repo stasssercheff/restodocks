@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/inbox_viewed_service.dart';
 import '../utils/inventory_document_labels.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/employee_name_translation_utils.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -31,6 +32,8 @@ class _InventoryInboxDetailScreenState
 
   /// Переводы названий продуктов: оригинальное имя -> переведённое
   final Map<String, String> _translatedNames = {};
+  String? _translatedEmployeeName;
+  final Map<String, String> _translatedSourceEmployeeNames = {};
 
   @override
   void initState() {
@@ -43,6 +46,8 @@ class _InventoryInboxDetailScreenState
       _loading = true;
       _error = null;
       _translatedNames.clear();
+      _translatedEmployeeName = null;
+      _translatedSourceEmployeeNames.clear();
     });
     final doc = await InventoryDocumentService().getById(widget.documentId);
     if (!mounted) return;
@@ -55,6 +60,45 @@ class _InventoryInboxDetailScreenState
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
       context.read<InboxViewedService>().addViewed(estId, widget.documentId);
       _loadTranslations(doc);
+      _translateHeaderNames(doc);
+    }
+  }
+
+  Future<void> _translateHeaderNames(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+        ? payload['sourceLang'] as String
+        : 'ru';
+    final ts = context.read<TranslationService>();
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final employee = (header['employeeName'] ?? '').toString().trim();
+    if (employee.isNotEmpty && employee != '—') {
+      final translated = sourceLang == targetLang
+          ? employee
+          : await translateAdHocPersonName(ts, employee, targetLang);
+      if (mounted) {
+        setState(() => _translatedEmployeeName = translated);
+      }
+    }
+    final mergeMetadata = payload['mergeMetadata'] as Map<String, dynamic>?;
+    final sources = (mergeMetadata?['sourceDocuments'] as List<dynamic>?) ?? [];
+    if (sources.isEmpty) return;
+    final translatedSources = <String, String>{};
+    for (final source in sources) {
+      if (source is! Map) continue;
+      final raw = (source['employeeName'] ?? '').toString().trim();
+      if (raw.isEmpty || raw == '—' || translatedSources.containsKey(raw)) {
+        continue;
+      }
+      translatedSources[raw] = sourceLang == targetLang
+          ? raw
+          : await translateAdHocPersonName(ts, raw, targetLang);
+    }
+    if (mounted && translatedSources.isNotEmpty) {
+      setState(() => _translatedSourceEmployeeNames.addAll(translatedSources));
     }
   }
 
@@ -715,7 +759,8 @@ class _InventoryInboxDetailScreenState
               final m = s is Map
                   ? Map<String, dynamic>.from(s as Map)
                   : <String, dynamic>{};
-              final emp = m['employeeName']?.toString() ?? '—';
+              final rawEmp = m['employeeName']?.toString() ?? '—';
+              final emp = _translatedSourceEmployeeNames[rawEmp] ?? rawEmp;
               final createdRaw = m['createdAt']?.toString() ?? '';
               String createdStr = createdRaw;
               try {
@@ -741,7 +786,10 @@ class _InventoryInboxDetailScreenState
       children: [
         _headerRow(loc.t('inventory_establishment'),
             header['establishmentName'] ?? '—'),
-        _headerRow(loc.t('inventory_employee'), header['employeeName'] ?? '—'),
+        _headerRow(
+          loc.t('inventory_employee'),
+          _translatedEmployeeName ?? (header['employeeName'] ?? '—'),
+        ),
         _headerRow(loc.t('inventory_date'), header['date'] ?? '—'),
         _headerRow(loc.t('inventory_time_start'), header['timeStart'] ?? '—'),
         _headerRow(loc.t('inventory_time_end'), header['timeEnd'] ?? '—'),

@@ -53,6 +53,17 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function formatUsd(amount: number | null | undefined) {
+  const n = Number(amount ?? 0)
+  if (!Number.isFinite(n)) return '$0.00'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(n)
+}
+
 /** Значение для `input type="date"` (календарь в локальной дате). */
 function isoToDateInputValue(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -105,7 +116,7 @@ const RD_ADMIN_SUPPORT_KEY = 'rd_admin_support_active'
 export default function AdminClient() {
   const router = useRouter()
   const [tab, setTab] = useState<
-    'establishments' | 'promo' | 'broadcast' | 'support' | 'security' | 'health'
+    'establishments' | 'promo' | 'broadcast' | 'support' | 'security' | 'health' | 'ai_usage'
   >('establishments')
   const [supportShellHighlight, setSupportShellHighlight] = useState(false)
 
@@ -152,6 +163,7 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
+            { key: 'ai_usage', label: 'AI Usage' },
             { key: 'broadcast', label: 'Рассылка' },
             { key: 'support', label: 'Техподдержка' },
             { key: 'security', label: 'Безопасность' },
@@ -175,6 +187,7 @@ export default function AdminClient() {
       <main className="max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
+        {tab === 'ai_usage' && <AiUsageTab />}
         {tab === 'broadcast' && <BroadcastTab />}
         {tab === 'support' && (
           <SupportAccessTab
@@ -2308,6 +2321,228 @@ function SystemHealthTab() {
       >
         Обновить проверки
       </button>
+    </div>
+  )
+}
+
+// ─── AI Usage Tab ──────────────────────────────────────────────────────────────
+
+type AiUsageResponse = {
+  meta: {
+    days: number
+    provider: string | null
+    fromIso: string
+    sampleSize: number
+    limit: number
+  }
+  summary: {
+    requests: number
+    successRequests: number
+    failedRequests: number
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    estimatedCostUsd: number
+  }
+  byProvider: Array<{ provider: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  byContext: Array<{ context: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  byDay: Array<{ date: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  recent: Array<{
+    created_at: string
+    provider: string
+    model: string | null
+    context: string | null
+    total_tokens: number | null
+    estimated_cost_usd: number | null
+    status: string | null
+  }>
+}
+
+function AiUsageTab() {
+  const [provider, setProvider] = useState('deepseek')
+  const [days, setDays] = useState(30)
+  const [data, setData] = useState<AiUsageResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const p = new URLSearchParams()
+      p.set('days', String(days))
+      if (provider.trim()) p.set('provider', provider.trim().toLowerCase())
+      p.set('limit', '3000')
+      const res = await fetch(`/api/ai-usage?${p.toString()}`)
+      const json = (await res.json()) as AiUsageResponse & { error?: string }
+      if (!res.ok) {
+        setError(typeof json?.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        setData(null)
+      } else {
+        setData(json as AiUsageResponse)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [days, provider])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const successRate = data?.summary.requests
+    ? Math.round((data.summary.successRequests / data.summary.requests) * 1000) / 10
+    : 0
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">Провайдер</label>
+          <select
+            value={provider}
+            onChange={e => setProvider(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+          >
+            <option value="deepseek">deepseek</option>
+            <option value="">all</option>
+            <option value="openai">openai</option>
+            <option value="gemini">gemini</option>
+            <option value="groq">groq</option>
+            <option value="claude">claude</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">Период (дней)</label>
+          <select
+            value={days}
+            onChange={e => setDays(Number(e.target.value))}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+          >
+            <option value={7}>7</option>
+            <option value={14}>14</option>
+            <option value={30}>30</option>
+            <option value={90}>90</option>
+            <option value={180}>180</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium"
+          disabled={loading}
+        >
+          {loading ? 'Обновление…' : 'Обновить'}
+        </button>
+        {data?.meta ? (
+          <div className="text-xs text-gray-500 ml-auto">
+            Выборка: {data.meta.sampleSize} записей, с {formatDate(data.meta.fromIso)}
+          </div>
+        ) : null}
+      </div>
+
+      {error ? (
+        <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">{error}</div>
+      ) : null}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
+        <StatCard label="Запросов" value={data?.summary.requests ?? '—'} />
+        <StatCard label="Успешных" value={data?.summary.successRequests ?? '—'} />
+        <StatCard label="Ошибок" value={data?.summary.failedRequests ?? '—'} dimmed={(data?.summary.failedRequests ?? 0) === 0} />
+        <StatCard label="Токены (всего)" value={data?.summary.totalTokens?.toLocaleString('ru-RU') ?? '—'} />
+        <StatCard label="Успешность" value={`${successRate}%`} />
+        <StatCard label="Оценка расходов" value={formatUsd(data?.summary.estimatedCostUsd)} />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-800 text-sm text-gray-300">По контекстам</div>
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-xs sm:text-sm">
+              <thead className="bg-gray-950 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">Контекст</th>
+                  <th className="text-right px-3 py-2 font-medium">Запросы</th>
+                  <th className="text-right px-3 py-2 font-medium">Токены</th>
+                  <th className="text-right px-3 py-2 font-medium">$</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.byContext ?? []).map(row => (
+                  <tr key={row.context} className="border-t border-gray-800/70">
+                    <td className="px-3 py-2 text-gray-300">{row.context}</td>
+                    <td className="px-3 py-2 text-right">{row.requests.toLocaleString('ru-RU')}</td>
+                    <td className="px-3 py-2 text-right">{row.totalTokens.toLocaleString('ru-RU')}</td>
+                    <td className="px-3 py-2 text-right text-emerald-300">{formatUsd(row.estimatedCostUsd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-800 text-sm text-gray-300">По дням</div>
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-xs sm:text-sm">
+              <thead className="bg-gray-950 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">Дата</th>
+                  <th className="text-right px-3 py-2 font-medium">Запросы</th>
+                  <th className="text-right px-3 py-2 font-medium">Токены</th>
+                  <th className="text-right px-3 py-2 font-medium">$</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.byDay ?? []).map(row => (
+                  <tr key={row.date} className="border-t border-gray-800/70">
+                    <td className="px-3 py-2 text-gray-300">{formatDate(row.date)}</td>
+                    <td className="px-3 py-2 text-right">{row.requests.toLocaleString('ru-RU')}</td>
+                    <td className="px-3 py-2 text-right">{row.totalTokens.toLocaleString('ru-RU')}</td>
+                    <td className="px-3 py-2 text-right text-emerald-300">{formatUsd(row.estimatedCostUsd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-800 text-sm text-gray-300">
+          Последние вызовы (до 200)
+        </div>
+        <div className="max-h-[420px] overflow-auto">
+          <table className="w-full text-xs sm:text-sm">
+            <thead className="bg-gray-950 text-gray-500 sticky top-0">
+              <tr>
+                <th className="text-left px-3 py-2 font-medium">Время</th>
+                <th className="text-left px-3 py-2 font-medium">Provider</th>
+                <th className="text-left px-3 py-2 font-medium">Model</th>
+                <th className="text-left px-3 py-2 font-medium">Context</th>
+                <th className="text-right px-3 py-2 font-medium">Токены</th>
+                <th className="text-right px-3 py-2 font-medium">$</th>
+                <th className="text-left px-3 py-2 font-medium">Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.recent ?? []).map((row, idx) => (
+                <tr key={`${row.created_at}-${idx}`} className="border-t border-gray-800/70">
+                  <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{new Date(row.created_at).toLocaleString('ru-RU')}</td>
+                  <td className="px-3 py-2">{row.provider}</td>
+                  <td className="px-3 py-2 text-gray-400">{row.model ?? '—'}</td>
+                  <td className="px-3 py-2 text-gray-400">{row.context ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">{Number(row.total_tokens ?? 0).toLocaleString('ru-RU')}</td>
+                  <td className="px-3 py-2 text-right text-emerald-300">{formatUsd(row.estimated_cost_usd ?? 0)}</td>
+                  <td className={`px-3 py-2 ${String(row.status ?? 'ok').toLowerCase() === 'ok' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {row.status ?? 'ok'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
