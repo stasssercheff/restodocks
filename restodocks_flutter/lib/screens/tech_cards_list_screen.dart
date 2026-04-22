@@ -550,8 +550,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _showTrialImportCapDialog(LocalizationService loc) async {
     if (!mounted) return;
-    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
-    final title = isRu ? 'Лимит импорта исчерпан' : 'Import limit reached';
+    final title = _localizedOrFallback(
+      loc,
+      'trial_ttk_import_limit_title',
+      'Лимит импорта исчерпан',
+    );
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -3549,9 +3552,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     } else if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
       return;
-    } else {
-      trialRemaining = await _trialImportRemainingOrNotify(loc);
-      if (trialRemaining != null && trialRemaining <= 0) return;
     }
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
     final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
@@ -3728,6 +3728,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
     controller.dispose();
     if (result == null || result.isEmpty || !mounted) return;
+    if (!allowPromptFallback) {
+      final remainingNow = await _trialImportRemaining();
+      if (remainingNow != null && remainingNow <= 0) {
+        await _showTrialImportCapDialog(loc);
+        return;
+      }
+      trialRemaining = remainingNow;
+    }
     setState(() {
       _loadingExcel = true;
       _loadingTtkIsAiPrompt = allowPromptFallback;
