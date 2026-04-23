@@ -25,6 +25,9 @@ class TranslationService {
   final AiServiceSupabase _aiService;
   final SupabaseService _supabase;
 
+  static final RegExp _sfPrefixRe =
+      RegExp(r'^\s*(пф|п/ф|п\.ф\.|pf|prep|sf|hf)\s+', caseSensitive: false);
+
   // Локальный кеш переводов
   final Map<String, Translation> _cache = {};
 
@@ -119,6 +122,11 @@ class TranslationService {
         } catch (_) {}
       }
       if (translatedText != null && translatedText.trim().isNotEmpty) {
+        translatedText = _normalizeSemiFinishedPrefix(
+          translatedText,
+          sourceText: text,
+          targetLanguage: to,
+        );
         final translation = Translation(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           entityType: entityType,
@@ -145,9 +153,14 @@ class TranslationService {
     // 2. Перевод через AI (только если useAiForTranslation == true)
     if (useAiForTranslation) {
       try {
-        final translatedText = await _translateWithAI(text, from, to);
+        var translatedText = await _translateWithAI(text, from, to);
 
         if (translatedText != null && translatedText.trim().isNotEmpty) {
+          translatedText = _normalizeSemiFinishedPrefix(
+            translatedText,
+            sourceText: text,
+            targetLanguage: to,
+          );
           final translation = Translation(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             entityType: entityType,
@@ -234,6 +247,42 @@ class TranslationService {
     } catch (e) {
       return null;
     }
+  }
+
+  String _semiFinishedPrefixForLanguage(String languageCode) {
+    switch (languageCode) {
+      case 'ru':
+        return 'ПФ';
+      case 'en':
+      case 'it':
+      case 'de':
+        return 'Prep';
+      case 'es':
+      case 'fr':
+      case 'tr':
+      case 'vi':
+      case 'kk':
+      default:
+        return 'SF';
+    }
+  }
+
+  String _normalizeSemiFinishedPrefix(
+    String translatedText, {
+    required String sourceText,
+    required String targetLanguage,
+  }) {
+    final src = sourceText.trim();
+    final out = translatedText.trim();
+    if (src.isEmpty || out.isEmpty) return translatedText;
+    final sourceLooksSemiFinished = _sfPrefixRe.hasMatch(src);
+    final translatedHasPrefix = _sfPrefixRe.hasMatch(out);
+    if (!sourceLooksSemiFinished && !translatedHasPrefix) return translatedText;
+
+    final withoutPrefix = out.replaceFirst(_sfPrefixRe, '').trim();
+    if (withoutPrefix.isEmpty) return translatedText;
+    final prefix = _semiFinishedPrefixForLanguage(targetLanguage.toLowerCase());
+    return '$prefix $withoutPrefix';
   }
 
   /// Перевод для данной версии source_text и целевого языка (любой source_language в строке).

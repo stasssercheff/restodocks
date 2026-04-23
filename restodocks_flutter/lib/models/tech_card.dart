@@ -332,11 +332,11 @@ class TechCard extends Equatable {
       case 'es':
         return 'SF';
       case 'it':
-        return 'PF';
+        return 'Prep';
       case 'fr':
         return 'SF';
       case 'de':
-        return 'HF';
+        return 'Prep';
       default:
         return 'ПФ';
     }

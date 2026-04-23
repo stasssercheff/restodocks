@@ -4,7 +4,7 @@
 String ensurePfPrefix(String name) {
   if (name.trim().isEmpty) return name.trim();
   final s = name.trim();
-  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf '];
+  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
   final sLower = s.toLowerCase();
   for (final p in pfPrefixes) {
     if (sLower.startsWith(p)) return s;
@@ -32,7 +32,7 @@ String stripPfPrefix(String name) {
 String normalizeForPfMatching(String name) {
   if (name.isEmpty) return name;
   var s = stripIikoPrefix(name).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf '];
+  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
   for (final p in pfPrefixes) {
     if (s.startsWith(p)) {
       s = s.substring(p.length).trim();
