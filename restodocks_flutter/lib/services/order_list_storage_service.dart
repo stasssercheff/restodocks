@@ -9,6 +9,13 @@ import 'supabase_service.dart';
 const _keyPrefix = 'restodocks_order_lists_';
 const _table = 'establishment_order_list_data';
 
+bool _isQuotaExceededError(Object e) {
+  final msg = e.toString().toLowerCase();
+  return msg.contains('quotaexceeded') ||
+      msg.contains('quota exceeded') ||
+      (msg.contains('domexception') && msg.contains('quota'));
+}
+
 /// Подразделения (kitchen, bar, hall)
 const _departments = ['kitchen', 'bar', 'hall'];
 
@@ -116,9 +123,17 @@ Future<void> saveOrderLists(String establishmentId, List<OrderList> lists, {Stri
         'data': data,
       });
     }
-    await prefs.setString(key, encoded);
+    try {
+      await prefs.setString(key, encoded);
+    } catch (e) {
+      if (!_isQuotaExceededError(e)) rethrow;
+    }
   } catch (_) {
-    await prefs.setString(key, encoded);
+    try {
+      await prefs.setString(key, encoded);
+    } catch (e) {
+      if (!_isQuotaExceededError(e)) rethrow;
+    }
   }
 }
 

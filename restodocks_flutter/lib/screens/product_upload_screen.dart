@@ -1533,6 +1533,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final ai = context.read<AiService>();
       final userLocale =
           WidgetsBinding.instance.platformDispatcher.locale.toString();
+      final rawLineCount = rows?.length ??
+          (text == null
+              ? 0
+              : text
+                  .split(RegExp(r'\r?\n'))
+                  .where((s) => s.trim().isNotEmpty)
+                  .length);
+      final aiParseTimeoutSec = rawLineCount >= 80 ? 12 : 20;
 
       if (useRawIikoNames) {
         _setLoadingMsg('product_upload_loading_match_db');
@@ -1557,7 +1565,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                   userLocale: userLocale,
                   mode: mode,
                 )
-                .timeout(const Duration(seconds: 20));
+                .timeout(Duration(seconds: aiParseTimeoutSec));
           } on TimeoutException {
             _addDebugLog(
                 'WARN: ai.parseProductList timeout for rows input, switching to local parser');
@@ -1572,10 +1580,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                   userLocale: userLocale,
                   mode: mode,
                 )
-                .timeout(const Duration(seconds: 20));
+                .timeout(Duration(seconds: aiParseTimeoutSec));
           } on TimeoutException {
             _addDebugLog(
-                'WARN: ai.parseProductList timeout for text input, switching to local parser');
+                'WARN: ai.parseProductList timeout for text input (>${aiParseTimeoutSec}s), switching to local parser');
             parsed = [];
           }
         }

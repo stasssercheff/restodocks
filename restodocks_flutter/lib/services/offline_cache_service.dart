@@ -42,10 +42,41 @@ class OfflineCacheService {
     return '$_cachePrefix$dataset:$establishmentId:$token$sfx';
   }
 
+  bool _isQuotaExceededError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('quotaexceeded') ||
+        msg.contains('quota exceeded') ||
+        msg.contains('domexception') && msg.contains('quota');
+  }
+
+  Future<void> _safeWriteString(SharedPreferences prefs, String key, String value) async {
+    try {
+      await prefs.setString(key, value);
+    } catch (e) {
+      if (!_isQuotaExceededError(e)) rethrow;
+      // Web private mode may have tiny storage quota; cache writes must not break app flow.
+      try {
+        await clearCurrentUserCache();
+        await prefs.setString(key, value);
+      } catch (_) {
+        // Ignore cache write failures; network data remains source of truth.
+      }
+    }
+  }
+
+  Future<void> _safeWriteInt(SharedPreferences prefs, String key, int value) async {
+    try {
+      await prefs.setInt(key, value);
+    } catch (e) {
+      if (!_isQuotaExceededError(e)) rethrow;
+      // Ignore timestamp writes on quota pressure.
+    }
+  }
+
   Future<void> writeJsonMap(String key, Map<String, dynamic> data) async {
     final prefs = await _sp();
-    await prefs.setString(key, jsonEncode(data));
-    await prefs.setInt('$key:ts', DateTime.now().millisecondsSinceEpoch);
+    await _safeWriteString(prefs, key, jsonEncode(data));
+    await _safeWriteInt(prefs, '$key:ts', DateTime.now().millisecondsSinceEpoch);
   }
 
   Future<Map<String, dynamic>?> readJsonMap(String key) async {
@@ -61,8 +92,8 @@ class OfflineCacheService {
   Future<void> writeJsonList(
       String key, List<Map<String, dynamic>> data) async {
     final prefs = await _sp();
-    await prefs.setString(key, jsonEncode(data));
-    await prefs.setInt('$key:ts', DateTime.now().millisecondsSinceEpoch);
+    await _safeWriteString(prefs, key, jsonEncode(data));
+    await _safeWriteInt(prefs, '$key:ts', DateTime.now().millisecondsSinceEpoch);
   }
 
   Future<List<Map<String, dynamic>>?> readJsonList(String key) async {

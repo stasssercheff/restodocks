@@ -6,16 +6,19 @@ const TRIAL_TOTAL_LIMIT = 3;
 const PAID_TIERS = new Set(["pro", "plus", "starter", "business", "ultra", "premium"]);
 const ULTRA_TIERS = new Set(["ultra", "premium"]);
 
-export async function checkAndIncrementAiTtkUsage(
-  establishmentId: string,
-): Promise<{ allowed: boolean; count: number; limit: number; reason?: string }> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) {
-    return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
-  }
-  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+type AiTtkUsageStatus = {
+  allowed: boolean;
+  count: number;
+  limit: number;
+  reason?: string;
+  periodType?: string;
+  periodKey?: string;
+};
 
+async function resolveAiTtkUsageStatus(
+  supabase: ReturnType<typeof createClient>,
+  establishmentId: string,
+): Promise<AiTtkUsageStatus> {
   const { data: est, error: estError } = await supabase
     .from("establishments")
     .select("subscription_type, pro_trial_ends_at, pro_paid_until")
@@ -72,23 +75,57 @@ export async function checkAndIncrementAiTtkUsage(
     .maybeSingle();
 
   const currentCount = row?.ai_parse_count ?? 0;
-  if (currentCount >= limit) {
-    return { allowed: false, count: currentCount, limit, reason: denyReason };
+  const allowed = currentCount < limit;
+  return {
+    allowed,
+    count: currentCount,
+    limit,
+    reason: allowed ? undefined : denyReason,
+    periodType,
+    periodKey,
+  };
+}
+
+export async function getAiTtkUsageStatus(
+  establishmentId: string,
+): Promise<AiTtkUsageStatus> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
+  }
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  return resolveAiTtkUsageStatus(supabase, establishmentId);
+}
+
+export async function checkAndIncrementAiTtkUsage(
+  establishmentId: string,
+): Promise<{ allowed: boolean; count: number; limit: number; reason?: string }> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
+  }
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const status = await resolveAiTtkUsageStatus(supabase, establishmentId);
+  if (!status.allowed) {
+    return { allowed: false, count: status.count, limit: status.limit, reason: status.reason };
   }
 
+  const now = new Date();
   const { error } = await supabase.from("ai_ttk_usage_counters").upsert(
     {
       establishment_id: establishmentId,
-      period_type: periodType,
-      period_key: periodKey,
-      ai_parse_count: currentCount + 1,
+      period_type: status.periodType,
+      period_key: status.periodKey,
+      ai_parse_count: status.count + 1,
       updated_at: now.toISOString(),
     },
     { onConflict: "establishment_id,period_type,period_key" },
   );
   if (error) {
     console.error("[ai_ttk_limit] upsert error:", error);
-    return { allowed: true, count: 0, limit };
+    return { allowed: true, count: status.count, limit: status.limit };
   }
-  return { allowed: true, count: currentCount + 1, limit };
+  return { allowed: true, count: status.count + 1, limit: status.limit };
 }

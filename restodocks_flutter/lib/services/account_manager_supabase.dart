@@ -18,6 +18,7 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import '../utils/employee_row_pick.dart';
 import 'account_ui_sync_service.dart';
+import 'ai_ttk_quota_cache_service.dart';
 import 'ai_service_supabase.dart';
 import 'establishment_data_warmup_service.dart';
 import 'establishment_local_hydration_service.dart';
@@ -82,6 +83,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   bool _supportSessionActive = false;
   bool _supportAccessTablesUnavailable = false;
   bool _checkEstablishmentAccessRpcUnavailable = false;
+  bool _trialUsageTableUnavailable = false;
 
   bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
     final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
@@ -179,6 +181,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     if (isLoggedInSync) {
       await refreshSupportSessionState();
+      try {
+        await AiTtkQuotaCacheService.instance
+            .preloadForCurrentSession(force: true)
+            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
@@ -194,6 +201,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     _initialized = true;
     if (isLoggedInSync) {
       await refreshSupportSessionState();
+      try {
+        await AiTtkQuotaCacheService.instance
+            .preloadForCurrentSession(force: true)
+            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
@@ -672,6 +684,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String kind,
     int delta = 1,
   }) async {
+    if (_trialUsageTableUnavailable) {
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
+      return;
+    }
     try {
       await _supabase.client.rpc(
         'trial_increment_usage',
@@ -681,18 +699,33 @@ class AccountManagerSupabase extends ChangeNotifier {
           'p_delta': delta,
         },
       );
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
     } on PostgrestException catch (e) {
       // На старой/частично мигрированной БД не блокируем экспорт/импорт из-за счётчиков триала.
+      final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+      if (e.code == '42P01' ||
+          msg.contains('establishment_trial_usage') ||
+          msg.contains('trial_increment_usage')) {
+        _trialUsageTableUnavailable = true;
+      }
       devLog(
         'trial_increment_usage: PostgREST error code=${e.code} '
         'message=${e.message}; skip trial usage increment',
       );
+      if (kind == 'ttk_import_cards' && delta > 0) {
+        await _incrementLocalTrialTtkImportCards(establishmentId, delta);
+      }
       return;
     }
   }
 
   /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
   Future<int> fetchTrialTtkImportCardsUsed(String establishmentId) async {
+    if (_trialUsageTableUnavailable) {
+      return _getLocalTrialTtkImportCards(establishmentId);
+    }
     try {
       final row = await _supabase.client
           .from('establishment_trial_usage')
@@ -701,21 +734,52 @@ class AccountManagerSupabase extends ChangeNotifier {
           .maybeSingle();
       if (row == null) return 0;
       final v = row['ttk_import_cards'];
-      if (v is int) return v;
-      if (v is num) return v.toInt();
-      return 0;
+      final serverValue =
+          v is int ? v : (v is num ? v.toInt() : 0);
+      final localValue =
+          await _getLocalTrialTtkImportCards(establishmentId);
+      return serverValue >= localValue ? serverValue : localValue;
     } on PostgrestException catch (e) {
       // Совместимость со старыми/частично мигрированными БД:
       // отсутствие таблицы trial usage не должно ломать сохранение ТТК.
+      final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+      if (e.code == '42P01' || msg.contains('establishment_trial_usage')) {
+        _trialUsageTableUnavailable = true;
+      }
       devLog(
         'fetchTrialTtkImportCardsUsed: PostgREST error code=${e.code} '
         'message=${e.message}; fallback to 0',
       );
-      return 0;
+      return _getLocalTrialTtkImportCards(establishmentId);
     } catch (e) {
       devLog('fetchTrialTtkImportCardsUsed: unexpected error: $e; fallback to 0');
+      return _getLocalTrialTtkImportCards(establishmentId);
+    }
+  }
+
+  String _localTrialTtkImportCardsKey(String establishmentId) =>
+      'trial_ttk_import_cards_${establishmentId.trim().toLowerCase()}';
+
+  Future<int> _getLocalTrialTtkImportCards(String establishmentId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_localTrialTtkImportCardsKey(establishmentId)) ?? 0;
+    } catch (_) {
       return 0;
     }
+  }
+
+  Future<void> _incrementLocalTrialTtkImportCards(
+    String establishmentId,
+    int delta,
+  ) async {
+    if (delta <= 0) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _localTrialTtkImportCardsKey(establishmentId);
+      final current = prefs.getInt(key) ?? 0;
+      await prefs.setInt(key, current + delta);
+    } catch (_) {}
   }
 
   /// Лимит «сохранение на устройстве» в первые 72 ч: 3 на каждый вид документа.
@@ -1635,6 +1699,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (empUi != null) {
       unawaited(AccountUiSyncService.instance.applyAfterLogin(empUi));
     }
+    try {
+      await AiTtkQuotaCacheService.instance
+          .preloadForCurrentSession(force: true)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+    } catch (_) {}
     notifyListeners();
 
     if (!kIsWeb && isLoggedInSync && _establishment != null) {

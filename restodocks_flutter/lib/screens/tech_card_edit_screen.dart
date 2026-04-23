@@ -1903,6 +1903,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               if (line.productName.trim().isEmpty) continue;
               final proc =
                   CookingProcess.resolveFromAiToken(line.cookingMethod, langForAi);
+              final resolvedProc =
+                  proc ?? CookingProcess.findById('mixing');
               var gross = line.grossGrams ?? 0.0;
               var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit =
@@ -1927,9 +1929,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
-                cookingProcessId: proc?.id,
-                cookingProcessName: proc != null
-                    ? proc.getLocalizedName(langForAi)
+                cookingProcessId: resolvedProc?.id,
+                cookingProcessName: resolvedProc != null
+                    ? resolvedProc.getLocalizedName(langForAi)
                     : null,
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
@@ -4794,7 +4796,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   border: const Border(
                       bottom: BorderSide(color: Colors.grey, width: 1)),
                 ),
-                child: Text(loc.t('hall_menu_info') ?? 'Для меню зала',
+                child: Text(loc.t('hall_menu_info'),
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.bold)),
               ),
