@@ -608,6 +608,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
   }
 
+  String? _resolveAiQuotaEstablishmentId(AccountManagerSupabase account) {
+    final est = account.establishment;
+    if (est == null) return null;
+    final dataId = est.dataEstablishmentId.trim();
+    if (dataId.isNotEmpty) return dataId;
+    final id = est.id.trim();
+    return id.isEmpty ? null : id;
+  }
+
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -616,8 +625,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       return;
     }
-    final establishmentId = account.establishment?.dataEstablishmentId.trim();
-    if (establishmentId == null || establishmentId.isEmpty) return;
+    final establishmentId = _resolveAiQuotaEstablishmentId(account);
+    if (establishmentId == null || establishmentId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _aiTtkRemainingQuota = null;
+          _aiQuotaServerUnavailable = true;
+        });
+      }
+      return;
+    }
     final quotaWindow = _aiTtkQuotaWindow(account);
     try {
       final row = await Supabase.instance.client
@@ -4055,8 +4072,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       _loadingTtkIsAiPrompt = allowPromptFallback;
     });
     try {
-      final est = context.read<AccountManagerSupabase>().establishment;
-      final establishmentId = est?.dataEstablishmentId;
+      final establishmentId = _resolveAiQuotaEstablishmentId(acc);
       final aiService = context.read<AiService>();
       if (allowPromptFallback && aiService is AiServiceSupabase) {
         final unitPrefs = context.read<UnitSystemPreferenceService>();
