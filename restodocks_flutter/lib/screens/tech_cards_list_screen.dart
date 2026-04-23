@@ -4004,7 +4004,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
     final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
     final aiQuotaRemaining =
-        canShowAiQuota ? (_aiTtkRemainingQuota ?? aiQuotaTotal) : null;
+        canShowAiQuota ? _aiTtkRemainingQuota : null;
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -4235,6 +4235,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 reason == 'ai_ttk_no_access_lite' ||
                 reason == 'ai_limit_exceeded' ||
                 reason == 'limit_3_per_day')) {
+          // Keep badge/UI in sync immediately when backend confirms limit.
+          if (mounted) {
+            setState(() => _aiTtkRemainingQuota = 0);
+          }
           await _showAiCreateReasonDialog(loc, reason);
           return;
         }
