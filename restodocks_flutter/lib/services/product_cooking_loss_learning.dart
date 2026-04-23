@@ -7,6 +7,17 @@ class ProductCookingLossLearning {
   ProductCookingLossLearning._();
 
   static SupabaseClient get _client => Supabase.instance.client;
+  static bool _recordLossRpcUnavailable = false;
+  static bool _recordWasteRpcUnavailable = false;
+
+  static bool _isRpcUnavailableError(Object e, String rpcName) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains(rpcName.toLowerCase()) &&
+        (msg.contains('404') ||
+            msg.contains('does not exist') ||
+            msg.contains('not found') ||
+            msg.contains('pgrst'));
+  }
 
   /// Средний % ужарки из системной БД или null — тогда UI использует дефолт способа.
   static Future<double?> getSuggestedLossPct({
@@ -89,7 +100,10 @@ class ProductCookingLossLearning {
 
       final loss = _lossPctForSample(ing);
       final procId = ing.cookingProcessId?.trim() ?? '';
-      if (loss != null && procId.isNotEmpty && procId != 'custom') {
+      if (!_recordLossRpcUnavailable &&
+          loss != null &&
+          procId.isNotEmpty &&
+          procId != 'custom') {
         try {
           await _client.rpc(
             'record_product_cooking_loss_sample_global',
@@ -102,6 +116,10 @@ class ProductCookingLossLearning {
             },
           );
         } catch (e, st) {
+          if (_isRpcUnavailableError(
+              e, 'record_product_cooking_loss_sample_global')) {
+            _recordLossRpcUnavailable = true;
+          }
           devLog(
             'ProductCookingLossLearning.record cooking: '
             '$pid $procId: $e\n$st',
@@ -110,7 +128,7 @@ class ProductCookingLossLearning {
       }
 
       final waste = _wastePctForSample(ing);
-      if (waste != null) {
+      if (!_recordWasteRpcUnavailable && waste != null) {
         try {
           await _client.rpc(
             'record_product_waste_sample_global',
@@ -122,6 +140,10 @@ class ProductCookingLossLearning {
             },
           );
         } catch (e, st) {
+          if (_isRpcUnavailableError(
+              e, 'record_product_waste_sample_global')) {
+            _recordWasteRpcUnavailable = true;
+          }
           devLog(
             'ProductCookingLossLearning.record waste: '
             '$pid: $e\n$st',
