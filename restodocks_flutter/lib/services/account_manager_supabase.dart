@@ -181,7 +181,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     if (isLoggedInSync) {
       await refreshSupportSessionState();
-      unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession());
+      try {
+        await AiTtkQuotaCacheService.instance
+            .preloadForCurrentSession(force: true)
+            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
@@ -197,7 +201,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     _initialized = true;
     if (isLoggedInSync) {
       await refreshSupportSessionState();
-      unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession());
+      try {
+        await AiTtkQuotaCacheService.instance
+            .preloadForCurrentSession(force: true)
+            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
@@ -1691,7 +1699,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (empUi != null) {
       unawaited(AccountUiSyncService.instance.applyAfterLogin(empUi));
     }
-    unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession(force: true));
+    try {
+      await AiTtkQuotaCacheService.instance
+          .preloadForCurrentSession(force: true)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+    } catch (_) {}
     notifyListeners();
 
     if (!kIsWeb && isLoggedInSync && _establishment != null) {
