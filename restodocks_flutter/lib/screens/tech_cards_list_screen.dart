@@ -658,17 +658,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       return;
     }
-    final quotaWindow = _aiTtkQuotaWindow(account);
     try {
-      final row = await Supabase.instance.client
-          .from('ai_ttk_usage_counters')
-          .select('ai_parse_count')
-          .eq('establishment_id', establishmentId)
-          .eq('period_type', quotaWindow.periodType)
-          .eq('period_key', quotaWindow.periodKey)
-          .maybeSingle();
-      final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
-      final remaining = (quotaWindow.limit - used).clamp(0, quotaWindow.limit);
+      final res = await Supabase.instance.client.functions.invoke(
+        'ai-create-tech-card',
+        body: <String, dynamic>{
+          'establishmentId': establishmentId,
+          'checkOnly': true,
+        },
+      );
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw StateError('ai-create-tech-card checkOnly returned invalid payload');
+      }
+      final limit = (data['limit'] as num?)?.toInt() ?? _aiTtkQuotaWindow(account).limit;
+      final used = (data['used'] as num?)?.toInt() ?? 0;
+      final remainingFromServer = (data['remaining'] as num?)?.toInt();
+      final remaining = (remainingFromServer ?? (limit - used)).clamp(0, limit);
       if (mounted) {
         setState(() {
           _aiTtkRemainingQuota = remaining;

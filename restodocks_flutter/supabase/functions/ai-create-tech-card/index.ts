@@ -25,12 +25,14 @@ Deno.serve(async (req: Request) => {
       prompt?: string;
       establishmentId?: string;
       locale?: string;
+      checkOnly?: boolean;
     };
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : "";
+    const checkOnly = body.checkOnly === true;
     const rawLocale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";
     const localeTag = rawLocale.length >= 2 ? rawLocale.slice(0, 2) : "en";
-    if (!prompt) {
+    if (!checkOnly && !prompt) {
       return new Response(JSON.stringify({ error: "prompt required" }), {
         status: 400,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
@@ -38,11 +40,32 @@ Deno.serve(async (req: Request) => {
     }
 
     if (establishmentId) {
-      const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
-      const { allowed, reason } = await checkAndIncrementAiTtkUsage(establishmentId);
+      const { checkAndIncrementAiTtkUsage, getAiTtkUsageStatus } = await import("../_shared/ai_ttk_limit.ts");
+      const status = checkOnly
+        ? await getAiTtkUsageStatus(establishmentId)
+        : await checkAndIncrementAiTtkUsage(establishmentId);
+      const { allowed, reason, count, limit } = status;
       if (!allowed) {
         return new Response(
-          JSON.stringify({ error: reason ?? "ai_limit_exceeded", reason: reason ?? "ai_limit_exceeded" }),
+          JSON.stringify({
+            error: reason ?? "ai_limit_exceeded",
+            reason: reason ?? "ai_limit_exceeded",
+            limit,
+            used: count,
+            remaining: Math.max(0, limit - count),
+            allowed: false,
+          }),
+          { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+        );
+      }
+      if (checkOnly) {
+        return new Response(
+          JSON.stringify({
+            allowed: true,
+            limit,
+            used: count,
+            remaining: Math.max(0, limit - count),
+          }),
           { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
         );
       }
