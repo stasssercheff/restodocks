@@ -377,14 +377,14 @@ class _OrderListsTab extends StatelessWidget {
                             color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 20),
                         Text(
-                          loc.t('order_list_empty') ?? 'Нет списков заказа',
+                          loc.t('order_list_empty') ?? 'No order lists yet',
                           style: Theme.of(context).textTheme.titleLarge,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           loc.t('order_list_empty_hint') ??
-                              'Выберите поставщика, заполните количества и сохраните или отправьте заказ',
+                              'Choose a supplier, fill in quantities, and save or send the order',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -452,7 +452,7 @@ class _OrderListsTab extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete_outline),
                               color: Theme.of(context).colorScheme.error,
-                              tooltip: loc.t('delete') ?? 'Удалить',
+                              tooltip: loc.t('delete') ?? 'Delete',
                               onPressed: () => _confirmDelete(context, order),
                             ),
                           ],
@@ -464,7 +464,7 @@ class _OrderListsTab extends StatelessWidget {
                 ),
         ),
         _BottomCreateButton(
-          label: loc.t('order_list_create') ?? 'Создать заказ',
+          label: loc.t('order_list_create') ?? 'Create order',
           onPressed: onCreate,
         ),
       ],
@@ -475,17 +475,17 @@ class _OrderListsTab extends StatelessWidget {
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('delete') ?? 'Удалить'),
+        title: Text(loc.t('delete') ?? 'Delete'),
         content: Text(
-            '${loc.t('order_delete_order_confirm') ?? 'Удалить список заказа'} «${order.name}»?'),
+            '${loc.t('order_delete_order_confirm') ?? 'Delete order list'} "${order.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel') ?? 'Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('delete') ?? 'Удалить'),
+            child: Text(loc.t('delete') ?? 'Delete'),
           ),
         ],
       ),

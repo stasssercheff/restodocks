@@ -57,7 +57,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final format = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузка'),
+        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Export'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,7 +77,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel') ?? 'Cancel'),
           ),
         ],
       ),
@@ -93,7 +93,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         end: DateTime(DateTime.now().year, DateTime.now().month + 1, 0),
       ),
       helpText: loc.t('expenses_orders_export_date_range') ??
-          'Диапазон дат для выгрузки',
+          'Date range for export',
     );
     if (range == null || !mounted) return;
     final dateStart = DateTime(range.start.year, range.start.month, range.start.day);
@@ -117,7 +117,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(height: 12),
-                Text(loc.t('expenses_orders_export_loading') ?? 'Выгрузка...'),
+                Text(loc.t('expenses_orders_export_loading') ?? 'Exporting...'),
               ],
             ),
           ),
@@ -188,13 +188,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       await saveFileBytes(fileName, bytes);
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Сводный отчёт сохранён: $fileName')),
+        SnackBar(content: Text('Summary report saved: $fileName')),
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка выгрузки: $e'),
+          content: Text('Export error: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -225,7 +225,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: ScrollToTopAppBarTitle(
-          child: Text(loc.t('expenses') ?? 'Расходы'),
+          child: Text(loc.t('expenses') ?? 'Expenses'),
         ),
         actions: [
           if (hasProOrUltra)
@@ -258,17 +258,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         String label;
                         switch (tab) {
                           case _ExpensesTab.fzp:
-                            label = loc.t('salary_tab_fzp') ?? 'ФЗП';
+                            label = loc.t('salary_tab_fzp') ?? 'Payroll';
                             break;
                           case _ExpensesTab.productOrders:
                             label = loc.t('expenses_tab_product_orders') ??
-                                'Заказы';
+                                'Orders';
                             break;
                           case _ExpensesTab.writeoffs:
-                            label = loc.t('expenses_tab_writeoffs') ?? 'Списания';
+                            label = loc.t('expenses_tab_writeoffs') ?? 'Write-offs';
                             break;
                           case _ExpensesTab.procurementReceipts:
-                            label = loc.t('expenses_tab_procurement') ?? 'Поставки';
+                            label = loc.t('expenses_tab_procurement') ?? 'Supplies';
                             break;
                         }
                         return Expanded(
@@ -753,7 +753,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
-      helpText: loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+      helpText: loc.t('expenses_orders_date_range') ?? 'Date range',
     );
     if (range != null && mounted) {
       setState(() {
@@ -775,14 +775,14 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: Text(loc.t('expenses_orders_filter_suppliers') ?? 'Выбор поставщиков'),
+              title: Text(loc.t('expenses_orders_filter_suppliers') ?? 'Select suppliers'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CheckboxListTile(
-                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'Все поставщики'),
+                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'All suppliers'),
                       value: showAll,
                       onChanged: (v) {
                         setDialogState(() {
@@ -812,11 +812,11 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                  child: Text(loc.t('cancel') ?? 'Cancel'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(ctx).pop(showAll ? {} : selected),
-                  child: Text(loc.t('apply') ?? 'Применить'),
+                  child: Text(loc.t('apply') ?? 'Apply'),
                 ),
               ],
             );
@@ -857,14 +857,14 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: Text(loc.t('expenses_orders_export_suppliers') ?? 'Поставщики для выгрузки'),
+              title: Text(loc.t('expenses_orders_export_suppliers') ?? 'Suppliers for export'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CheckboxListTile(
-                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'Все поставщики'),
+                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'All suppliers'),
                       value: showAll,
                       onChanged: (v) {
                         setDialogState(() {
@@ -894,11 +894,11 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                  child: Text(loc.t('cancel') ?? 'Cancel'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(ctx).pop(showAll ? {} : selected),
-                  child: Text(loc.t('apply') ?? 'Применить'),
+                  child: Text(loc.t('apply') ?? 'Apply'),
                 ),
               ],
             );
@@ -918,7 +918,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     final mode = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузить заказы продуктов'),
+        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Export product orders'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -928,13 +928,13 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.table_rows_outlined),
-              title: Text(loc.t('expenses_orders_export_mode_summary') ?? 'Сводная по заказам'),
+              title: Text(loc.t('expenses_orders_export_mode_summary') ?? 'Summary by orders'),
               onTap: () => Navigator.of(ctx).pop('summary'),
             ),
             ListTile(
               leading: const Icon(Icons.merge_type_outlined),
-              title: Text(loc.t('expenses_orders_export_mode_merge') ?? 'Слияние по выбранным позициям'),
-              subtitle: Text(loc.t('expenses_orders_export_mode_merge_sub') ?? 'Как при объединении инвентаризаций: выбор продуктов из номенклатуры'),
+              title: Text(loc.t('expenses_orders_export_mode_merge') ?? 'Merge selected items'),
+              subtitle: Text(loc.t('expenses_orders_export_mode_merge_sub') ?? 'Like inventory merge: choose products from nomenclature'),
               onTap: () => Navigator.of(ctx).pop('merge'),
             ),
           ],
@@ -942,7 +942,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel') ?? 'Cancel'),
           ),
         ],
       ),
@@ -955,7 +955,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
-      helpText: loc.t('expenses_orders_export_date_range') ?? 'Диапазон дат для выгрузки',
+      helpText: loc.t('expenses_orders_export_date_range') ?? 'Date range for export',
     );
     if (range == null || !mounted) return;
     final exportStart = DateTime(range.start.year, range.start.month, range.start.day);
@@ -991,7 +991,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(height: 16),
-                Text(loc.t('expenses_orders_export_loading') ?? 'Выгрузка...'),
+                Text(loc.t('expenses_orders_export_loading') ?? 'Exporting...'),
               ],
             ),
           ),
@@ -1040,7 +1040,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            (loc.t('expenses_orders_export_saved') ?? 'Выгружено') + ': $fileName',
+            (loc.t('expenses_orders_export_saved') ?? 'Exported') + ': $fileName',
           ),
         ),
       );
@@ -1057,7 +1057,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            loc.t('expenses_orders_export_error') ?? 'Ошибка выгрузки: $e',
+            loc.t('expenses_orders_export_error') ?? 'Export error: $e',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
@@ -1086,7 +1086,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               const SizedBox(height: 16),
               Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Повторить')),
+              FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Retry')),
             ],
           ),
         ),
@@ -1113,7 +1113,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
             Icon(Icons.shopping_cart_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('product_order_received_empty') ?? 'Отправленные заказы будут отображаться здесь',
+              loc.t('product_order_received_empty') ?? 'Sent orders will appear here',
               style: Theme.of(context).textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -1154,7 +1154,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+                                          loc.t('expenses_orders_date_range') ?? 'Date range',
                                           style: Theme.of(context).textTheme.titleSmall,
                                         ),
                                         Text(
@@ -1186,13 +1186,13 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          loc.t('order_tab_suppliers') ?? 'Поставщики',
+                                          loc.t('order_tab_suppliers') ?? 'Suppliers',
                                           style: Theme.of(context).textTheme.titleSmall,
                                         ),
                                         Text(
                                           _selectedSupplierNames.isEmpty
-                                              ? (loc.t('expenses_orders_all_suppliers') ?? 'Все')
-                                              : '${_selectedSupplierNames.length} ${loc.t('expenses_orders_selected') ?? 'выбрано'}',
+                                              ? (loc.t('expenses_orders_all_suppliers') ?? 'All')
+                                              : '${_selectedSupplierNames.length} ${loc.t('expenses_orders_selected') ?? 'selected'}',
                                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -1211,7 +1211,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                     IconButton.filled(
                       icon: const Icon(Icons.download),
                       onPressed: _exportProductOrders,
-                      tooltip: loc.t('expenses_orders_export_btn') ?? 'Выгрузить Excel',
+                      tooltip: loc.t('expenses_orders_export_btn') ?? 'Export Excel',
                     ),
                   ],
                 ),
@@ -1240,7 +1240,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                         Text(
                           _filteredOrders.isNotEmpty &&
                                   _textSearch.text.trim().isNotEmpty
-                              ? (loc.t('no_results') ?? 'Ничего не найдено')
+                              ? (loc.t('no_results') ?? 'Nothing found')
                               : (loc.t('expenses_orders_empty_filter') ??
                                   'Нет заказов за выбранный период и поставщиков'),
                           style: Theme.of(context).textTheme.bodyLarge,
@@ -1281,7 +1281,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                       child: Row(
                         children: [
                           Tooltip(
-                            message: loc.t('expenses_orders_include_in_total_hint') ?? 'Учитывать в итоге затрат',
+                            message: loc.t('expenses_orders_include_in_total_hint') ?? 'Include in total expenses',
                             child: SizedBox(
                               width: 40,
                               child: Checkbox(
@@ -1305,7 +1305,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                                 Text('$dateStr · ${header['supplierName'] ?? '—'}', style: Theme.of(context).textTheme.titleSmall),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${loc.t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName',
+                                  '${loc.t('inbox_header_employee') ?? 'Employee'}: $employeeName',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -1340,7 +1340,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        loc.t('salary_total_all') ?? 'Итого по всем',
+                        loc.t('salary_total_all') ?? 'Total overall',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -1360,7 +1360,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            (loc.t('expenses_orders_excluded_from_total') ?? 'Не включено в итог: %s').replaceAll('%s', '$excludedCount'),
+                            (loc.t('expenses_orders_excluded_from_total') ?? 'Excluded from total: %s').replaceAll('%s', '$excludedCount'),
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         );
@@ -1557,7 +1557,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
-      helpText: loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+      helpText: loc.t('expenses_orders_date_range') ?? 'Date range',
     );
     if (range != null && mounted) {
       setState(() {
@@ -1581,7 +1581,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
           builder: (ctx, setDialogState) {
             return AlertDialog(
               title: Text(
-                loc.t('expenses_orders_filter_suppliers') ?? 'Поставщики',
+                loc.t('expenses_orders_filter_suppliers') ?? 'Suppliers',
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -1590,7 +1590,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
                   children: [
                     CheckboxListTile(
                       title: Text(
-                        loc.t('expenses_orders_all_suppliers') ?? 'Все',
+                        loc.t('expenses_orders_all_suppliers') ?? 'All',
                       ),
                       value: showAll,
                       onChanged: (v) {
@@ -1625,12 +1625,12 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                  child: Text(loc.t('cancel') ?? 'Cancel'),
                 ),
                 FilledButton(
                   onPressed: () =>
                       Navigator.of(ctx).pop(showAll ? {} : selected),
-                  child: Text(loc.t('apply') ?? 'Применить'),
+                  child: Text(loc.t('apply') ?? 'Apply'),
                 ),
               ],
             );
@@ -1653,14 +1653,14 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          loc.t('expenses_procurement_export_dialog_title') ?? 'Выгрузить',
+          loc.t('expenses_procurement_export_dialog_title') ?? 'Export',
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              loc.t('expenses_procurement_export_format_title') ?? 'Формат',
+              loc.t('expenses_procurement_export_format_title') ?? 'Format',
             ),
             const SizedBox(height: 12),
             ListTile(
@@ -1680,7 +1680,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel') ?? 'Cancel'),
           ),
         ],
       ),
@@ -1811,7 +1811,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _load,
-                child: Text(loc.t('retry') ?? 'Повторить'),
+                child: Text(loc.t('retry') ?? 'Retry'),
               ),
             ],
           ),
@@ -1956,7 +1956,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
                   icon: const Icon(Icons.download),
                   onPressed: () => _export(loc),
                   tooltip:
-                      loc.t('expenses_procurement_export_btn') ?? 'Сохранить',
+                      loc.t('expenses_procurement_export_btn') ?? 'Save',
                 ),
               ],
             ),
@@ -2116,7 +2116,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        loc.t('salary_total_all') ?? 'Итого',
+                        loc.t('salary_total_all') ?? 'Total',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -2388,17 +2388,17 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
   String _categoryName(LocalizationService loc, String? code) {
     switch (code) {
       case 'staff':
-        return loc.t('writeoff_category_staff') ?? 'Персонал';
+        return loc.t('writeoff_category_staff') ?? 'Staff';
       case 'workingThrough':
-        return loc.t('writeoff_category_working') ?? 'Проработка';
+        return loc.t('writeoff_category_working') ?? 'Testing';
       case 'spoilage':
-        return loc.t('writeoff_category_spoilage') ?? 'Порча';
+        return loc.t('writeoff_category_spoilage') ?? 'Spoilage';
       case 'breakage':
-        return loc.t('writeoff_category_breakage') ?? 'Брекераж';
+        return loc.t('writeoff_category_breakage') ?? 'Defect check';
       case 'guestRefusal':
-        return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+        return loc.t('writeoff_category_guest_refusal') ?? 'Guest refusal';
       case 'generic':
-        return loc.t('writeoff_category_simple') ?? 'Списание';
+        return loc.t('writeoff_category_simple') ?? 'Write-off';
       default:
         return code ?? '—';
     }
@@ -2419,7 +2419,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
             const SizedBox(height: 16),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Повторить')),
+            FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Retry')),
           ],
         ),
       );
@@ -2448,7 +2448,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
             Icon(Icons.remove_circle_outline, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('expenses_writeoffs_empty') ?? 'Списания появятся здесь после отправки из экрана списаний',
+              loc.t('expenses_writeoffs_empty') ?? 'Write-offs will appear here after sending from the write-offs screen',
               style: Theme.of(context).textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -2475,7 +2475,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                   firstDate: DateTime(2020),
                   lastDate: DateTime(2030),
                   initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
-                  helpText: loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+                  helpText: loc.t('expenses_orders_date_range') ?? 'Date range',
                 );
                 if (range != null && mounted) {
                   setState(() {
@@ -2496,7 +2496,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+                            loc.t('expenses_orders_date_range') ?? 'Date range',
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                           Text(
@@ -2531,7 +2531,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                     child: Text(
                       _filteredDocs.isNotEmpty && _textSearch.text.trim().isNotEmpty
                           ? (loc.t('no_results') ?? '')
-                          : (loc.t('expenses_orders_empty_filter') ?? 'Нет за период'),
+                          : (loc.t('expenses_orders_empty_filter') ?? 'No records for period'),
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
@@ -2563,7 +2563,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                             child: Row(
                               children: [
                                 Tooltip(
-                                  message: loc.t('expenses_orders_include_in_total_hint') ?? 'Учитывать в итоге затрат',
+                                  message: loc.t('expenses_orders_include_in_total_hint') ?? 'Include in total expenses',
                                   child: SizedBox(
                                     width: 40,
                                     child: Checkbox(
@@ -2584,7 +2584,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${loc.t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName',
+                                        '${loc.t('inbox_header_employee') ?? 'Employee'}: $employeeName',
                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         ),
@@ -2621,7 +2621,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        loc.t('expenses_writeoffs_total_selected') ?? 'Итого по выбранным',
+                        loc.t('expenses_writeoffs_total_selected') ?? 'Total selected',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -2637,7 +2637,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        (loc.t('expenses_writeoffs_total_period') ?? 'За период: %s').replaceFirst('%s', NumberFormatUtils.formatSum(totalPeriod, currency)),
+                        (loc.t('expenses_writeoffs_total_period') ?? 'For period: %s').replaceFirst('%s', NumberFormatUtils.formatSum(totalPeriod, currency)),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
@@ -2710,7 +2710,7 @@ class _ProductIdsMergeExportPickerDialogState
             TextField(
               controller: _search,
               decoration: InputDecoration(
-                hintText: loc.t('search') ?? 'Поиск',
+                hintText: loc.t('search') ?? 'Search',
                 prefixIcon: const Icon(Icons.search),
               ),
               onChanged: (_) => setState(() {}),
@@ -2724,11 +2724,11 @@ class _ProductIdsMergeExportPickerDialogState
                       _selected.addAll(filtered.map((p) => p.id));
                     });
                   },
-                  child: Text(loc.t('inventory_merge_select_all') ?? 'Выбрать видимые'),
+                  child: Text(loc.t('inventory_merge_select_all') ?? 'Select visible'),
                 ),
                 TextButton(
                   onPressed: () => setState(_selected.clear),
-                  child: Text(loc.t('inventory_selective_clear') ?? 'Снять выбор'),
+                  child: Text(loc.t('inventory_selective_clear') ?? 'Clear selection'),
                 ),
               ],
             ),
@@ -2760,13 +2760,13 @@ class _ProductIdsMergeExportPickerDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(loc.t('cancel') ?? 'Отмена'),
+          child: Text(loc.t('cancel') ?? 'Cancel'),
         ),
         FilledButton(
           onPressed: _selected.isEmpty
               ? null
               : () => Navigator.of(context).pop(Set<String>.from(_selected)),
-          child: Text(loc.t('apply') ?? 'Далее'),
+          child: Text(loc.t('apply') ?? 'Next'),
         ),
       ],
     );
@@ -2801,7 +2801,7 @@ class _ExpensesExportLanguageDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                loc.t('salary_export_lang') ?? 'Язык сохранения:',
+                loc.t('salary_export_lang') ?? 'Save language:',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),

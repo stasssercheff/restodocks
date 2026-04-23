@@ -616,7 +616,7 @@ class _InboxScreenState extends State<InboxScreen> {
             : (shellReturnLeading(context) ?? appBarBackButton(context)),
         title: ScrollToTopAppBarTitle(
           child: Text(widget.messagesOnly
-              ? (loc.t('inbox_tab_messages') ?? 'Сообщения')
+              ? (loc.t('inbox_tab_messages') ?? 'Messages')
               : loc.t('inbox')),
         ),
         actions: [
@@ -636,7 +636,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 },
                 icon: const Icon(Icons.done_all, size: 20, color: Colors.white),
                 label:
-                    Text(loc.t('inbox_mark_all_viewed') ?? 'Просмотреть все'),
+                    Text(loc.t('inbox_mark_all_viewed') ?? 'Mark all viewed'),
               ),
             if (_isInventoryMergeTabSelected(isOwner) &&
                 _mergeableDocumentsForCurrentTab.isNotEmpty &&
@@ -649,7 +649,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     employee?.hasRole('floor_manager') == true))
               IconButton(
                 icon: const Icon(Icons.merge),
-                tooltip: loc.t('inventory_merge_title') ?? 'Объединить бланки',
+                tooltip: loc.t('inventory_merge_title') ?? 'Merge forms',
                 onPressed: () async {
                   final result = await context.push<bool>(
                     '/inbox/merge',
@@ -732,9 +732,9 @@ class _InboxScreenState extends State<InboxScreen> {
               _buildDeptChip(
                 allowed[i],
                 switch (allowed[i]) {
-                  _InboxDeptTab.kitchen => loc.t('dept_kitchen') ?? 'Кухня',
-                  _InboxDeptTab.bar => loc.t('dept_bar') ?? 'Бар',
-                  _InboxDeptTab.hall => loc.t('dept_hall') ?? 'Зал',
+                  _InboxDeptTab.kitchen => loc.t('dept_kitchen') ?? 'Kitchen',
+                  _InboxDeptTab.bar => loc.t('dept_bar') ?? 'Bar',
+                  _InboxDeptTab.hall => loc.t('dept_hall') ?? 'Hall',
                 },
                 loc,
               ),
@@ -955,20 +955,20 @@ class _InboxScreenState extends State<InboxScreen> {
                 tabs[i],
                 switch (tabs[i]) {
                   _InboxTypeTab.order =>
-                    loc.t('inbox_tab_order') ?? 'Заказы',
+                    loc.t('inbox_tab_order') ?? 'Orders',
                   _InboxTypeTab.goodsReceipt =>
-                    loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара',
+                    loc.t('inbox_tab_goods_receipt') ?? 'Goods receipt',
                   _InboxTypeTab.inventory =>
-                    loc.t('inbox_tab_inventory') ?? 'Инвентаризация',
-                  _InboxTypeTab.writeoff => loc.t('writeoffs') ?? 'Списания',
+                    loc.t('inbox_tab_inventory') ?? 'Inventory',
+                  _InboxTypeTab.writeoff => loc.t('writeoffs') ?? 'Write-offs',
                   _InboxTypeTab.iikoInventory =>
-                    loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko',
+                    loc.t('iiko_inventory_title') ?? 'iiko inventory',
                   _InboxTypeTab.notifications =>
-                    loc.t('inbox_tab_notifications') ?? 'Уведомления',
+                    loc.t('inbox_tab_notifications') ?? 'Notifications',
                   _InboxTypeTab.checklist =>
-                    loc.t('inbox_tab_checklist') ?? 'Чеклисты',
+                    loc.t('inbox_tab_checklist') ?? 'Checklists',
                   _InboxTypeTab.messages =>
-                    loc.t('inbox_tab_messages') ?? 'Сообщения',
+                    loc.t('inbox_tab_messages') ?? 'Messages',
                 },
                 loc,
               ),
@@ -1018,17 +1018,17 @@ class _InboxScreenState extends State<InboxScreen> {
       case _InboxTab.order:
         return loc.t('inbox_tab_order');
       case _InboxTab.goodsReceipt:
-        return loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара';
+        return loc.t('inbox_tab_goods_receipt') ?? 'Goods receipt';
       case _InboxTab.inventory:
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
-        return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
+        return loc.t('iiko_inventory_title') ?? 'iiko inventory';
       case _InboxTab.writeoff:
-        return loc.t('writeoffs') ?? 'Списания';
+        return loc.t('writeoffs') ?? 'Write-offs';
       case _InboxTab.messages:
-        return loc.t('inbox_tab_messages') ?? 'Сообщения';
+        return loc.t('inbox_tab_messages') ?? 'Messages';
       case _InboxTab.notifications:
-        return loc.t('inbox_tab_notifications') ?? 'Уведомления';
+        return loc.t('inbox_tab_notifications') ?? 'Notifications';
     }
   }
 
@@ -1169,7 +1169,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('inbox_notifications_empty') ?? 'Нет уведомлений',
+              loc.t('inbox_notifications_empty') ?? 'No notifications',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
@@ -1185,7 +1185,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('checklist_overdue') ?? 'Просроченные чеклисты',
+              loc.t('checklist_overdue') ?? 'Overdue checklists',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.error,
@@ -1202,7 +1202,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('birthday_upcoming') ?? 'Ближайшие дни рождения',
+              loc.t('birthday_upcoming') ?? 'Upcoming birthdays',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.primary,
@@ -1212,8 +1212,8 @@ class _InboxScreenState extends State<InboxScreen> {
           ..._upcomingBirthdays.map((e) {
             final dateStr = DateFormat('dd.MM').format(e.birthdayDate);
             final daysText = e.daysUntil == 0
-                ? (loc.t('birthday_today') ?? 'Сегодня')
-                : (loc.t('birthday_in_days') ?? 'Через %s дн.')
+                ? (loc.t('birthday_today') ?? 'Today')
+                : (loc.t('birthday_in_days') ?? 'In %s days')
                     .replaceAll('%s', '${e.daysUntil}');
             final nameLine = employeeDisplayName(
               e.emp,
@@ -1248,7 +1248,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('birthday_changed') ?? 'Изменение дня рождения',
+              loc.t('birthday_changed') ?? 'Birthday changed',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1265,7 +1265,7 @@ class _InboxScreenState extends State<InboxScreen> {
             final dateStr = DateFormat('dd.MM.yyyy').format(n.newBirthday);
             final prevStr = n.previousBirthday != null
                 ? DateFormat('dd.MM.yyyy').format(n.previousBirthday!)
-                : (loc.t('not_specified') ?? 'не указано');
+                : (loc.t('not_specified') ?? 'not specified');
             final createdStr =
                 DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
             return Card(
@@ -1286,7 +1286,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       ?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 subtitle: Text(
-                  '${loc.t('birthday_was') ?? 'Было'}: $prevStr • $createdStr',
+                  '${loc.t('birthday_was') ?? 'Was'}: $prevStr • $createdStr',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
@@ -1401,8 +1401,8 @@ class _InboxScreenState extends State<InboxScreen> {
         docs.where((d) => d.type == DocumentType.checklistSubmission).toList();
 
     final lang = loc.currentLanguageCode;
-    final noSection = loc.t('checklist_no_section') ?? 'Без цеха';
-    final overdueLabel = loc.t('checklist_overdue') ?? 'Просроченные';
+    final noSection = loc.t('checklist_no_section') ?? 'No section';
+    final overdueLabel = loc.t('checklist_overdue') ?? 'Overdue';
     final fmtDate = (DateTime d) =>
         '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
@@ -1418,7 +1418,7 @@ class _InboxScreenState extends State<InboxScreen> {
       final dateKey = fmtDate(doc.createdAt);
       final empName = doc.employeeName.isNotEmpty
           ? doc.employeeName
-          : (loc.t('checklist_all_employees') ?? 'Всем');
+          : (loc.t('checklist_all_employees') ?? 'All employees');
 
       grouped.putIfAbsent(sectionLabel, () => {});
       grouped[sectionLabel]!.putIfAbsent(dateKey, () => {});
@@ -1606,7 +1606,7 @@ class _DocumentTile extends StatelessWidget {
         ? NumberFormatUtils.formatSum(grandTotal!, currency)
         : null;
     // order_list_grand_total часто уже с «:» в JSON — не дублировать
-    final totalRaw = loc.t('order_list_grand_total') ?? 'Итого';
+    final totalRaw = loc.t('order_list_grand_total') ?? 'Total';
     final totalLabel = totalRaw.replaceFirst(RegExp(r':\s*$'), '');
     final theme = Theme.of(context);
 
@@ -1981,7 +1981,7 @@ class _MessagesContentState extends State<_MessagesContent> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('chat_with_employees') ?? 'Диалоги с сотрудниками',
+              loc.t('chat_with_employees') ?? 'Chats with employees',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.primary,
@@ -2062,7 +2062,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    loc.t('group_chat_title') ?? 'Групповые чаты',
+                    loc.t('group_chat_title') ?? 'Group chats',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context).colorScheme.primary,
@@ -2072,7 +2072,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                     onPressed: () => context.push('/inbox/group/new'),
                     icon: const Icon(Icons.group_add, size: 20),
                     label:
-                        Text(loc.t('group_chat_new') ?? 'Новый групповой чат'),
+                        Text(loc.t('group_chat_new') ?? 'New group chat'),
                     style: FilledButton.styleFrom(
                       backgroundColor:
                           Theme.of(context).colorScheme.secondaryContainer,
@@ -2110,7 +2110,7 @@ class _MessagesContentState extends State<_MessagesContent> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                loc.t('inbox_msg_checklist_not_done') ?? 'Чеклист не выполнен',
+                loc.t('inbox_msg_checklist_not_done') ?? 'Checklist not completed',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.primary,

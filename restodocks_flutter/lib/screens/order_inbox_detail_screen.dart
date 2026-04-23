@@ -318,14 +318,14 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final exportLang = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('order_export_language_title') ?? 'Язык документа'),
+        title: Text(loc.t('order_export_language_title') ?? 'Document language'),
         contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(loc.t('order_export_language_subtitle') ??
-                'Выберите язык для файла'),
+                'Choose language for the file'),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -377,7 +377,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final format = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('download') ?? 'Сохранить'),
+        title: Text(loc.t('download') ?? 'Save'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,7 +500,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       }
       if (mounted) {
         AppToastService.show(
-            loc.t('inventory_excel_downloaded') ?? 'Файл сохранён',
+            loc.t('inventory_excel_downloaded') ?? 'File saved',
             duration: const Duration(seconds: 3));
       }
     } catch (e) {
@@ -559,7 +559,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Сохранить',
+            tooltip: loc.t('download') ?? 'Save',
             onPressed: _showSaveFormatDialog,
           ),
         ],
@@ -572,7 +572,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
             _buildHeader(loc, header),
             const SizedBox(height: 24),
             Text(
-              loc.t('order_export_list') ?? 'Список',
+              loc.t('order_export_list') ?? 'List',
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -601,18 +601,18 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _row(loc.t('inbox_header_employee') ?? 'Кто отправил',
+        _row(loc.t('inbox_header_employee') ?? 'Sent by',
             _translatedEmployeeName ?? (header['employeeName'] ?? '—')),
         _row(
-            loc.t('order_export_date_time') ?? 'Дата отправки',
+            loc.t('order_export_date_time') ?? 'Sent at',
             createdAt != null
                 ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt)
                 : '—'),
-        _row(loc.t('order_export_to') ?? 'Поставщик',
+        _row(loc.t('order_export_to') ?? 'Supplier',
             _translatedSupplierName ?? (header['supplierName'] ?? '—')),
-        _row(loc.t('order_export_from') ?? 'Заведение',
+        _row(loc.t('order_export_from') ?? 'Establishment',
             header['establishmentName'] ?? '—'),
-        _row(loc.t('order_export_order_for') ?? 'На дату',
+        _row(loc.t('order_export_order_for') ?? 'For date',
             orderFor != null ? DateFormat('dd.MM.yyyy').format(orderFor) : '—'),
       ],
     );
@@ -671,7 +671,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                       _cell(theme, loc.t('inventory_item_name'), bold: true),
                       _cell(theme, loc.t('order_list_unit'), bold: true),
                       _cell(theme, loc.t('order_list_quantity'), bold: true),
-                      _cell(theme, loc.t('order_list_unit_price') ?? 'Цена',
+                      _cell(theme, loc.t('order_list_unit_price') ?? 'Price',
                           bold: true),
                       _cell(theme, _lineTotalHeader(loc), bold: true),
                     ],
@@ -698,7 +698,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                         color: theme.colorScheme.surfaceContainerHighest),
                     children: [
                       _cell(theme, '', bold: true),
-                      _cell(theme, loc.t('order_list_grand_total') ?? 'Итого:',
+                      _cell(theme, loc.t('order_list_grand_total') ?? 'Total:',
                           bold: true),
                       _cell(theme, '', bold: true),
                       _cell(theme, '', bold: true),
@@ -741,7 +741,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final currency =
         context.read<AccountManagerSupabase>().establishment?.defaultCurrency ??
             'VND';
-    final t = loc.t('order_list_line_total_currency') ?? 'Сумма %s';
+    final t = loc.t('order_list_line_total_currency') ?? 'Amount %s';
     return t.replaceFirst('%s', currency);
   }
 

@@ -4796,7 +4796,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   border: const Border(
                       bottom: BorderSide(color: Colors.grey, width: 1)),
                 ),
-                child: Text(loc.t('hall_menu_info') ?? 'Для меню зала',
+                child: Text(loc.t('hall_menu_info') ?? 'For hall menu',
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.bold)),
               ),

@@ -107,7 +107,7 @@ class _TechCardsImportReviewScreenState
 
   Map<String, String> _getSectionLabels(LocalizationService loc) {
     if (_isBar) {
-      return {'bar': loc.t('bar') ?? 'Бар'};
+      return {'bar': loc.t('bar') ?? 'Bar'};
     }
     return Map.fromEntries(
       _kitchenSectionCodes
@@ -116,13 +116,13 @@ class _TechCardsImportReviewScreenState
   }
 
   String _sectionsDisplayLabel(List<String> sections, LocalizationService loc) {
-    if (sections.isEmpty) return loc.t('ttk_sections_hidden') ?? 'Скрыто';
+    if (sections.isEmpty) return loc.t('ttk_sections_hidden') ?? 'Hidden';
     if (sections.contains('all'))
-      return loc.t('ttk_sections_all') ?? 'Все цеха';
+      return loc.t('ttk_sections_all') ?? 'All sections';
     if (sections.length == 1) {
       return _getSectionLabels(loc)[sections.first] ?? sections.first;
     }
-    return (loc.t('ttk_sections_count') ?? '%s цеха')
+    return (loc.t('ttk_sections_count') ?? '%s sections')
         .replaceAll('%s', '${sections.length}');
   }
 
@@ -386,14 +386,14 @@ class _TechCardsImportReviewScreenState
                         Icon(Icons.store,
                             color: theme.colorScheme.primary, size: 22),
                         const SizedBox(width: 10),
-                        Text(loc.t('ttk_section_select') ?? 'Выбор цеха',
+                        Text(loc.t('ttk_section_select') ?? 'Select section',
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700)),
                       ]),
                       const SizedBox(height: 4),
                       Text(
                         loc.t('ttk_section_hint') ??
-                            'ТТК будет видна только поварам выбранных цехов.',
+                            'This tech card will be visible only to cooks in selected sections.',
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.6)),
@@ -426,9 +426,9 @@ class _TechCardsImportReviewScreenState
                           Expanded(
                             child: Text(
                               isHidden
-                                  ? (loc.t('ttk_section_hidden') ?? 'Скрыто')
+                                  ? (loc.t('ttk_section_hidden') ?? 'Hidden')
                                   : (loc.t('ttk_section_uncheck_hint') ??
-                                      'Снимите все цеха чтобы скрыть'),
+                                      'Uncheck all sections to hide this card'),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHidden
@@ -449,7 +449,7 @@ class _TechCardsImportReviewScreenState
                           )),
                       const Divider(height: 20),
                       _CheckItem(
-                        label: loc.t('ttk_section_all') ?? 'Все цеха',
+                        label: loc.t('ttk_section_all') ?? 'All sections',
                         checked: isAll,
                         onTap: () => toggle('all'),
                         theme: theme,
@@ -462,11 +462,11 @@ class _TechCardsImportReviewScreenState
                         children: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(),
-                            child: Text(loc.t('back') ?? 'Назад'),
+                            child: Text(loc.t('back') ?? 'Back'),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.of(ctx).pop(selected),
-                            child: Text(loc.t('save') ?? 'Сохранить'),
+                            child: Text(loc.t('save') ?? 'Save'),
                           ),
                         ],
                       ),
@@ -745,7 +745,7 @@ class _TechCardsImportReviewScreenState
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(est == null
-              ? (loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')
+              ? (loc.t('ttk_import_no_establishment') ?? 'Select an establishment')
               : (loc.t('ttk_import_no_employee') ??
                   'Войдите как сотрудник для сохранения ТТК')),
           duration: const Duration(seconds: 4),
@@ -966,7 +966,7 @@ class _TechCardsImportReviewScreenState
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(null),
-                    child: Text(loc.t('cancel') ?? 'Отмена'),
+                    child: Text(loc.t('cancel') ?? 'Cancel'),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.of(ctx)
@@ -1067,7 +1067,7 @@ class _TechCardsImportReviewScreenState
           }
         } catch (e) {
           final name = (item.result.dishName ?? '').trim().isEmpty
-              ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия')
+              ? (loc.t('tech_cards_import_unnamed') ?? 'Unnamed')
               : (item.result.dishName ?? '').trim();
           failed.add((name: name, error: e.toString()));
           failedItems.add(item);
@@ -1164,7 +1164,7 @@ class _TechCardsImportReviewScreenState
           }
           if (AiServiceSupabase.lastLearningError != null) {
             msg +=
-                ' ${loc.t('ttk_learn_error_hint') ?? '(Обучение не сохранилось)'}';
+                        ' ${loc.t('ttk_learn_error_hint') ?? '(Learning was not saved)'}';
             final err = AiServiceSupabase.lastLearningError!;
             if (err.length <= 120) {
               msg += ' $err';
@@ -1241,7 +1241,7 @@ class _TechCardsImportReviewScreenState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(loc.t('dish_name') ?? 'Название'),
+          title: Text(loc.t('dish_name') ?? 'Name'),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -1256,14 +1256,14 @@ class _TechCardsImportReviewScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop<String>(),
-              child: Text(loc.t('cancel') ?? 'Отмена'),
+              child: Text(loc.t('cancel') ?? 'Cancel'),
             ),
             FilledButton(
               onPressed: () {
                 final v = controller.text.trim();
                 Navigator.of(ctx).pop<String>(v.isEmpty ? null : v);
               },
-              child: Text(loc.t('save') ?? 'Сохранить'),
+              child: Text(loc.t('save') ?? 'Save'),
             ),
           ],
         );
@@ -1399,7 +1399,7 @@ class _TechCardsImportReviewScreenState
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                             minWidth: 36, minHeight: 36),
-                        tooltip: loc.t('close') ?? 'Закрыть',
+                        tooltip: loc.t('close') ?? 'Close',
                         icon: const Icon(Icons.close, size: 22),
                         onPressed: () => setState(
                             () => _importReviewHelpDismissed = true),
@@ -1504,7 +1504,7 @@ class _TechCardsImportReviewScreenState
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Text(loc.t('ttk_import_all_pf') ?? 'Все ПФ'),
+                          child: Text(loc.t('ttk_import_all_pf') ?? 'All prep'),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -1563,7 +1563,7 @@ class _TechCardsImportReviewScreenState
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Text(
-                              loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
+                              loc.t('ttk_import_all_dishes') ?? 'All dishes'),
                         ),
                       ),
                     ],
