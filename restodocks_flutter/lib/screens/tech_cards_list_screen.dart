@@ -533,6 +533,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return value;
   }
 
+  String _locRuEn(
+    LocalizationService loc,
+    String key, {
+    required String ruFallback,
+    required String enFallback,
+  }) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    return _localizedOrFallback(loc, key, isRu ? ruFallback : enFallback);
+  }
+
   String _trialImportCapMessage(LocalizationService loc) {
     final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
     return _localizedOrFallback(
@@ -573,7 +583,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final title = _localizedOrFallback(
       loc,
       'trial_ttk_import_limit_title',
-      'Лимит импорта исчерпан',
+      'Import limit reached',
     );
     await showDialog<void>(
       context: context,
@@ -599,7 +609,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')),
+                  loc.t('ttk_import_no_establishment') ?? 'Select an establishment')),
         );
       }
       return 0;
@@ -723,7 +733,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final title = _localizedOrFallback(
       loc,
       'ai_ttk_limit_title',
-      'Лимит ИИ исчерпан',
+      'AI limit reached',
     );
     await showDialog<void>(
       context: context,
@@ -749,7 +759,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final title = _localizedOrFallback(
       loc,
       'ai_ttk_limit_title',
-      'Лимит ИИ исчерпан',
+      'AI limit reached',
     );
     await showDialog<void>(
       context: context,
@@ -1635,16 +1645,40 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     final issues = <String>[];
     if (ambiguousCount > 0) {
-      issues.add('Неоднозначных ПФ: $ambiguousCount');
+      final label = _locRuEn(
+        loc,
+        'ttk_review_issue_ambiguous_pf',
+        ruFallback: 'Неоднозначных ПФ',
+        enFallback: 'Ambiguous prep items',
+      );
+      issues.add('$label: $ambiguousCount');
     }
     if (priceIssuesCount > 0) {
-      issues.add('Без цен: $priceIssuesCount');
+      final label = _locRuEn(
+        loc,
+        'ttk_review_issue_no_prices',
+        ruFallback: 'Без цен',
+        enFallback: 'Missing prices',
+      );
+      issues.add('$label: $priceIssuesCount');
     }
     if (weightIssuesCount > 0) {
-      issues.add('Без веса: $weightIssuesCount');
+      final label = _locRuEn(
+        loc,
+        'ttk_review_issue_no_weight',
+        ruFallback: 'Без веса',
+        enFallback: 'Missing weights',
+      );
+      issues.add('$label: $weightIssuesCount');
     }
     if (technologyIssuesCount > 0) {
-      issues.add('Без технологии: $technologyIssuesCount');
+      final label = _locRuEn(
+        loc,
+        'ttk_review_issue_no_technology',
+        ruFallback: 'Без технологии',
+        enFallback: 'Missing technology',
+      );
+      issues.add('$label: $technologyIssuesCount');
     }
 
     return issues.join(', ');
@@ -1813,21 +1847,47 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     // Проверяем общий выход (вес готового продукта)
     if (tc.yield <= 0) {
-      issues.add('Отсутствует общий выход (вес готового продукта)');
+      issues.add(_locRuEn(
+        context.read<LocalizationService>(),
+        'ttk_review_missing_total_yield',
+        ruFallback: 'Отсутствует общий выход (вес готового продукта)',
+        enFallback: 'Total yield is missing (final product weight)',
+      ));
     }
 
     // Проверяем вес порции для блюд
     if (!tc.isSemiFinished && tc.portionWeight <= 0) {
-      issues.add('Отсутствует вес порции');
+      issues.add(_locRuEn(
+        context.read<LocalizationService>(),
+        'ttk_review_missing_portion_weight',
+        ruFallback: 'Отсутствует вес порции',
+        enFallback: 'Portion weight is missing',
+      ));
     }
 
     // Проверяем веса ингредиентов (нетто и брутто)
     for (final ing in tc.ingredients) {
       if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
         final issuesList = <String>[];
-        if (ing.netWeight <= 0) issuesList.add('нетто');
-        if (ing.grossWeight <= 0) issuesList.add('брутто');
-        issues.add('Нет веса (${issuesList.join(', ')}): ${ing.productName}');
+        if (ing.netWeight <= 0) issuesList.add(_locRuEn(
+          context.read<LocalizationService>(),
+          'ttk_review_missing_netto',
+          ruFallback: 'нетто',
+          enFallback: 'net',
+        ));
+        if (ing.grossWeight <= 0) issuesList.add(_locRuEn(
+          context.read<LocalizationService>(),
+          'ttk_review_missing_brutto',
+          ruFallback: 'брутто',
+          enFallback: 'gross',
+        ));
+        final prefix = _locRuEn(
+          context.read<LocalizationService>(),
+          'ttk_review_missing_weight_prefix',
+          ruFallback: 'Нет веса',
+          enFallback: 'Missing weight',
+        );
+        issues.add('$prefix (${issuesList.join(', ')}): ${ing.productName}');
       }
     }
 
@@ -1840,13 +1900,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     // Проверяем технологию приготовления (многоязычная)
     if (tc.technologyLocalized == null || tc.technologyLocalized!.isEmpty) {
-      issues.add('Отсутствует технология приготовления');
+      issues.add(_locRuEn(
+        context.read<LocalizationService>(),
+        'ttk_review_missing_technology',
+        ruFallback: 'Отсутствует технология приготовления',
+        enFallback: 'Cooking technology is missing',
+      ));
     } else {
       // Проверяем, что есть хотя бы одна непустая технология
       final hasNonEmptyTechnology =
           tc.technologyLocalized!.values.any((tech) => tech.trim().isNotEmpty);
       if (!hasNonEmptyTechnology) {
-        issues.add('Все технологии приготовления пустые');
+        issues.add(_locRuEn(
+          context.read<LocalizationService>(),
+          'ttk_review_all_technology_empty',
+          ruFallback: 'Все технологии приготовления пустые',
+          enFallback: 'All technology fields are empty',
+        ));
       }
     }
 
@@ -2252,7 +2322,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 ? i.outputWeight
                 : (i.netWeight > 0 ? i.netWeight : i.grossWeight);
             final unit =
-                i.unit?.trim().isNotEmpty == true ? i.unit!.trim() : 'г';
+                i.unit?.trim().isNotEmpty == true ? i.unit!.trim() : 'g';
             return '${i.productName} — ${w.toStringAsFixed(0)} $unit';
           }).join('\n');
 
@@ -3269,7 +3339,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           builder: (ctx, setStateDialog) {
             final selected = picked.length;
             return AlertDialog(
-              title: Text(loc.t('ttk_import_file') ?? 'Импорт ТТК'),
+              title: Text(loc.t('ttk_import_file') ?? 'TTK import'),
               content: SizedBox(
                 width: 560,
                 height: 420,
@@ -3277,12 +3347,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Выберите ТТК для парсинга (до $maxSelected). Парсинг начнется только после подтверждения.',
+                      _locRuEn(
+                        loc,
+                        'ttk_import_pick_for_parsing_hint',
+                        ruFallback:
+                            'Выберите ТТК для парсинга (до $maxSelected). Парсинг начнется только после подтверждения.',
+                        enFallback:
+                            'Select tech cards to parse (up to $maxSelected). Parsing starts only after confirmation.',
+                      ),
                       style: Theme.of(ctx).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Выбрано: $selected / $maxSelected',
+                      _locRuEn(
+                        loc,
+                        'ttk_import_selected_count',
+                        ruFallback: 'Выбрано: $selected / $maxSelected',
+                        enFallback: 'Selected: $selected / $maxSelected',
+                      ),
                       style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -3330,7 +3412,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                  child: Text(loc.t('cancel') ?? 'Cancel'),
                 ),
                 FilledButton(
                   onPressed: selected <= 0
@@ -3382,7 +3464,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(l.t('ttk_import_file') ?? 'Импорт ТТК'),
+              title: Text(l.t('ttk_import_file') ?? 'TTK import'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -3394,7 +3476,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       onChanged: (_) =>
                           setState(() => dialogMode = _TtkImportMode.single),
                       title: Text(l.t('ttk_import_mode_single') ??
-                          'Одна ТТК в документе'),
+                          'One tech card per document'),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -3402,7 +3484,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       padding: const EdgeInsets.only(left: 48, bottom: 8),
                       child: Text(
                         l.t('ttk_import_mode_single_hint') ??
-                            'Можно выбрать до 10 файлов (в каждом файле — одна карточка).',
+                            'You can select up to 10 files (one card per file).',
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ),
@@ -3412,7 +3494,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       onChanged: (_) =>
                           setState(() => dialogMode = _TtkImportMode.multi),
                       title: Text(l.t('ttk_import_mode_multi') ??
-                          'Несколько ТТК в документе'),
+                          'Multiple tech cards per document'),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -3420,7 +3502,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       padding: const EdgeInsets.only(left: 48),
                       child: Text(
                         l.t('ttk_import_multi_format_hint') ??
-                            'Excel и Word: карточки — друг под другом, в один столбец (не рядом в 2 колонки). Одинаковая разметка: у каждой ТТК те же колонки (название, продукты, вес, технология). Иначе система не распознает.',
+                            'Excel and Word: cards must be one under another in a single column (not side-by-side). Use the same layout for each card (name, products, weight, technology).',
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ),
@@ -3454,7 +3536,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(l.t('cancel') ?? 'Отмена'),
+                  child: Text(l.t('cancel') ?? 'Cancel'),
                 ),
                 FilledButton(
                   onPressed: () async {
@@ -3493,7 +3575,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(
                               content: Text(l.t('file_read_failed') ??
-                                  'Не удалось прочитать файл')),
+                                  'Could not read file')),
                         );
                       }
                       return;
@@ -3501,7 +3583,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     Navigator.of(ctx).pop((mode: dialogMode, files: valid));
                   },
                   child:
-                      Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
+                      Text(l.t('ttk_import_select_files') ?? 'Select files'),
                 ),
               ],
             );
@@ -3524,9 +3606,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(mode == _TtkImportMode.single
             ? (loc.t('ttk_import_max_files') ??
-                'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)')
+                'Select up to $_maxFilesSingleTtk files (1 file = 1 tech card)')
             : (loc.t('ttk_import_max_files_multi') ??
-                'Выберите до $_maxFilesMultiTtk файлов')),
+                'Select up to $_maxFilesMultiTtk files')),
       ));
       return;
     }
@@ -3539,9 +3621,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ? _trialImportCapMessage(loc)
         : (files.length <= 1
             ? (loc.t('ttk_import_max_cards_single_file') ??
-                'Можно импортировать не более $_maxCardsFromSingleFileImport ТТК из одного файла.')
+                'You can import at most $_maxCardsFromSingleFileImport tech cards from one file.')
             : (loc.t('ttk_import_max_cards_multi_files') ??
-                'Можно импортировать не более $_maxCardsFromMultiFileImport ТТК при загрузке из нескольких файлов.'));
+                'You can import at most $_maxCardsFromMultiFileImport tech cards when uploading multiple files.'));
     Map<int, Map<String, int>>? selectedTrialCandidates;
     if (trialOnly) {
       final candidates = _collectTrialTtkCandidates(files);
@@ -3646,7 +3728,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (mounted) setState(() => _loadingExcel = false);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text((loc.t('ttk_import_multi_card_in_file') ??
-                    'В файле «%s» несколько карточек. Выберите режим «Несколько ТТК в документе» или загрузите файлы по одному.')
+                    'The file "%s" contains multiple cards. Choose "Multiple tech cards per document" mode or upload files one by one.')
                 .replaceFirst('%s', file.name)),
             duration: const Duration(seconds: 5),
           ));
@@ -3664,7 +3746,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text((loc.t('ttk_import_one_card_in_multi') ??
-                      'В файле «%s» распознана 1 карточка. Если их больше — выберите режим «Одна ТТК в документе» для каждого или проверьте разметку.')
+                      '1 card was recognized in "%s". If there are more, choose "One tech card per document" mode for each file or check the layout.')
                   .replaceFirst('%s', file.name)),
               duration: const Duration(seconds: 4),
             ));
@@ -3727,8 +3809,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ];
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(loc.t('ttk_import_empty_parse_hint') ??
-                  'Не удалось распознать автоматически. Заполните карточку вручную — при следующем импорте похожего файла применится обучение.'),
+              content: Text(
+                _locRuEn(
+                  loc,
+                  'ttk_import_empty_parse_hint',
+                  ruFallback:
+                      'Не удалось распознать автоматически. Заполните карточку вручную — при следующем импорте похожего файла применится обучение.',
+                  enFallback:
+                      'Could not recognize automatically. Fill the card manually and the system will learn for similar files next time.',
+                ),
+              ),
               duration: const Duration(seconds: 5),
             ));
           }
@@ -3745,30 +3835,37 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 reason == 'ai_ttk_no_access_lite') {
               msg = _aiTtkLimitMessage(reason ?? '', loc);
             } else if (reason == 'service_unavailable') {
-              msg = loc.t('ai_ttk_pdf_service_unavailable') ??
-                  'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
+              msg = _locRuEn(
+                loc,
+                'ai_ttk_pdf_service_unavailable',
+                ruFallback:
+                    'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.',
+                enFallback:
+                    'Recognition service is temporarily unavailable. Export PDF to Word or Excel and upload again.',
+              );
             } else if (reason == 'timeout_or_network') {
               msg = loc.t('ai_ttk_pdf_timeout') ??
                   (loc.t('ai_tech_card_pdf_format_hint') ??
-                      'Таймаут загрузки PDF');
+                      'PDF loading timed out');
             } else if (reason != null &&
                 reason.startsWith('extraction_failed')) {
               msg = loc.t('ai_ttk_pdf_extraction_failed') ??
                   (loc.t('ai_tech_card_pdf_format_hint') ??
-                      'Не удалось извлечь текст из PDF');
+                      'Could not extract text from PDF');
             } else if (reason == 'empty_text') {
               msg = loc.t('ai_ttk_pdf_empty_text') ??
-                  (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
+                  (loc.t('ai_tech_card_pdf_format_hint') ??
+                      'PDF has no extractable text');
             } else if (reason != null && reason.isNotEmpty) {
               msg =
-                  '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+                  '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Could not recognize tech card'} ($reason)';
             } else {
               msg = loc.t('ai_tech_card_excel_format_hint') ??
-                  'Не удалось распознать ТТК';
+                  'Could not recognize tech card';
             }
           } else {
             msg = loc.t('ai_tech_card_excel_format_hint') ??
-                'Не удалось распознать ТТК';
+                'Could not recognize tech card';
           }
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(msg),
@@ -3802,7 +3899,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (failedCount > 0 && allCards.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              (loc.t('ttk_import_partial') ?? 'Загружено %s из %s файлов')
+              (loc.t('ttk_import_partial') ?? 'Loaded %s of %s files')
                   .replaceFirst('%s', '${allCards.length}')
                   .replaceFirst('%s', '${files.length}')),
           duration: const Duration(seconds: 3),
@@ -3960,7 +4057,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
               : null,
           title: Text(
-            loc.t('ttk_import_text') ?? 'Вставить из текста',
+            loc.t('ttk_import_text') ?? 'Paste from text',
             style: titleStyle,
             maxLines: useCompactLayout ? 2 : 4,
             overflow: TextOverflow.ellipsis,
@@ -4236,7 +4333,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(loc.t('ai_tech_card_excel_format_hint') ??
-                  'Не удалось распознать ТТК в тексте')),
+                  'Could not recognize tech card in text')),
         );
         return;
       }
@@ -4380,7 +4477,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(loc.t('ai_tech_card_excel_format_hint') ??
-                  'Не удалось распознать ТТК в тексте')),
+                  'Could not recognize tech card in text')),
         );
         return;
       }
@@ -4424,7 +4521,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_select_sheet') ?? 'Выберите лист'),
+        title: Text(loc.t('ttk_import_select_sheet') ?? 'Select sheet'),
         content: SizedBox(
           width: 320,
           child: Column(
@@ -4433,7 +4530,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             children: [
               Text(
                 (loc.t('ttk_import_select_sheet_hint') ??
-                        'В файле «%s» несколько листов. Импортировать за раз можно только один лист.')
+                        'The file "%s" has multiple sheets. Only one sheet can be imported at a time.')
                     .replaceFirst('%s', fileName),
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
@@ -4444,7 +4541,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: List.generate(sheetNames.length, (i) {
                       final name = sheetNames[i].isEmpty
-                          ? '${loc.t('ttk_sheet') ?? 'Лист'} ${i + 1}'
+                          ? '${loc.t('ttk_sheet') ?? 'Sheet'} ${i + 1}'
                           : sheetNames[i];
                       return ListTile(
                         title: Text(name),
@@ -4801,7 +4898,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       Expanded(
                         child: Text(
                           loc.t('create_with_ai').trim().isEmpty
-                              ? 'Создать с ИИ'
+                              ? 'Create with AI'
                               : loc.t('create_with_ai'),
                           style:
                               Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -4847,7 +4944,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         Expanded(
                           child: Text(
                             loc.t('ttk_import_paste_text').trim().isEmpty
-                                ? 'Вставить текст'
+                                ? 'Paste text'
                                 : loc.t('ttk_import_paste_text'),
                             style:
                                 Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -5343,7 +5440,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                     items: [
                       DropdownMenuItem(
-                          value: null, child: Text(loc.t('all') ?? 'Все')),
+                          value: null, child: Text(loc.t('all') ?? 'All')),
                       ..._sectionOrder
                           .where((s) => s != 'hidden' && s != 'all')
                           .map((s) => DropdownMenuItem(
@@ -5368,7 +5465,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                     items: [
                       DropdownMenuItem(
-                          value: null, child: Text(loc.t('all') ?? 'Все')),
+                          value: null, child: Text(loc.t('all') ?? 'All')),
                       ...filterCatOrder.map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(_categoryLabel(c, loc)),
@@ -5434,10 +5531,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             Text(
               isDishesTab
                   ? (loc.t('ttk_tab_dishes') == 'ttk_tab_dishes'
-                      ? 'Блюда'
+                      ? 'Dishes'
                       : loc.t('ttk_tab_dishes'))
                   : (loc.t('ttk_tab_pf') == 'ttk_tab_pf'
-                      ? 'ПФ'
+                      ? 'Prep'
                       : loc.t('ttk_tab_pf')),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
@@ -5732,7 +5829,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           size: 20,
                         ),
                         tooltip: effectiveCanEdit
-                            ? (loc.t('edit') ?? 'Редактировать')
+                            ? (loc.t('edit') ?? 'Edit')
                             : loc.t('ttk_view'),
                         onPressed: effectiveCanEdit
                             ? () => context.push(
