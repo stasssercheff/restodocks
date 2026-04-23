@@ -40,6 +40,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   int _saveProgress = 0;
   int _saveTotal = 0;
 
+  bool _isQuotaExceededError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('quotaexceeded') ||
+        msg.contains('quota exceeded') ||
+        (msg.contains('domexception') && msg.contains('quota'));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -335,6 +342,26 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           _saveTotal = 0;
         });
         final locErr = context.read<LocalizationService>();
+        final quotaErr = _isQuotaExceededError(e);
+        if (quotaErr && (created > 0 || updated > 0)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${locErr.t('import_review_saved_counts', args: {'created': '$created', 'updated': '$updated'})} '
+                '${locErr.t('import_review_storage_quota_warning')}',
+              ),
+              duration: const Duration(seconds: 9),
+            ),
+          );
+          if (widget.supplierOrderListId != null &&
+              widget.supplierOrderListId!.trim().isNotEmpty) {
+            final d = widget.supplierDepartment ?? 'kitchen';
+            context.go('/suppliers/$d', extra: {'back': true});
+          } else {
+            context.go('/nomenclature?refresh=1', extra: {'back': true});
+          }
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(locErr
