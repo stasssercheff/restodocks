@@ -691,7 +691,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Widget _buildAiQuotaBadge() {
-    final text = _aiTtkRemainingQuota?.toString() ?? '?';
+    final text = (_aiTtkRemainingQuota ?? 0).toString();
     return Container(
       width: 22,
       height: 22,
