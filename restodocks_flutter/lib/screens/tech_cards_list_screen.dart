@@ -4165,8 +4165,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       if (!allowPromptFallback && trialRemaining != null && list.isNotEmpty) {
         try {
+          final estForTrial = acc.establishment;
+          if (estForTrial == null) return;
           await acc.trialIncrementUsageOrThrow(
-            establishmentId: est!.id,
+            establishmentId: estForTrial.id,
             kind: 'ttk_import_cards',
             delta: list.length,
           );
