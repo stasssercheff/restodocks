@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'account_manager_supabase.dart';
