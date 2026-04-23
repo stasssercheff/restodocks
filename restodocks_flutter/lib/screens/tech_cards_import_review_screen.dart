@@ -107,7 +107,7 @@ class _TechCardsImportReviewScreenState
 
   Map<String, String> _getSectionLabels(LocalizationService loc) {
     if (_isBar) {
-      return {'bar': loc.t('bar') ?? 'Bar'};
+      return {'bar': loc.t('bar')};
     }
     return Map.fromEntries(
       _kitchenSectionCodes
@@ -116,13 +116,13 @@ class _TechCardsImportReviewScreenState
   }
 
   String _sectionsDisplayLabel(List<String> sections, LocalizationService loc) {
-    if (sections.isEmpty) return loc.t('ttk_sections_hidden') ?? 'Hidden';
+    if (sections.isEmpty) return loc.t('ttk_sections_hidden');
     if (sections.contains('all'))
-      return loc.t('ttk_sections_all') ?? 'All sections';
+      return loc.t('ttk_sections_all');
     if (sections.length == 1) {
       return _getSectionLabels(loc)[sections.first] ?? sections.first;
     }
-    return (loc.t('ttk_sections_count') ?? '%s sections')
+    return (loc.t('ttk_sections_count'))
         .replaceAll('%s', '${sections.length}');
   }
 
@@ -211,14 +211,12 @@ class _TechCardsImportReviewScreenState
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('tech_cards_import_first_time_title') ??
-            'Первый импорт формата'),
-        content: Text(loc.t('tech_cards_import_first_time_message') ??
-            'Проверьте правильность внесённых данных, при необходимости исправьте — это поможет обучить систему для следующих загрузок.'),
+        title: Text(loc.t('tech_cards_import_first_time_title')),
+        content: Text(loc.t('tech_cards_import_first_time_message')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('ok') ?? 'OK'),
+            child: Text(loc.t('ok')),
           ),
         ],
       ),
@@ -239,8 +237,7 @@ class _TechCardsImportReviewScreenState
           'Обнаружены ошибки распознавания в карточках: %s. Проверьте их ниже.';
       return template.replaceFirst('%s', names.join(', '));
     }
-    return loc.t('tech_cards_import_parse_errors_banner') ??
-        'Обнаружены ошибки распознавания. Проверьте карточки ниже.';
+    return loc.t('tech_cards_import_parse_errors_banner');
   }
 
   String _inferCategory(String dishName) {
@@ -386,14 +383,13 @@ class _TechCardsImportReviewScreenState
                         Icon(Icons.store,
                             color: theme.colorScheme.primary, size: 22),
                         const SizedBox(width: 10),
-                        Text(loc.t('ttk_section_select') ?? 'Select section',
+                        Text(loc.t('ttk_section_select'),
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700)),
                       ]),
                       const SizedBox(height: 4),
                       Text(
-                        loc.t('ttk_section_hint') ??
-                            'This tech card will be visible only to cooks in selected sections.',
+                        loc.t('ttk_section_hint'),
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.6)),
@@ -426,9 +422,8 @@ class _TechCardsImportReviewScreenState
                           Expanded(
                             child: Text(
                               isHidden
-                                  ? (loc.t('ttk_section_hidden') ?? 'Hidden')
-                                  : (loc.t('ttk_section_uncheck_hint') ??
-                                      'Uncheck all sections to hide this card'),
+                                  ? (loc.t('ttk_section_hidden'))
+                                  : (loc.t('ttk_section_uncheck_hint')),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHidden
@@ -449,7 +444,7 @@ class _TechCardsImportReviewScreenState
                           )),
                       const Divider(height: 20),
                       _CheckItem(
-                        label: loc.t('ttk_section_all') ?? 'All sections',
+                        label: loc.t('ttk_section_all'),
                         checked: isAll,
                         onTap: () => toggle('all'),
                         theme: theme,
@@ -462,11 +457,11 @@ class _TechCardsImportReviewScreenState
                         children: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(),
-                            child: Text(loc.t('back') ?? 'Back'),
+                            child: Text(loc.t('back')),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.of(ctx).pop(selected),
-                            child: Text(loc.t('save') ?? 'Save'),
+                            child: Text(loc.t('save')),
                           ),
                         ],
                       ),
@@ -578,8 +573,7 @@ class _TechCardsImportReviewScreenState
       0,
       (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
     );
-    final template = loc.t('tech_cards_import_adjust_waste_hint') ??
-        'Выход в карточке %s г, сумма ингредиентов %s г. В редакторе можно подстроить % отхода под целевой выход.';
+    final template = loc.t('tech_cards_import_adjust_waste_hint');
     return template
         .replaceFirst('%s', yield.toStringAsFixed(0))
         .replaceFirst('%s', sum.toStringAsFixed(0));
@@ -745,9 +739,8 @@ class _TechCardsImportReviewScreenState
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(est == null
-              ? (loc.t('ttk_import_no_establishment') ?? 'Select an establishment')
-              : (loc.t('ttk_import_no_employee') ??
-                  'Войдите как сотрудник для сохранения ТТК')),
+              ? (loc.t('ttk_import_no_establishment'))
+              : (loc.t('ttk_import_no_employee'))),
           duration: const Duration(seconds: 4),
         ));
       }
@@ -966,7 +959,7 @@ class _TechCardsImportReviewScreenState
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(null),
-                    child: Text(loc.t('cancel') ?? 'Cancel'),
+                    child: Text(loc.t('cancel')),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.of(ctx)
@@ -1067,7 +1060,7 @@ class _TechCardsImportReviewScreenState
           }
         } catch (e) {
           final name = (item.result.dishName ?? '').trim().isEmpty
-              ? (loc.t('tech_cards_import_unnamed') ?? 'Unnamed')
+              ? (loc.t('tech_cards_import_unnamed'))
               : (item.result.dishName ?? '').trim();
           failed.add((name: name, error: e.toString()));
           failedItems.add(item);
@@ -1164,7 +1157,7 @@ class _TechCardsImportReviewScreenState
           }
           if (AiServiceSupabase.lastLearningError != null) {
             msg +=
-                        ' ${loc.t('ttk_learn_error_hint') ?? '(Learning was not saved)'}';
+                        ' ${loc.t('ttk_learn_error_hint')}';
             final err = AiServiceSupabase.lastLearningError!;
             if (err.length <= 120) {
               msg += ' $err';
@@ -1226,7 +1219,7 @@ class _TechCardsImportReviewScreenState
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('ok') ?? 'OK'),
+            child: Text(loc.t('ok')),
           ),
         ],
       ),
@@ -1241,7 +1234,7 @@ class _TechCardsImportReviewScreenState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(loc.t('dish_name') ?? 'Name'),
+          title: Text(loc.t('dish_name')),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -1256,14 +1249,14 @@ class _TechCardsImportReviewScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop<String>(),
-              child: Text(loc.t('cancel') ?? 'Cancel'),
+              child: Text(loc.t('cancel')),
             ),
             FilledButton(
               onPressed: () {
                 final v = controller.text.trim();
                 Navigator.of(ctx).pop<String>(v.isEmpty ? null : v);
               },
-              child: Text(loc.t('save') ?? 'Save'),
+              child: Text(loc.t('save')),
             ),
           ],
         );
@@ -1298,8 +1291,7 @@ class _TechCardsImportReviewScreenState
           if (_importReviewHelpDismissed)
             IconButton(
               icon: const Icon(Icons.help_outline),
-              tooltip: loc.t('tech_cards_import_hint_restore') ??
-                  'Подсказка по импорту',
+              tooltip: loc.t('tech_cards_import_hint_restore'),
               onPressed: () => setState(() {
                 _importReviewHelpDismissed = false;
                 _importReviewHelpExpanded = true;
@@ -1316,10 +1308,8 @@ class _TechCardsImportReviewScreenState
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  labelText: loc.t('tech_cards_import_search_hint') ??
-                      'Поиск по названию ТТК',
-                  hintText: loc.t('tech_cards_import_search_hint') ??
-                      'Введите часть названия...',
+                  labelText: loc.t('tech_cards_import_search_hint'),
+                  hintText: loc.t('tech_cards_import_search_hint'),
                   prefixIcon: const Icon(Icons.search, size: 22),
                   isDense: true,
                   border: OutlineInputBorder(
@@ -1334,8 +1324,7 @@ class _TechCardsImportReviewScreenState
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  (loc.t('tech_cards_import_search_count') ??
-                          'Показано: %s из %s')
+                  (loc.t('tech_cards_import_search_count'))
                       .replaceFirst('%s', '${_filteredIndices.length}')
                       .replaceFirst('%s', '${_items.length}'),
                   style: theme.textTheme.bodySmall
@@ -1368,9 +1357,8 @@ class _TechCardsImportReviewScreenState
                       Expanded(
                         child: Text(
                           _importReviewHelpExpanded
-                              ? (loc.t('tech_cards_import_review_hint') ?? '')
-                              : (loc.t('tech_cards_import_review_check_banner') ??
-                                  ''),
+                              ? (loc.t('tech_cards_import_review_hint'))
+                              : (loc.t('tech_cards_import_review_check_banner')),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -1399,7 +1387,7 @@ class _TechCardsImportReviewScreenState
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                             minWidth: 36, minHeight: 36),
-                        tooltip: loc.t('close') ?? 'Close',
+                        tooltip: loc.t('close'),
                         icon: const Icon(Icons.close, size: 22),
                         onPressed: () => setState(
                             () => _importReviewHelpDismissed = true),
@@ -1437,8 +1425,7 @@ class _TechCardsImportReviewScreenState
                               () => _ensurePfPrefix = !_ensurePfPrefix),
                           behavior: HitTestBehavior.opaque,
                           child: Text(
-                            loc.t('ttk_import_ensure_pf_prefix') ??
-                                'Установить перед названием «ПФ»\n(если ещё нет)',
+                            loc.t('ttk_import_ensure_pf_prefix'),
                             style: theme.textTheme.bodyMedium,
                             maxLines: 2,
                           ),
@@ -1504,7 +1491,7 @@ class _TechCardsImportReviewScreenState
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Text(loc.t('ttk_import_all_pf') ?? 'All prep'),
+                          child: Text(loc.t('ttk_import_all_pf')),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -1563,7 +1550,7 @@ class _TechCardsImportReviewScreenState
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Text(
-                              loc.t('ttk_import_all_dishes') ?? 'All dishes'),
+                              loc.t('ttk_import_all_dishes')),
                         ),
                       ),
                     ],
@@ -1826,8 +1813,7 @@ class _TechCardsImportReviewScreenState
                                 padding: const EdgeInsets.only(left: 8),
                                 child: Chip(
                                   label: Text(
-                                      loc.t('tech_cards_import_already_saved') ??
-                                          'Уже сохранена',
+                                      loc.t('tech_cards_import_already_saved'),
                                       style: const TextStyle(fontSize: 12)),
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(

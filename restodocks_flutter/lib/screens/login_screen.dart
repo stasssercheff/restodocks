@@ -215,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
         alignment: Alignment.centerRight,
         child: TextButton(
           onPressed: () => context.push('/forgot-password'),
-          child: Text(loc.t('forgot_password') ?? 'Forgot password?'),
+          child: Text(loc.t('forgot_password')),
         ),
       ),
       SizedBox(height: fieldGap),

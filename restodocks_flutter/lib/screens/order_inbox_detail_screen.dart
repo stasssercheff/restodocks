@@ -318,14 +318,13 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final exportLang = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('order_export_language_title') ?? 'Document language'),
+        title: Text(loc.t('order_export_language_title')),
         contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(loc.t('order_export_language_subtitle') ??
-                'Choose language for the file'),
+            Text(loc.t('order_export_language_subtitle')),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -346,17 +345,17 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                 OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop('it'),
                   child: Text(
-                      '🇮🇹  ${loc.t('order_export_language_it') ?? 'Italiano'}'),
+                      '🇮🇹  ${loc.t('order_export_language_it')}'),
                 ),
                 OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop('tr'),
                   child: Text(
-                      '🇹🇷  ${loc.t('order_export_language_tr') ?? 'Türkçe'}'),
+                      '🇹🇷  ${loc.t('order_export_language_tr')}'),
                 ),
                 OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop('kk'),
                   child: Text(
-                      '🇰🇿  ${loc.t('order_export_language_kk') ?? 'Қазақша'}'),
+                      '🇰🇿  ${loc.t('order_export_language_kk')}'),
                 ),
               ],
             ),
@@ -377,7 +376,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final format = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('download') ?? 'Save'),
+        title: Text(loc.t('download')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,7 +499,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       }
       if (mounted) {
         AppToastService.show(
-            loc.t('inventory_excel_downloaded') ?? 'File saved',
+            loc.t('inventory_excel_downloaded'),
             duration: const Duration(seconds: 3));
       }
     } catch (e) {
@@ -559,7 +558,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Save',
+            tooltip: loc.t('download'),
             onPressed: _showSaveFormatDialog,
           ),
         ],
@@ -572,7 +571,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
             _buildHeader(loc, header),
             const SizedBox(height: 24),
             Text(
-              loc.t('order_export_list') ?? 'List',
+              loc.t('order_export_list'),
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -601,18 +600,18 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _row(loc.t('inbox_header_employee') ?? 'Sent by',
+        _row(loc.t('inbox_header_employee'),
             _translatedEmployeeName ?? (header['employeeName'] ?? '—')),
         _row(
-            loc.t('order_export_date_time') ?? 'Sent at',
+            loc.t('order_export_date_time'),
             createdAt != null
                 ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt)
                 : '—'),
-        _row(loc.t('order_export_to') ?? 'Supplier',
+        _row(loc.t('order_export_to'),
             _translatedSupplierName ?? (header['supplierName'] ?? '—')),
-        _row(loc.t('order_export_from') ?? 'Establishment',
+        _row(loc.t('order_export_from'),
             header['establishmentName'] ?? '—'),
-        _row(loc.t('order_export_order_for') ?? 'For date',
+        _row(loc.t('order_export_order_for'),
             orderFor != null ? DateFormat('dd.MM.yyyy').format(orderFor) : '—'),
       ],
     );
@@ -667,11 +666,11 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                     decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest),
                     children: [
-                      _cell(theme, loc.t('order_export_no') ?? '#', bold: true),
+                      _cell(theme, loc.t('order_export_no'), bold: true),
                       _cell(theme, loc.t('inventory_item_name'), bold: true),
                       _cell(theme, loc.t('order_list_unit'), bold: true),
                       _cell(theme, loc.t('order_list_quantity'), bold: true),
-                      _cell(theme, loc.t('order_list_unit_price') ?? 'Price',
+                      _cell(theme, loc.t('order_list_unit_price'),
                           bold: true),
                       _cell(theme, _lineTotalHeader(loc), bold: true),
                     ],
@@ -698,7 +697,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                         color: theme.colorScheme.surfaceContainerHighest),
                     children: [
                       _cell(theme, '', bold: true),
-                      _cell(theme, loc.t('order_list_grand_total') ?? 'Total:',
+                      _cell(theme, loc.t('order_list_grand_total'),
                           bold: true),
                       _cell(theme, '', bold: true),
                       _cell(theme, '', bold: true),
@@ -741,7 +740,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final currency =
         context.read<AccountManagerSupabase>().establishment?.defaultCurrency ??
             'VND';
-    final t = loc.t('order_list_line_total_currency') ?? 'Amount %s';
+    final t = loc.t('order_list_line_total_currency');
     return t.replaceFirst('%s', currency);
   }
 

@@ -246,7 +246,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
           children: [
             Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Retry')),
+            FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
           ],
         ),
       );
@@ -259,7 +259,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
             Icon(Icons.shopping_cart_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('product_order_received_empty') ?? 'Sent orders will appear here',
+              loc.t('product_order_received_empty'),
               style: Theme.of(context).textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -277,10 +277,10 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
-                Expanded(flex: 1, child: Text(loc.t('inbox_header_date') ?? 'Date', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Section', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Employee', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_supplier') ?? 'Supplier', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 1, child: Text(loc.t('inbox_header_date'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_section'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_supplier'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
               ],
             ),
           ),
@@ -328,12 +328,12 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(loc.t('order_details') ?? 'Order details', style: Theme.of(ctx).textTheme.titleLarge),
+              Text(loc.t('order_details'), style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 16),
-              _detailRow(ctx, loc.t('inbox_header_date') ?? 'Date', DateFormat('dd.MM.yyyy HH:mm').format(createdAt)),
-              _detailRow(ctx, loc.t('inbox_header_section') ?? 'Section', establishmentName),
-              _detailRow(ctx, loc.t('inbox_header_employee') ?? 'Employee', employeeName),
-              _detailRow(ctx, loc.t('inbox_header_supplier') ?? 'Supplier', supplierName),
+              _detailRow(ctx, loc.t('inbox_header_date'), DateFormat('dd.MM.yyyy HH:mm').format(createdAt)),
+              _detailRow(ctx, loc.t('inbox_header_section'), establishmentName),
+              _detailRow(ctx, loc.t('inbox_header_employee'), employeeName),
+              _detailRow(ctx, loc.t('inbox_header_supplier'), supplierName),
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
@@ -344,7 +344,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
               const SizedBox(height: 8),
               FilledButton.icon(
                 icon: const Icon(Icons.download),
-                label: Text(loc.t('download') ?? 'Download'),
+                label: Text(loc.t('download')),
                 onPressed: () => _downloadOrder(ctx, doc, loc),
               ),
             ],
@@ -372,7 +372,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     final theme = Theme.of(context);
     final hasPrices = rows.isNotEmpty && (rows.first as Map<String, dynamic>).containsKey('pricePerUnit');
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
-    final lineTotalHeader = (loc.t('order_list_line_total_currency') ?? 'Amount %s').replaceFirst('%s', currency);
+    final lineTotalHeader = (loc.t('order_list_line_total_currency')).replaceFirst('%s', currency);
     if (hasPrices) {
       return Table(
         border: TableBorder.all(color: theme.dividerColor),
@@ -384,7 +384,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
               _tableCell(theme, loc.t('inventory_item_name'), bold: true),
               _tableCell(theme, loc.t('order_list_unit'), bold: true),
               _tableCell(theme, loc.t('order_list_quantity'), bold: true),
-              _tableCell(theme, loc.t('order_list_unit_price') ?? 'Price', bold: true),
+              _tableCell(theme, loc.t('order_list_unit_price'), bold: true),
               _tableCell(theme, lineTotalHeader, bold: true),
             ],
           ),
@@ -484,7 +484,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
         final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now());
         await saveFileBytes('order_$dateStr.xlsx', bytes);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Excel file saved')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('inventory_excel_downloaded'))));
         }
       }
     } catch (e) {

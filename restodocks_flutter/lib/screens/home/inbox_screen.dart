@@ -616,7 +616,7 @@ class _InboxScreenState extends State<InboxScreen> {
             : (shellReturnLeading(context) ?? appBarBackButton(context)),
         title: ScrollToTopAppBarTitle(
           child: Text(widget.messagesOnly
-              ? (loc.t('inbox_tab_messages') ?? 'Messages')
+              ? (loc.t('inbox_tab_messages'))
               : loc.t('inbox')),
         ),
         actions: [
@@ -636,7 +636,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 },
                 icon: const Icon(Icons.done_all, size: 20, color: Colors.white),
                 label:
-                    Text(loc.t('inbox_mark_all_viewed') ?? 'Mark all viewed'),
+                    Text(loc.t('inbox_mark_all_viewed')),
               ),
             if (_isInventoryMergeTabSelected(isOwner) &&
                 _mergeableDocumentsForCurrentTab.isNotEmpty &&
@@ -649,7 +649,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     employee?.hasRole('floor_manager') == true))
               IconButton(
                 icon: const Icon(Icons.merge),
-                tooltip: loc.t('inventory_merge_title') ?? 'Merge forms',
+                tooltip: loc.t('inventory_merge_title'),
                 onPressed: () async {
                   final result = await context.push<bool>(
                     '/inbox/merge',
@@ -732,9 +732,9 @@ class _InboxScreenState extends State<InboxScreen> {
               _buildDeptChip(
                 allowed[i],
                 switch (allowed[i]) {
-                  _InboxDeptTab.kitchen => loc.t('dept_kitchen') ?? 'Kitchen',
-                  _InboxDeptTab.bar => loc.t('dept_bar') ?? 'Bar',
-                  _InboxDeptTab.hall => loc.t('dept_hall') ?? 'Hall',
+                  _InboxDeptTab.kitchen => loc.t('dept_kitchen'),
+                  _InboxDeptTab.bar => loc.t('dept_bar'),
+                  _InboxDeptTab.hall => loc.t('dept_hall'),
                 },
                 loc,
               ),
@@ -955,20 +955,20 @@ class _InboxScreenState extends State<InboxScreen> {
                 tabs[i],
                 switch (tabs[i]) {
                   _InboxTypeTab.order =>
-                    loc.t('inbox_tab_order') ?? 'Orders',
+                    loc.t('inbox_tab_order'),
                   _InboxTypeTab.goodsReceipt =>
-                    loc.t('inbox_tab_goods_receipt') ?? 'Goods receipt',
+                    loc.t('inbox_tab_goods_receipt'),
                   _InboxTypeTab.inventory =>
-                    loc.t('inbox_tab_inventory') ?? 'Inventory',
-                  _InboxTypeTab.writeoff => loc.t('writeoffs') ?? 'Write-offs',
+                    loc.t('inbox_tab_inventory'),
+                  _InboxTypeTab.writeoff => loc.t('writeoffs'),
                   _InboxTypeTab.iikoInventory =>
-                    loc.t('iiko_inventory_title') ?? 'iiko inventory',
+                    loc.t('iiko_inventory_title'),
                   _InboxTypeTab.notifications =>
-                    loc.t('inbox_tab_notifications') ?? 'Notifications',
+                    loc.t('inbox_tab_notifications'),
                   _InboxTypeTab.checklist =>
-                    loc.t('inbox_tab_checklist') ?? 'Checklists',
+                    loc.t('inbox_tab_checklist'),
                   _InboxTypeTab.messages =>
-                    loc.t('inbox_tab_messages') ?? 'Messages',
+                    loc.t('inbox_tab_messages'),
                 },
                 loc,
               ),
@@ -1018,17 +1018,17 @@ class _InboxScreenState extends State<InboxScreen> {
       case _InboxTab.order:
         return loc.t('inbox_tab_order');
       case _InboxTab.goodsReceipt:
-        return loc.t('inbox_tab_goods_receipt') ?? 'Goods receipt';
+        return loc.t('inbox_tab_goods_receipt');
       case _InboxTab.inventory:
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
-        return loc.t('iiko_inventory_title') ?? 'iiko inventory';
+        return loc.t('iiko_inventory_title');
       case _InboxTab.writeoff:
-        return loc.t('writeoffs') ?? 'Write-offs';
+        return loc.t('writeoffs');
       case _InboxTab.messages:
-        return loc.t('inbox_tab_messages') ?? 'Messages';
+        return loc.t('inbox_tab_messages');
       case _InboxTab.notifications:
-        return loc.t('inbox_tab_notifications') ?? 'Notifications';
+        return loc.t('inbox_tab_notifications');
     }
   }
 
@@ -1169,7 +1169,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('inbox_notifications_empty') ?? 'No notifications',
+              loc.t('inbox_notifications_empty'),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
@@ -1185,7 +1185,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('checklist_overdue') ?? 'Overdue checklists',
+              loc.t('checklist_overdue'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.error,
@@ -1202,7 +1202,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('birthday_upcoming') ?? 'Upcoming birthdays',
+              loc.t('birthday_upcoming'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.primary,
@@ -1212,8 +1212,8 @@ class _InboxScreenState extends State<InboxScreen> {
           ..._upcomingBirthdays.map((e) {
             final dateStr = DateFormat('dd.MM').format(e.birthdayDate);
             final daysText = e.daysUntil == 0
-                ? (loc.t('birthday_today') ?? 'Today')
-                : (loc.t('birthday_in_days') ?? 'In %s days')
+                ? (loc.t('birthday_today'))
+                : (loc.t('birthday_in_days'))
                     .replaceAll('%s', '${e.daysUntil}');
             final nameLine = employeeDisplayName(
               e.emp,
@@ -1248,7 +1248,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('birthday_changed') ?? 'Birthday changed',
+              loc.t('birthday_changed'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1265,7 +1265,7 @@ class _InboxScreenState extends State<InboxScreen> {
             final dateStr = DateFormat('dd.MM.yyyy').format(n.newBirthday);
             final prevStr = n.previousBirthday != null
                 ? DateFormat('dd.MM.yyyy').format(n.previousBirthday!)
-                : (loc.t('not_specified') ?? 'not specified');
+                : (loc.t('not_specified'));
             final createdStr =
                 DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
             return Card(
@@ -1286,7 +1286,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       ?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 subtitle: Text(
-                  '${loc.t('birthday_was') ?? 'Was'}: $prevStr • $createdStr',
+                  '${loc.t('birthday_was')}: $prevStr • $createdStr',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
@@ -1401,8 +1401,8 @@ class _InboxScreenState extends State<InboxScreen> {
         docs.where((d) => d.type == DocumentType.checklistSubmission).toList();
 
     final lang = loc.currentLanguageCode;
-    final noSection = loc.t('checklist_no_section') ?? 'No section';
-    final overdueLabel = loc.t('checklist_overdue') ?? 'Overdue';
+    final noSection = loc.t('checklist_no_section');
+    final overdueLabel = loc.t('checklist_overdue');
     final fmtDate = (DateTime d) =>
         '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
@@ -1418,7 +1418,7 @@ class _InboxScreenState extends State<InboxScreen> {
       final dateKey = fmtDate(doc.createdAt);
       final empName = doc.employeeName.isNotEmpty
           ? doc.employeeName
-          : (loc.t('checklist_all_employees') ?? 'All employees');
+          : (loc.t('checklist_all_employees'));
 
       grouped.putIfAbsent(sectionLabel, () => {});
       grouped[sectionLabel]!.putIfAbsent(dateKey, () => {});
@@ -1606,7 +1606,7 @@ class _DocumentTile extends StatelessWidget {
         ? NumberFormatUtils.formatSum(grandTotal!, currency)
         : null;
     // order_list_grand_total часто уже с «:» в JSON — не дублировать
-    final totalRaw = loc.t('order_list_grand_total') ?? 'Total';
+    final totalRaw = loc.t('order_list_grand_total');
     final totalLabel = totalRaw.replaceFirst(RegExp(r':\s*$'), '');
     final theme = Theme.of(context);
 
@@ -1981,7 +1981,7 @@ class _MessagesContentState extends State<_MessagesContent> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              loc.t('chat_with_employees') ?? 'Chats with employees',
+              loc.t('chat_with_employees'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.primary,
@@ -2062,7 +2062,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    loc.t('group_chat_title') ?? 'Group chats',
+                    loc.t('group_chat_title'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context).colorScheme.primary,
@@ -2072,7 +2072,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                     onPressed: () => context.push('/inbox/group/new'),
                     icon: const Icon(Icons.group_add, size: 20),
                     label:
-                        Text(loc.t('group_chat_new') ?? 'New group chat'),
+                        Text(loc.t('group_chat_new')),
                     style: FilledButton.styleFrom(
                       backgroundColor:
                           Theme.of(context).colorScheme.secondaryContainer,
@@ -2096,8 +2096,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                     ),
                     title: Text(
                       room.displayName.isEmpty
-                          ? (loc.t('group_chat_default_name') ??
-                              'Групповой чат')
+                          ? (loc.t('group_chat_default_name'))
                           : room.displayName,
                     ),
                     trailing: const Icon(Icons.chat_bubble, size: 18),
@@ -2110,7 +2109,7 @@ class _MessagesContentState extends State<_MessagesContent> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                loc.t('inbox_msg_checklist_not_done') ?? 'Checklist not completed',
+                loc.t('inbox_msg_checklist_not_done'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.primary,
