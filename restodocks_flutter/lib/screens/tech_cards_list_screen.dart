@@ -503,9 +503,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   String _aiTtkRemainingLabel(LocalizationService loc, int remaining, int total) {
-    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
-    if (isRu) return 'Лимит ИИ-ТТК: осталось $remaining из $total';
-    return 'AI TTK limit: $remaining of $total left';
+    final template = _localizedOrFallback(
+      loc,
+      'ai_ttk_quota_remaining_status',
+      'AI TTK limit: %s of %s left',
+    );
+    return template
+        .replaceFirst('%s', '$remaining')
+        .replaceFirst('%s', '$total');
+  }
+
+  /// Локальная причина для диалога «лимит исчерпан» (когда счётчик на клиенте упал в 0).
+  String _aiTtkExhaustedReason(AccountManagerSupabase account) {
+    if (account.isTrialOnlyWithoutPaid) return 'ai_ttk_limit_trial_total';
+    final tier = account.subscriptionEntitlements.paidTier;
+    if (tier == AppSubscriptionTier.ultra) return 'ai_ttk_limit_ultra_month';
+    return 'ai_ttk_limit_pro_month';
   }
 
   String _localizedOrFallback(
@@ -702,7 +715,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
-  Future<void> _showAiCreateLimitDialog(LocalizationService loc) async {
+  Future<void> _showAiCreateLimitDialog(
+    LocalizationService loc,
+    AccountManagerSupabase account,
+  ) async {
     if (!mounted) return;
     final title = _localizedOrFallback(
       loc,
@@ -714,7 +730,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(title),
-        content: Text(_aiTtkLimitMessage('limit_3_per_day', loc)),
+        content: Text(_aiTtkLimitMessage(_aiTtkExhaustedReason(account), loc)),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -3862,7 +3878,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Не удалось проверить ИИ-лимит на сервере. Повторите через минуту.',
+                _localizedOrFallback(
+                  loc,
+                  'ai_ttk_quota_check_failed',
+                  'Could not verify AI limit on the server. Try again in a minute.',
+                ),
               ),
             ),
           );
@@ -3871,7 +3891,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       final aiRemaining = _aiTtkRemainingQuota!;
       if (aiRemaining <= 0) {
-        await _showAiCreateLimitDialog(loc);
+        await _showAiCreateLimitDialog(loc, acc);
         return;
       }
     } else if (!acc.hasProSubscription) {
@@ -3991,8 +4011,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     scrollPadding: EdgeInsets.only(bottom: kb + 24),
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
-                      hintText:
-                          'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                      hintText: _localizedOrFallback(
+                        loc,
+                        'ttk_paste_text_hint',
+                        'Dish name\nname\tUnit\tBatch norm\t...\n1\tProduct\tkg\t0.100\t...\nYield\t\tkg\t1.000',
+                      ),
                       hintStyle: hintStyle,
                       isDense: useCompactLayout,
                       contentPadding: useCompactLayout
@@ -4080,22 +4103,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           result,
           establishmentId: establishmentId,
           unitSystem: unitPrefs.isImperial ? 'imperial' : 'metric',
+          outputLocale: loc.currentLanguageCode,
         );
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
-          final quotaWindow = _aiTtkQuotaWindow(acc);
-          if (_aiTtkRemainingQuota != null) {
-            final next = (_aiTtkRemainingQuota! - createdCards.length)
-                .clamp(0, quotaWindow.limit);
-            if (mounted) setState(() => _aiTtkRemainingQuota = next);
-            if (next == 0) {
-              await _showAiCreateLimitDialog(loc);
-            }
-          } else {
-            await _refreshAiTtkRemainingQuota();
-            if (mounted && _aiTtkRemainingQuota != null && _aiTtkRemainingQuota == 0) {
-              await _showAiCreateLimitDialog(loc);
-            }
+          await _refreshAiTtkRemainingQuota();
+          if (!mounted) return;
+          if (_aiTtkRemainingQuota != null && _aiTtkRemainingQuota! <= 0) {
+            await _showAiCreateLimitDialog(loc, acc);
           }
           if (createdCards.length == 1) {
             context.push(
@@ -4197,9 +4212,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             isSemiFinished: false,
           );
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'ИИ не смог извлечь структуру автоматически. Открыт черновик ТТК с вашим запросом.',
+                _localizedOrFallback(
+                  loc,
+                  'ai_ttk_structure_fallback_snackbar',
+                  'AI could not extract a structured card. A draft was opened with your text.',
+                ),
               ),
             ),
           );
@@ -4448,45 +4467,45 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
-  static String _pdfFailureMessage(String reason, LocalizationService loc) {
-    if (reason == 'ai_limit_exceeded' ||
-        reason == 'limit_3_per_day' ||
-        reason == 'ai_ttk_limit_trial_total' ||
-        reason == 'ai_ttk_limit_pro_month' ||
-        reason == 'ai_ttk_limit_ultra_month' ||
-        reason == 'ai_ttk_no_access_lite') {
-      return _aiTtkLimitMessage(reason, loc);
-    }
-    if (reason.startsWith('empty_text'))
-      return 'PDF не содержит извлекаемого текста.';
-    if (reason.startsWith('extraction_failed'))
-      return 'Не удалось прочитать PDF.';
-    if (reason.startsWith('ai_error') ||
-        reason.contains('429') ||
-        reason.contains('quota')) {
-      return 'Лимит ИИ исчерпан. Попробуйте позже.';
-    }
-    if (reason == 'ai_empty_response' || reason == 'ai_no_cards') {
-      return loc.t('ai_tech_card_pdf_format_hint');
-    }
-    if (reason == 'invoke_null')
-      return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
-    return loc.t('ai_tech_card_pdf_format_hint');
-  }
-
-  static String _aiTtkLimitMessage(String reason, LocalizationService loc) {
+  String _aiTtkLimitMessage(String reason, LocalizationService loc) {
     switch (reason) {
       case 'ai_ttk_no_access_lite':
-        return 'Lite: создание ТТК с ИИ недоступно.';
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_lite_message',
+          'Lite: AI tech card creation is not available on your plan.',
+        );
       case 'ai_ttk_limit_trial_total':
       case 'limit_3_per_day':
-        return 'Триал: лимит создания ТТК с ИИ — 3 за первые 3 дня.';
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_trial_total_message',
+          'Trial: you can create up to 3 AI tech cards for the entire trial period. Subscribe to Pro or Ultra for a higher monthly limit.',
+        );
       case 'ai_ttk_limit_pro_month':
-        return 'Pro: лимит создания ТТК с ИИ — 15 в месяц.';
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_pro_month_message',
+          'Pro: up to 15 AI tech card creations per calendar month. The limit resets at the start of the next month.',
+        );
       case 'ai_ttk_limit_ultra_month':
-        return 'Ultra: лимит создания ТТК с ИИ — 35 в месяц.';
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_ultra_month_message',
+          'Ultra: up to 35 AI tech card creations per calendar month. The limit resets at the start of the next month.',
+        );
+      case 'ai_limit_exceeded':
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_generic_message',
+          'The AI tech card limit has been reached. Try again later or upgrade your plan.',
+        );
       default:
-        return loc.t('ai_ttk_limit_3_per_day');
+        return _localizedOrFallback(
+          loc,
+          'ai_ttk_limit_generic_message',
+          'The AI tech card limit has been reached. Try again later or upgrade your plan.',
+        );
     }
   }
 
@@ -4638,7 +4657,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                       strokeWidth: 2)),
                               const SizedBox(height: 16),
                               Text(_loadingTtkIsAiPrompt
-                                  ? 'Создание ТТК с ИИ...'
+                                  ? (_localizedOrFallback(
+                                      loc,
+                                      'loading_ttk_ai_prompt',
+                                      'Creating tech card with AI…',
+                                    ))
                                   : (_loadingTtkIsPdf
                                       ? loc.t('loading_ttk_pdf')
                                       : loc.t('loading_excel'))),

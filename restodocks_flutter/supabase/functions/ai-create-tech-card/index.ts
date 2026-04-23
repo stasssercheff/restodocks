@@ -21,9 +21,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { prompt?: string; establishmentId?: string };
+    const body = (await req.json()) as {
+      prompt?: string;
+      establishmentId?: string;
+      locale?: string;
+    };
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : "";
+    const rawLocale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";
+    const localeTag = rawLocale.length >= 2 ? rawLocale.slice(0, 2) : "en";
     if (!prompt) {
       return new Response(JSON.stringify({ error: "prompt required" }), {
         status: 400,
@@ -42,20 +48,28 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const langRule =
+      localeTag === "ru"
+        ? "All natural-language fields (dishName, each productName, technologyText) MUST be in Russian. Do not mix in English except internationally common product names if unavoidable."
+        : localeTag === "en"
+        ? "All natural-language fields (dishName, each productName, technologyText) MUST be in English. Do not mix in Russian or other languages."
+        : `All natural-language fields (dishName, each productName, technologyText) MUST be written in the primary language for UI locale "${localeTag}". Avoid mixing languages.`;
+
     const content = await chatText({
       messages: [
         {
           role: "system",
           content:
-            "Технолог ОП. По запросу — ТТК в JSON. Только {\"cards\":[{...}]}; элемент = одна ТТК. " +
-            "Компоненты «своего приготовления» (хлеб, соус и т.п.) — отдельные ПФ (isSemiFinished=true) + в основной ТТК ingredientType='semi_finished'. " +
-            "Поля: dishName, technologyText, isSemiFinished, yieldGrams, ingredients[] " +
+            "You are a head technologist. Return ONLY JSON as {\"cards\":[{...}]}; each array element is one tech card. " +
+            "In-house prepped components (bread, sauces, etc.) are separate semi-finished items (isSemiFinished=true) and referenced in the main card with ingredientType='semi_finished'. " +
+            "Fields: dishName, technologyText, isSemiFinished, yieldGrams, ingredients[] " +
             "{productName,grossGrams,unit,primaryWastePct,netGrams,cookingLossPct,outputGrams,ingredientType,cookingProcessId}. " +
-            "cookingProcessId — ОБЯЗАТЕЛЬНО для каждого ингредиента, одно из значений (латиница): " +
+            "cookingProcessId is REQUIRED for every ingredient, one of these Latin ids: " +
             "boiling,frying,baking,stewing,sous_vide,fermentation,grilling,torch_browning,sauteing,blanching,steaming,canning,cutting. " +
-            "Подбери по смыслу (овощи на гриле → grilling, запечь → baking, нарезка сырого → cutting). " +
-            "cookingLossPct — оценка % ужарки для этой строки (0–60), согласованная с cookingProcessId. " +
-            "Технология: 3–5 коротких шагов. ≥3 ингредиента. Без markdown.",
+            "Pick by meaning (grilled vegetables → grilling, bake → baking, raw cut → cutting). " +
+            "cookingLossPct — estimated shrinkage % for that line (0–60), consistent with cookingProcessId. " +
+            "technologyText: 3–5 short steps. At least 3 ingredients. No markdown. " +
+            langRule,
         },
         { role: "user", content: prompt },
       ],

@@ -567,6 +567,7 @@ class AiServiceSupabase implements AiService {
     String prompt, {
     String? establishmentId,
     String? unitSystem,
+    String? outputLocale,
   }) async {
     lastCreateTechCardReason = null;
     final body = <String, dynamic>{'prompt': prompt};
@@ -575,6 +576,10 @@ class AiServiceSupabase implements AiService {
     }
     if (unitSystem != null && unitSystem.trim().isNotEmpty) {
       body['unitSystem'] = unitSystem.trim().toLowerCase();
+    }
+    final loc = outputLocale?.trim();
+    if (loc != null && loc.isNotEmpty) {
+      body['locale'] = loc;
     }
     final res = await _client.functions.invoke('ai-create-tech-card', body: body);
     final data = res.data;
