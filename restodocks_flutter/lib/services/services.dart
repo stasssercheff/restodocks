@@ -33,6 +33,7 @@ export 'push_notification_service.dart';
 export 'translation_manager.dart';
 export 'ai_service.dart';
 export 'ai_service_supabase.dart';
+export 'ai_ttk_quota_cache_service.dart';
 export 'on_device_ocr/on_device_ocr_service.dart';
 export 'receipt_text_heuristic_parser.dart';
 export 'intelligent_product_import_service.dart';

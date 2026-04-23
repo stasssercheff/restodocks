@@ -18,6 +18,7 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import '../utils/employee_row_pick.dart';
 import 'account_ui_sync_service.dart';
+import 'ai_ttk_quota_cache_service.dart';
 import 'ai_service_supabase.dart';
 import 'establishment_data_warmup_service.dart';
 import 'establishment_local_hydration_service.dart';
@@ -180,6 +181,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     if (isLoggedInSync) {
       await refreshSupportSessionState();
+      unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession());
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
@@ -195,6 +197,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     _initialized = true;
     if (isLoggedInSync) {
       await refreshSupportSessionState();
+      unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession());
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
@@ -1688,6 +1691,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (empUi != null) {
       unawaited(AccountUiSyncService.instance.applyAfterLogin(empUi));
     }
+    unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession(force: true));
     notifyListeners();
 
     if (!kIsWeb && isLoggedInSync && _establishment != null) {

@@ -468,6 +468,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       _tryReconcileTechCards(force: false);
     });
+    final aiQuotaEstablishmentId = _resolveAiQuotaEstablishmentId(acc);
+    if (aiQuotaEstablishmentId != null) {
+      final cachedRemaining = AiTtkQuotaCacheService.instance
+          .readCachedRemaining(aiQuotaEstablishmentId);
+      if (cachedRemaining != null && mounted) {
+        setState(() {
+          _aiTtkRemainingQuota = cachedRemaining;
+          _aiQuotaServerUnavailable = false;
+        });
+      }
+    }
     unawaited(_refreshAiTtkRemainingQuota());
     unawaited(_refreshTrialImportRemainingQuota());
     _tryReconcileTechCards(force: false);
@@ -659,21 +670,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     try {
-      final res = await Supabase.instance.client.functions.invoke(
-        'ai-create-tech-card',
-        body: <String, dynamic>{
-          'establishmentId': establishmentId,
-          'checkOnly': true,
-        },
-      );
-      final data = res.data;
-      if (data is! Map<String, dynamic>) {
-        throw StateError('ai-create-tech-card checkOnly returned invalid payload');
+      final remaining = await AiTtkQuotaCacheService.instance
+          .refreshForEstablishment(establishmentId, account: account);
+      if (remaining == null) {
+        throw StateError('ai quota check returned null');
       }
-      final limit = (data['limit'] as num?)?.toInt() ?? _aiTtkQuotaWindow(account).limit;
-      final used = (data['used'] as num?)?.toInt() ?? 0;
-      final remainingFromServer = (data['remaining'] as num?)?.toInt();
-      final remaining = (remainingFromServer ?? (limit - used)).clamp(0, limit);
       if (mounted) {
         setState(() {
           _aiTtkRemainingQuota = remaining;

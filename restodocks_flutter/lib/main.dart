@@ -149,6 +149,7 @@ Future<void> _bootstrapApp() async {
         .savePreferredLanguage(code, fromReconcile: true);
   };
   await AccountManagerSupabase().initialize();
+  unawaited(AiTtkQuotaCacheService.instance.preloadForCurrentSession());
 
   // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
   LocalizationService.onAfterLocaleChanged = () async {
