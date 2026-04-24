@@ -119,7 +119,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       final loc = context.read<LocalizationService>();
-      AppToastService.show(loc.t('documentation_name_required') ?? 'Введите название');
+      AppToastService.show(loc.t('documentation_name_required'));
       return;
     }
     setState(() => _saving = true);
@@ -147,7 +147,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
           sourceLanguage: loc.currentLanguageCode,
           userId: emp.id,
         ));
-        AppToastService.show(loc.t('documentation_created') ?? 'Документ создан');
+        AppToastService.show(loc.t('documentation_created'));
       } else {
         final updated = _doc!.copyWith(
           name: name,
@@ -167,7 +167,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
           sourceLanguage: loc.currentLanguageCode,
           userId: emp.id,
         ));
-        AppToastService.show(loc.t('documentation_updated') ?? 'Документ обновлён');
+        AppToastService.show(loc.t('documentation_updated'));
       }
       if (mounted) context.pop();
     } catch (e) {
@@ -181,10 +181,10 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
 
   String _getDepartmentLabel(String code, LocalizationService loc) {
     switch (code) {
-      case 'kitchen': return loc.t('kitchen') ?? 'Кухня';
-      case 'bar': return loc.t('bar') ?? 'Бар';
-      case 'hall': return loc.t('dining_room') ?? 'Зал';
-      case 'management': return loc.t('management') ?? 'Управление';
+      case 'kitchen': return loc.t('kitchen');
+      case 'bar': return loc.t('bar');
+      case 'hall': return loc.t('dining_room');
+      case 'management': return loc.t('management');
       default: return code;
     }
   }
@@ -203,28 +203,28 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
 
     if (!canEdit) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
-        body: Center(child: Text(loc.t('access_denied') ?? 'Доступ запрещён')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation'))),
+        body: Center(child: Text(loc.t('access_denied'))),
       );
     }
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null && !_isNew && _doc == null) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation'))),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(_error!),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back'))),
             ],
           ),
         ),
@@ -234,7 +234,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(_isNew ? (loc.t('documentation_create') ?? 'Создать документ') : (loc.t('documentation_edit') ?? 'Редактировать')),
+        title: Text(_isNew ? loc.t('documentation_create') : loc.t('documentation_edit')),
         actions: [
           if (!_isNew && _doc != null)
             IconButton(
@@ -251,7 +251,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
-                labelText: loc.t('documentation_name') ?? 'Название',
+                labelText: loc.t('documentation_name'),
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -259,21 +259,21 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
             TextField(
               controller: _topicController,
               decoration: InputDecoration(
-                labelText: loc.t('documentation_topic') ?? 'Тема',
+                labelText: loc.t('documentation_topic'),
                 border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
-            Text(loc.t('documentation_visibility') ?? 'Кому отображается', style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('documentation_visibility'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<DocumentVisibilityType>(
               value: _visibilityType,
               decoration: const InputDecoration(border: OutlineInputBorder()),
               items: [
-                DropdownMenuItem(value: DocumentVisibilityType.all, child: Text(loc.t('documentation_visibility_all') ?? 'Всем')),
-                DropdownMenuItem(value: DocumentVisibilityType.department, child: Text(loc.t('documentation_visibility_department') ?? 'Подразделения')),
-                DropdownMenuItem(value: DocumentVisibilityType.section, child: Text(loc.t('documentation_visibility_section') ?? 'Цеха')),
-                DropdownMenuItem(value: DocumentVisibilityType.employee, child: Text(loc.t('documentation_visibility_employee') ?? 'Сотрудникам')),
+                DropdownMenuItem(value: DocumentVisibilityType.all, child: Text(loc.t('documentation_visibility_all'))),
+                DropdownMenuItem(value: DocumentVisibilityType.department, child: Text(loc.t('documentation_visibility_department'))),
+                DropdownMenuItem(value: DocumentVisibilityType.section, child: Text(loc.t('documentation_visibility_section'))),
+                DropdownMenuItem(value: DocumentVisibilityType.employee, child: Text(loc.t('documentation_visibility_employee'))),
               ],
               onChanged: (v) => setState(() {
                 _visibilityType = v ?? DocumentVisibilityType.all;
@@ -335,7 +335,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            Text(loc.t('documentation_body') ?? 'Текст документа', style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('documentation_body'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             DocumentationRichTextEditor(
               controller: _quillController,
@@ -345,7 +345,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _saving ? null : _save,
-              child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save') ?? 'Сохранить'),
+              child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
             ),
           ],
         ),
@@ -357,10 +357,10 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('documentation_delete_confirm') ?? 'Удалить документ?'),
+        title: Text(loc.t('documentation_delete_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel') ?? 'Отмена')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('delete') ?? 'Удалить')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('delete'))),
         ],
       ),
     );
@@ -369,7 +369,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     try {
       await context.read<DocumentationServiceSupabase>().deleteDocument(_doc!.id);
       if (mounted) {
-        AppToastService.show(loc.t('documentation_deleted') ?? 'Документ удалён');
+        AppToastService.show(loc.t('documentation_deleted'));
         context.pop();
       }
     } catch (e) {

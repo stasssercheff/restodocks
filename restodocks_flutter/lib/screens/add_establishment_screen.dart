@@ -130,7 +130,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
       if (!mounted) return;
       context.go('/home', extra: {'back': true});
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('establishment_added') ?? 'Заведение добавлено'}: ${establishment.name}')),
+        SnackBar(content: Text('${loc.t('establishment_added')}: ${establishment.name}')),
       );
     } catch (e) {
       if (mounted) {
@@ -192,18 +192,18 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
       final origin = publicAppOrigin;
       final link =
           '$origin/confirm-establishment-clone?token=${Uri.encodeComponent(token)}';
-      final html = loc.t('clone_email_html', args: {'link': link}) ?? '';
+      final html = loc.t('clone_email_html', args: {'link': link});
 
       await accountManager.sendEstablishmentCloneConfirmationEmail(
         to: email,
-        subject: loc.t('clone_email_subject') ?? 'Restodocks',
+        subject: loc.t('clone_email_subject'),
         htmlBody: html,
       );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('clone_email_sent') ?? '')),
+        SnackBar(content: Text(loc.t('clone_email_sent'))),
       );
       context.pop();
     } catch (e) {
@@ -225,7 +225,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('add_establishment') ?? 'Добавить заведение'),
+        title: Text(loc.t('add_establishment')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -237,17 +237,15 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
               children: [
                 Text(
                   _type == _EstablishmentType.copy
-                      ? (loc.t('establishment_copy_hint') ??
-                          '')
-                      : (loc.t('add_establishment_hint') ??
-                          'Добавьте ещё одно заведение к вашему аккаунту. Владелец уже зарегистрирован.'),
+                      ? (loc.t('establishment_copy_hint'))
+                      : (loc.t('add_establishment_hint')),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  loc.t('establishment_type') ?? 'Тип заведения',
+                  loc.t('establishment_type'),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
@@ -255,17 +253,17 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                   segments: [
                     ButtonSegment(
                       value: _EstablishmentType.newEst,
-                      label: Text(loc.t('new_establishment') ?? 'Новое заведение'),
+                      label: Text(loc.t('new_establishment')),
                       icon: const Icon(Icons.add_business_outlined),
                     ),
                     ButtonSegment(
                       value: _EstablishmentType.branch,
-                      label: Text(loc.t('branch_of') ?? 'Филиал'),
+                      label: Text(loc.t('branch_of')),
                       icon: const Icon(Icons.account_tree_outlined),
                     ),
                     ButtonSegment(
                       value: _EstablishmentType.copy,
-                      label: Text(loc.t('establishment_copy_short') ?? 'Копирование'),
+                      label: Text(loc.t('establishment_copy_short')),
                       icon: const Icon(Icons.copy_all_outlined),
                     ),
                   ],
@@ -279,7 +277,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                 if (_type == _EstablishmentType.branch) ...[
                   const SizedBox(height: 16),
                   Text(
-                    loc.t('branch_of_establishment') ?? 'Филиал какого заведения?',
+                    loc.t('branch_of_establishment'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -292,7 +290,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                     DropdownButtonFormField<Establishment>(
                       value: _selectedParent,
                       decoration: InputDecoration(
-                        labelText: loc.t('main_establishment') ?? 'Основное заведение',
+                        labelText: loc.t('main_establishment'),
                         prefixIcon: const Icon(Icons.store),
                         border: const OutlineInputBorder(),
                       ),
@@ -301,12 +299,12 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                           .toList(),
                       onChanged: (e) => setState(() => _selectedParent = e),
                       validator: (v) => _type == _EstablishmentType.branch && v == null
-                          ? (loc.t('select_main_establishment') ?? 'Выберите основное заведение')
+                          ? (loc.t('select_main_establishment'))
                           : null,
                     ),
                   const SizedBox(height: 12),
                   Text(
-                    loc.t('branch_sync_hint') ?? 'Номенклатура и ТТК будут синхронизироваться с основным заведением.',
+                    loc.t('branch_sync_hint'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -323,7 +321,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                     DropdownButtonFormField<Establishment>(
                       value: _cloneSource,
                       decoration: InputDecoration(
-                        labelText: loc.t('clone_source') ?? 'Откуда',
+                        labelText: loc.t('clone_source'),
                         prefixIcon: const Icon(Icons.outbox_outlined),
                         border: const OutlineInputBorder(),
                       ),
@@ -339,7 +337,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                     DropdownButtonFormField<Establishment>(
                       value: _cloneTarget,
                       decoration: InputDecoration(
-                        labelText: loc.t('clone_target') ?? 'Куда',
+                        labelText: loc.t('clone_target'),
                         prefixIcon: const Icon(Icons.move_to_inbox_outlined),
                         border: const OutlineInputBorder(),
                       ),
@@ -373,19 +371,19 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                     CheckboxListTile(
                       value: _optNomenclature,
                       onChanged: (v) => setState(() => _optNomenclature = v ?? true),
-                      title: Text(loc.t('clone_opt_nomenclature') ?? ''),
+                      title: Text(loc.t('clone_opt_nomenclature')),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     CheckboxListTile(
                       value: _optTechCards,
                       onChanged: (v) => setState(() => _optTechCards = v ?? true),
-                      title: Text(loc.t('clone_opt_tech_cards') ?? ''),
+                      title: Text(loc.t('clone_opt_tech_cards')),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     CheckboxListTile(
                       value: _optOrderLists,
                       onChanged: (v) => setState(() => _optOrderLists = v ?? false),
-                      title: Text(loc.t('clone_opt_order_lists') ?? ''),
+                      title: Text(loc.t('clone_opt_order_lists')),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                   ],
@@ -466,8 +464,8 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                         )
                       : Text(
                           _type == _EstablishmentType.copy
-                              ? (loc.t('clone_send_email') ?? 'Отправить ссылку')
-                              : (loc.t('add_establishment') ?? 'Добавить заведение'),
+                              ? (loc.t('clone_send_email'))
+                              : (loc.t('add_establishment')),
                         ),
                 ),
               ],

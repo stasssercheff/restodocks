@@ -30,7 +30,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
+                  loc.t('establishment_not_found'))),
         );
       }
       return;
@@ -44,8 +44,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
             title: Text(loc.t('haccp_agreement_lang_title') ??
-                loc.t('language') ??
-                'Language'),
+                loc.t('language')),
             content: Wrap(
               spacing: 8,
               children: LocalizationService.productLanguageCodes.map((code) {
@@ -63,7 +62,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx2).pop(selectedLang),
-                child: Text(loc.t('download') ?? 'Download'),
+                child: Text(loc.t('download')),
               ),
             ],
           ),
@@ -140,7 +139,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+              content: Text(loc.t('haccp_agreement_saved'))),
         );
       }
     } catch (e) {
@@ -171,8 +170,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
           builder: (ctx2, setState) {
             bool filled = mode == HaccpOrderThirdPageMode.filled;
             return AlertDialog(
-              title: Text(loc.t('haccp_order_print_title') ??
-                  'Order and appendix (print)'),
+              title: Text(loc.t('haccp_order_print_title')),
               content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,24 +178,21 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.empty,
                       groupValue: mode,
-                      title: Text(loc.t('haccp_order_mode_empty') ??
-                          'Empty form (manual fill)'),
+                      title: Text(loc.t('haccp_order_mode_empty')),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.empty),
                     ),
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.filled,
                       groupValue: mode,
-                      title: Text(loc.t('haccp_order_mode_filled') ??
-                          'Filled form (name/position auto)'),
+                      title: Text(loc.t('haccp_order_mode_filled')),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.filled),
                     ),
                     if (filled) ...[
                       const SizedBox(height: 10),
                       Text(
-                        loc.t('haccp_order_choose_employees') ??
-                            'Choose employees for acknowledgement sheet:',
+                        loc.t('haccp_order_choose_employees'),
                         style: Theme.of(ctx2).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),
@@ -244,12 +239,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                                 ..clear()
                                 ..addAll(employees.map((e) => e.id));
                             }),
-                            child: Text(loc.t('select_all') ?? 'Select all'),
+                            child: Text(loc.t('select_all')),
                           ),
                           TextButton(
                             onPressed: () =>
                                 setState(() => selectedIds.clear()),
-                            child: Text(loc.t('clear_selection') ?? 'Clear'),
+                            child: Text(loc.t('clear_selection')),
                           ),
                         ],
                       ),
@@ -272,7 +267,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                           mode: mode, selectedEmployees: selected),
                     );
                   },
-                  child: Text(loc.t('download') ?? 'Скачать'),
+                  child: Text(loc.t('download')),
                 ),
               ],
             );
@@ -315,7 +310,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+              content: Text(loc.t('haccp_agreement_saved'))),
         );
       }
     } catch (e) {
@@ -353,15 +348,15 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       return Scaffold(
         appBar: AppBar(
             leading: appBarBackButton(context),
-            title: Text(loc.t('documentation') ?? 'Документация')),
-        body: Center(child: Text(loc.t('access_denied') ?? 'Доступ запрещен')),
+            title: Text(loc.t('documentation'))),
+        body: Center(child: Text(loc.t('access_denied'))),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('documentation') ?? 'Документация'),
+        title: Text(loc.t('documentation')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -372,9 +367,9 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.business),
-                title: Text(loc.t('requisites') ?? 'Реквизиты'),
+                title: Text(loc.t('requisites')),
                 subtitle: Text(
-                  loc.t('requisites_hint') ?? 'Для бланков и приказов',
+                  loc.t('requisites_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 children: [
@@ -393,13 +388,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             ExpansionTile(
               initiallyExpanded: true,
               leading: const Icon(Icons.rule_outlined),
-              title: Text(loc.t('haccp_legal_legitimacy') ??
-                  'Юридическая легитимность'),
+              title: Text(loc.t('haccp_legal_legitimacy')),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Text(
-                    '${loc.t('haccp_legal_text') ?? 'Легитимность цифровых журналов: допускается ведение производственных журналов в электронном виде...'}\n\n'
+                    '${loc.t('haccp_legal_text')}\n\n'
                     '${LegalComplianceProvider.journalPdfComplianceFooterByCountry(loc.currentLanguageCode, countryCode)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -410,12 +404,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               initiallyExpanded: false,
               leading: const Icon(Icons.document_scanner_outlined),
               title:
-                  Text(loc.t('haccp_legal_sp_extract') ?? 'Извлечение из СП'),
+                  Text(loc.t('haccp_legal_sp_extract')),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Text(
-                    loc.t('haccp_legal_sp_paragraphs') ?? '',
+                    loc.t('haccp_legal_sp_paragraphs'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -439,20 +433,18 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             FilledButton.icon(
               onPressed: () => _downloadHaccpAgreement(context, loc),
               icon: const Icon(Icons.download),
-              label: Text(loc.t('haccp_download_agreement') ??
-                  'Скачать Соглашение с сотрудником'),
+              label: Text(loc.t('haccp_download_agreement')),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () => _downloadHaccpOrder(context, loc),
               icon: const Icon(Icons.download),
               label: Text(
-                  loc.t('haccp_download_order') ?? 'Download order (3 pages)'),
+                  loc.t('haccp_download_order')),
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('haccp_print_after_download') ??
-                  'After downloading PDF, print and fill manually where lines are shown.',
+              loc.t('haccp_print_after_download'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -551,7 +543,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _legalNameController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_organization') ?? 'Юр. название',
+                  widget.loc.t('requisites_organization'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -560,7 +552,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _innBinController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_inn_bin') ?? 'ИНН / БИН',
+              labelText: widget.loc.t('requisites_inn_bin'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -570,7 +562,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _ogrnOgrnipController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_ogrn_ogrnip') ?? 'ОГРН / ОГРНИП',
+                  widget.loc.t('requisites_ogrn_ogrnip'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -579,7 +571,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _kppController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_kpp') ?? 'КПП',
+              labelText: widget.loc.t('requisites_kpp'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -588,7 +580,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankRsController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bank_account') ?? 'Р/С',
+              labelText: widget.loc.t('requisites_bank_account'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -597,7 +589,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankBikController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bik') ?? 'БИК',
+              labelText: widget.loc.t('requisites_bik'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -606,7 +598,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankNameController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bank_name') ?? 'Банк',
+              labelText: widget.loc.t('requisites_bank_name'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -616,7 +608,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _directorFioController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_director_fio') ?? 'ФИО руководителя',
+                  widget.loc.t('requisites_director_fio'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -625,8 +617,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorPositionController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_director_position') ??
-                  'Должность руководителя',
+              labelText: widget.loc.t('requisites_director_position'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -635,7 +626,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _addressController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_address') ?? 'Адрес',
+              labelText: widget.loc.t('requisites_address'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -686,7 +677,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content:
-                                  Text(widget.loc.t('saved') ?? 'Сохранено')),
+                                  Text(widget.loc.t('saved'))),
                         );
                       }
                     } finally {
@@ -694,8 +685,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                     }
                   },
             child: Text(_saving
-                ? (widget.loc.t('saving') ?? 'Сохранение...')
-                : (widget.loc.t('save') ?? 'Сохранить')),
+                ? widget.loc.t('saving')
+                : widget.loc.t('save')),
           ),
         ],
       ),

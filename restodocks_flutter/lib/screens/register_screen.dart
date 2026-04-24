@@ -414,8 +414,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   leading: const Icon(Icons.cake),
                   title: Text(
                     _birthday == null
-                        ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('optional') ?? 'не указано')
-                        : '${loc.t('birthday') ?? 'День рождения'}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
+                        ? (loc.t('birthday')) + ' — ' + (loc.t('optional'))
+                        : '${loc.t('birthday')}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   trailing: Row(
@@ -425,7 +425,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () => setState(() => _birthday = null),
-                          tooltip: loc.t('clear') ?? 'Очистить',
+                          tooltip: loc.t('clear'),
                         ),
                       TextButton(
                         onPressed: () async {
@@ -437,7 +437,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           );
                           if (picked != null && mounted) setState(() => _birthday = picked);
                         },
-                        child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                        child: Text(_birthday == null ? (loc.t('set')) : (loc.t('change'))),
                       ),
                     ],
                   ),

@@ -156,7 +156,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         'owner_messages': _wrap(
           HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
-            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            title: loc.t('inbox_tab_messages'),
             onTap: () => context.go('/notifications?tab=messages'),
           ),
           'home-messages',
@@ -172,7 +172,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         'owner_expenses_lite': _wrap(
           HomeFeatureTile(
             icon: Icons.payments,
-            title: loc.t('expenses') ?? 'Расходы',
+            title: loc.t('expenses'),
             onTap: () => context.go('/expenses'),
           ),
           'home-expenses-lite',
@@ -201,7 +201,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             _wrap(
             HomeFeatureTile(
                 icon: Icons.description_outlined,
-                title: loc.t('documentation') ?? 'Документация',
+                title: loc.t('documentation'),
                 onTap: () => context.go('/documentation')),
             'home-doc')),
         ownerTile(
@@ -209,7 +209,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             _wrap(
             HomeFeatureTile(
                 icon: Icons.assignment,
-                title: loc.t('haccp_journals') ?? 'Журналы и ХАССП',
+                title: loc.t('haccp_journals'),
                 subscriptionLocked: !subOk,
                 onTap: () => context.go('/haccp-journals')),
             'home-haccp')),
@@ -218,7 +218,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             _wrap(
             HomeFeatureTile(
                 icon: Icons.chat_bubble_outline,
-                title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+                title: loc.t('inbox_tab_messages'),
                 onTap: () => context.go('/notifications?tab=messages')),
             'home-messages')),
         ownerTile(
@@ -285,7 +285,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.local_shipping,
-                  title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                  title: loc.t('pos_nav_procurement'),
                   onTap: () => context.push('/procurement/kitchen')),
               'home-procurement-kitchen')),
         ],
@@ -295,7 +295,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.receipt_long,
-                  title: loc.t('order_tab_orders') ?? 'Заказы',
+                  title: loc.t('order_tab_orders'),
                   onTap: () => context.push('/pos/orders/kitchen')),
               'home-pos-orders-kitchen')),
           ownerTile(
@@ -303,7 +303,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.point_of_sale_outlined,
-                  title: loc.t('sales_title') ?? 'Продажи',
+                  title: loc.t('sales_title'),
                   onTap: () => context.push('/sales/kitchen')),
               'home-pos-sales-kitchen')),
           ownerTile(
@@ -311,7 +311,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.warehouse,
-                  title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                  title: loc.t('pos_nav_warehouse'),
                   onTap: () => context.push('/pos/warehouse/kitchen')),
               'home-pos-wh-kitchen')),
           ownerTile(
@@ -319,7 +319,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.local_shipping,
-                  title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                  title: loc.t('pos_nav_procurement'),
                   onTap: () => context.push('/pos/procurement/kitchen')),
               'home-pos-pr-kitchen')),
         ],
@@ -328,7 +328,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             _wrap(
             HomeFeatureTile(
                 icon: Icons.remove_circle_outline,
-                title: loc.t('writeoffs') ?? 'Списания',
+                title: loc.t('writeoffs'),
                 subscriptionLocked: !subOk,
                 onTap: () => context.push('/writeoffs')),
             'home-writeoffs-kitchen')),
@@ -364,7 +364,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.description,
-                  title: loc.t('ttk_bar') ?? 'ТТК бара',
+                  title: loc.t('ttk_bar'),
                   onTap: () => context.go('/tech-cards/bar')),
               'home-ttk-bar')),
           ownerTile(
@@ -381,7 +381,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
-                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    title: loc.t('pos_nav_procurement'),
                     onTap: () => context.push('/procurement/bar')),
                 'home-procurement-bar')),
           ],
@@ -391,7 +391,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.receipt_long,
-                    title: loc.t('order_tab_orders') ?? 'Заказы',
+                    title: loc.t('order_tab_orders'),
                     onTap: () => context.push('/pos/orders/bar')),
                 'home-pos-orders-bar')),
             ownerTile(
@@ -399,7 +399,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.point_of_sale_outlined,
-                    title: loc.t('sales_title') ?? 'Продажи',
+                    title: loc.t('sales_title'),
                     onTap: () => context.push('/sales/bar')),
                 'home-pos-sales-bar')),
             ownerTile(
@@ -407,7 +407,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.warehouse,
-                    title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                    title: loc.t('pos_nav_warehouse'),
                     onTap: () => context.push('/pos/warehouse/bar')),
                 'home-pos-wh-bar')),
             ownerTile(
@@ -415,7 +415,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
-                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    title: loc.t('pos_nav_procurement'),
                     onTap: () => context.push('/pos/procurement/bar')),
                 'home-pos-pr-bar')),
           ],
@@ -424,7 +424,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.remove_circle_outline,
-                  title: loc.t('writeoffs') ?? 'Списания',
+                  title: loc.t('writeoffs'),
                   subscriptionLocked: !subOk,
                   onTap: () => context.push('/writeoffs')),
               'home-writeoffs-bar')),
@@ -470,7 +470,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
-                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    title: loc.t('pos_nav_procurement'),
                     onTap: () => context.push('/procurement/hall')),
                 'home-procurement-hall')),
           ],
@@ -480,7 +480,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.receipt_long,
-                    title: loc.t('order_tab_orders') ?? 'Заказы',
+                    title: loc.t('order_tab_orders'),
                     onTap: () => context.push('/pos/hall/orders')),
                 'home-pos-orders-hall')),
             ownerTile(
@@ -488,7 +488,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.point_of_sale,
-                    title: loc.t('pos_nav_cash_register') ?? 'Касса',
+                    title: loc.t('pos_nav_cash_register'),
                     onTap: () => context.push('/pos/hall/cash-register')),
                 'home-pos-cash-hall')),
             ownerTile(
@@ -496,7 +496,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.table_restaurant,
-                    title: loc.t('pos_nav_tables') ?? 'Столы',
+                    title: loc.t('pos_nav_tables'),
                     onTap: () => context.push('/pos/hall/tables')),
                 'home-pos-tables-hall')),
             ownerTile(
@@ -504,7 +504,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.warehouse,
-                    title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                    title: loc.t('pos_nav_warehouse'),
                     onTap: () => context.push('/pos/warehouse/hall')),
                 'home-pos-wh-hall')),
             ownerTile(
@@ -512,7 +512,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
-                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    title: loc.t('pos_nav_procurement'),
                     onTap: () => context.push('/pos/procurement/hall')),
                 'home-pos-pr-hall')),
           ],
@@ -521,7 +521,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.remove_circle_outline,
-                  title: loc.t('writeoffs') ?? 'Списания',
+                  title: loc.t('writeoffs'),
                   subscriptionLocked: !subOk,
                   onTap: () => context.push('/writeoffs')),
               'home-writeoffs-hall')),
@@ -538,8 +538,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               _wrap(
               HomeFeatureTile(
                   icon: Icons.warehouse,
-                  title: loc.t('pos_warehouse_establishment_title') ??
-                      'Сводная по заведению',
+                  title: loc.t('pos_warehouse_establishment_title'),
                   onTap: () => context.push('/pos/warehouse/establishment')),
               'home-pos-wh-est')),
         ],
@@ -569,7 +568,7 @@ class _ExpandableBanquetSection extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
         leading: const Icon(Icons.celebration),
-        title: Text(loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        title: Text(loc.t('banquet_catering')),
         trailing: const Icon(Icons.chevron_right),
         children: [
           ListTile(

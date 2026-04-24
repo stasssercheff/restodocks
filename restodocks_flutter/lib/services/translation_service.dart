@@ -11,7 +11,8 @@ import 'ai_service_supabase.dart';
 import 'supabase_service.dart';
 
 /// Сервис для переводов с кешированием.
-/// Источники: 1) кеш и БД, 2) Google Cloud Translation API (основной), 3) MyMemory (fallback), 4) ИИ (если включено).
+/// Источники: 1) кеш и БД, 2) DeepL через Edge Function `translate-text` (основной),
+/// 3) MyMemory (резерв), 4) ИИ (если включено).
 class TranslationService {
   /// Если false — при отсутствии в кеше/БД используется MyMemory API. Если true — вызывается ИИ.
   static bool useAiForTranslation = false;
@@ -19,7 +20,9 @@ class TranslationService {
   /// Если true — при отсутствии в кеше/БД вызывается внешний API (Google Translate или MyMemory). По умолчанию включено.
   static bool useTranslationApi = true;
 
-  /// Если true — в первую очередь используется Google Cloud Translation API. Иначе — MyMemory. По умолчанию true.
+  /// Legacy flag name kept for compatibility.
+  /// Если true — в первую очередь используется Edge Function `translate-text` (DeepL).
+  /// Иначе — сразу MyMemory.
   static bool useGoogleTranslate = true;
 
   final AiServiceSupabase _aiService;
@@ -108,7 +111,7 @@ class TranslationService {
       // Продолжаем без кеша
     }
 
-    // 1. Перевод через внешний API: Google Translate (основной) или MyMemory (fallback)
+    // 1. Перевод через внешний API: DeepL (основной, через Edge) или MyMemory (резерв).
     if (useTranslationApi && !useAiForTranslation) {
       String? translatedText;
       if (useGoogleTranslate) {
@@ -186,7 +189,7 @@ class TranslationService {
     return null;
   }
 
-  /// Перевести через Google Cloud Translation API (Edge Function translate-text)
+  /// Перевести через Edge Function `translate-text` (DeepL).
   Future<String?> _translateWithGoogle(String text, String from, String to) async {
     if (text.trim().isEmpty) return null;
     try {
@@ -198,8 +201,17 @@ class TranslationService {
       final data = res.data;
       if (data is! Map<String, dynamic>) return null;
       if (data.containsKey('error')) return null;
+      final isFallback = data['fallback'] == true;
       final translated = data['translatedText']?.toString().trim();
-      if (translated != null && translated.isNotEmpty) return translated;
+      if (translated == null || translated.isEmpty) return null;
+      // DeepL fallback in Edge can intentionally return original text.
+      // Treat this as a miss so reserve provider can try translating.
+      if (isFallback) return null;
+      if (from.trim().toLowerCase() != to.trim().toLowerCase() &&
+          translated.trim() == text.trim()) {
+        return null;
+      }
+      return translated;
     } catch (_) {}
     return null;
   }

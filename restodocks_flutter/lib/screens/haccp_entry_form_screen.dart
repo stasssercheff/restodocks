@@ -583,9 +583,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   String _finishedBrakerageTypeLabel(LocalizationService loc,
       {required bool isProduct, required bool isSemiFinished}) {
-    if (isProduct) return loc.t('products') ?? 'Продукты';
-    if (isSemiFinished) return loc.t('ttk_pf') ?? 'ТТК ПФ';
-    return loc.t('ttk_dish') ?? 'Блюдо';
+    if (isProduct) return loc.t('products');
+    if (isSemiFinished) return loc.t('ttk_pf');
+    return loc.t('ttk_dish');
   }
 
   List<_FinishedBrakerageChoice> _buildFinishedBrakerageChoices(
@@ -831,7 +831,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final controller = _controllers['product']!;
     final title = controller.text.isNotEmpty
         ? controller.text
-        : (loc.t('haccp_product') ?? 'Продукция / Сырьё');
+        : loc.t('haccp_product');
     return InkWell(
       onTap: () async {
         if (_finishedBrakerageTechCards.isEmpty &&
@@ -858,7 +858,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             return StatefulBuilder(
               builder: (ctx, setStateDialog) {
                 return AlertDialog(
-                  title: Text(loc.t('haccp_product') ?? 'Наименование блюда'),
+                  title: Text(loc.t('haccp_product')),
                   content: SizedBox(
                     width: 420,
                     child: Column(
@@ -868,7 +868,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                           controller: searchCtrl,
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.search),
-                            hintText: loc.t('search') ?? 'Поиск',
+                            hintText: loc.t('search'),
                             border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) {
@@ -880,7 +880,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                         const SizedBox(height: 12),
                         Flexible(
                           child: filtered.isEmpty
-                              ? Text(loc.t('no_results') ?? 'Ничего не найдено')
+                              ? Text(loc.t('no_results'))
                               : ListView.builder(
                                   shrinkWrap: true,
                                   itemCount: filtered.length,
@@ -918,7 +918,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       },
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: loc.t('haccp_product') ?? 'Продукция / Сырьё',
+          labelText: loc.t('haccp_product'),
           border: const OutlineInputBorder(),
           isDense: true,
         ),
@@ -1076,7 +1076,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               context: context,
               builder: (ctx) => AlertDialog(
                 title: Text(
-                    loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
+                    loc.t('haccp_add_employee_row')),
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1109,10 +1109,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               });
           },
           icon: const Icon(Icons.add),
-          label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
+          label: Text(loc.t('haccp_add_row')),
         ),
         const SizedBox(height: 8),
-        _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+        _textField('note', loc.t('haccp_note')),
       ],
     );
   }
@@ -1144,7 +1144,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             )),
             _tableCell(_savedOptionTextField(
               key: 'equipment',
-              label: loc.t('haccp_equipment') ?? 'Оборудование',
+              label: loc.t('haccp_equipment'),
               options: _presetOptions['equipment'] ?? const [],
               presetFieldKey: 'equipment',
             )),
@@ -1311,13 +1311,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     'Время (например 12:00)'))),
             _tableCell(_finishedProductPickerCell(loc)),
             _tableCell(_textField(
-                'result', loc.t('haccp_result') ?? 'Результат оценки',
+                'result', loc.t('haccp_result'),
                 multiline: true)),
             _tableCell(_approvalSelector()),
             _tableCell(_signatureFromAccount()),
             _tableCell(_textField('weighing_result',
                 _th(loc, 'haccp_cell_weighing', 'Взвешивание'))),
-            _tableCell(_textField('note', loc.t('haccp_note') ?? 'Примечание')),
+            _tableCell(_textField('note', loc.t('haccp_note'))),
           ],
         ),
       ],
@@ -1367,7 +1367,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _tableCell(
                 Text(_formatDateTime(DateTime.now()))),
             _tableCell(_textField(
-                'product', loc.t('haccp_product') ?? 'Наименование')),
+                'product', loc.t('haccp_product'))),
             _tableCell(_savedOptionTextField(
               key: 'packaging',
               label: _th(loc, 'haccp_tbl_packaging', 'Фасовка'),
@@ -1386,7 +1386,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 keyboardType: TextInputType.number)),
             _tableCell(_textField(
                 'document_number', _th(loc, 'haccp_doc_no_abbr', '№ док.'))),
-            _tableCell(_textField('result', loc.t('haccp_result') ?? 'Оценка',
+            _tableCell(_textField('result', loc.t('haccp_result'),
                 multiline: true)),
             _tableCell(_savedOptionTextField(
               key: 'storage_conditions',
@@ -1409,7 +1409,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   : _th(loc, 'haccp_pick_date_short', 'Выбрать')),
             )),
             _tableCell(_signatureFromAccount()),
-            _tableCell(_textField('note', loc.t('haccp_note') ?? 'Прим.')),
+            _tableCell(_textField('note', loc.t('haccp_note'))),
           ],
         ),
       ],
@@ -2352,10 +2352,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   });
               },
               icon: const Icon(Icons.add),
-              label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
+              label: Text(loc.t('haccp_add_row')),
             ),
             const SizedBox(height: 10),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('note', loc.t('haccp_note')),
           ],
         );
       case HaccpLogType.fridgeTemperature:
@@ -2375,7 +2375,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             ),
             _savedOptionTextField(
               key: 'equipment',
-              label: loc.t('haccp_equipment') ?? 'Оборудование',
+              label: loc.t('haccp_equipment'),
               options: _presetOptions['equipment'] ?? const [],
               presetFieldKey: 'equipment',
             ),
@@ -2453,7 +2453,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     'Время снятия бракеража (например 12:00)')),
             _finishedProductPickerCell(loc),
             _textField('result',
-                loc.t('haccp_result') ?? 'Результаты органолептической оценки',
+                loc.t('haccp_result'),
                 multiline: true),
             _approvalSelector(),
             _signatureFromAccount(),
@@ -2461,7 +2461,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 'weighing_result',
                 _th(loc, 'haccp_tbl_portion_weighing',
                     'Результаты взвешивания порционных блюд')),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('note', loc.t('haccp_note')),
           ],
         );
       case HaccpLogType.incomingRawBrakerage:
@@ -2478,7 +2478,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   isDense: true),
               readOnly: true,
             ),
-            _textField('product', loc.t('haccp_product') ?? 'Наименование'),
+            _textField('product', loc.t('haccp_product')),
             _savedOptionTextField(
               key: 'packaging',
               label: _th(loc, 'haccp_tbl_packaging', 'Фасовка'),
@@ -2498,7 +2498,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _textField(
                 'document_number', _th(loc, 'haccp_tbl_doc_no', '№ документа')),
             _textField(
-                'result', loc.t('haccp_result') ?? 'Органолептическая оценка',
+                'result', loc.t('haccp_result'),
                 multiline: true),
             _savedOptionTextField(
               key: 'storage_conditions',
@@ -2529,7 +2529,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               ),
             ),
             _signatureFromAccount(),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('note', loc.t('haccp_note')),
           ],
         );
       case HaccpLogType.fryingOil:
@@ -2600,7 +2600,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     'Утилизированный жир, кг'),
                 keyboardType: TextInputType.number),
             _signatureFromAccount(),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('note', loc.t('haccp_note')),
           ],
         );
       case HaccpLogType.medBookRegistry:
@@ -2857,7 +2857,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _genCleanDate,
                 (d) => setState(() => _genCleanDate = d)),
             _signatureFromAccount(),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('note', loc.t('haccp_note')),
           ],
         );
       case HaccpLogType.sieveFilterMagnet:
@@ -3280,8 +3280,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       return Scaffold(
         appBar: AppBar(
             leading: appBarBackButton(context),
-            title: Text(loc.t('haccp_journals') ?? 'Журналы ХАССП')),
-        body: Center(child: Text(loc.t('error') ?? 'Неизвестный тип журнала')),
+            title: Text(loc.t('haccp_journals'))),
+        body: Center(child: Text(loc.t('error'))),
       );
     }
 
@@ -3289,7 +3289,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(
-            '${loc.t('haccp_add_entry') ?? 'Добавить'} — ${_logTypeTitle(_logType!, loc)}'),
+            '${loc.t('haccp_add_entry')} — ${_logTypeTitle(_logType!, loc)}'),
       ),
       body: Form(
         key: _formKey,

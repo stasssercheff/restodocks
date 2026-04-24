@@ -207,8 +207,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         if (orderDoc == null) {
           // Заказ сохранён локально, но входящие не созданы — показываем предупреждение, но не блокируем
           AppToastService.show(
-            loc.t('order_save_inbox_warning') ??
-                '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)',
+            loc.t('order_save_inbox_warning'),
             duration: const Duration(seconds: 5),
           );
           setState(() => _saving = false);
@@ -302,15 +301,15 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     onTap: () => Navigator.of(ctx).pop('es')),
                 _LangButton(
                     flag: '🇮🇹',
-                    label: loc.t('order_export_language_it') ?? 'Italiano',
+                    label: loc.t('order_export_language_it'),
                     onTap: () => Navigator.of(ctx).pop('it')),
                 _LangButton(
                     flag: '🇹🇷',
-                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
+                    label: loc.t('order_export_language_tr'),
                     onTap: () => Navigator.of(ctx).pop('tr')),
                 _LangButton(
                     flag: '🇰🇿',
-                    label: loc.t('order_export_language_kk') ?? 'Қазақша',
+                    label: loc.t('order_export_language_kk'),
                     onTap: () => Navigator.of(ctx).pop('kk')),
               ],
             ),
@@ -378,7 +377,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('order_list_create') ?? 'Создать заказ'),
+        title: Text(loc.t('order_list_create')),
       ),
       body: Column(
         children: [
@@ -392,7 +391,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                   TextField(
                     controller: _nameCtrl,
                     decoration: InputDecoration(
-                      labelText: loc.t('order_list_name') ?? 'Название заказа',
+                      labelText: loc.t('order_list_name'),
                       border: const OutlineInputBorder(),
                       filled: true,
                     ),
@@ -433,9 +432,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                       icon: const Icon(Icons.calendar_month_outlined),
                       label: Text(
                         _orderForDate != null
-                            ? '${loc.t('order_export_order_for') ?? 'На когда заказ'}: ${DateFormat('dd.MM.yyyy').format(_orderForDate!)}'
-                            : (loc.t('order_export_order_for') ??
-                                'На когда заказ'),
+                            ? '${loc.t('order_export_order_for')}: ${DateFormat('dd.MM.yyyy').format(_orderForDate!)}'
+                            : (loc.t('order_export_order_for')),
                       ),
                       style: OutlinedButton.styleFrom(
                         alignment: Alignment.centerLeft,
@@ -452,7 +450,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                       controller: _productSearchCtrl,
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        hintText: loc.t('search') ?? 'Поиск',
+                        hintText: loc.t('search'),
                         prefixIcon: const Icon(Icons.search),
                         border: const OutlineInputBorder(),
                       ),
@@ -478,7 +476,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 8),
                               child: Text(
-                                loc.t('inventory_item_name') ?? 'Наименование',
+                                loc.t('inventory_item_name'),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),
@@ -487,7 +485,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 8),
                               child: Text(
-                                loc.t('order_list_unit') ?? 'Ед.',
+                                loc.t('order_list_unit'),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),
@@ -496,7 +494,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 8),
                               child: Text(
-                                loc.t('order_list_quantity') ?? 'Кол-во',
+                                loc.t('order_list_quantity'),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),
@@ -576,7 +574,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     const SizedBox(height: 24),
                     Center(
                       child: Text(
-                        loc.t('no_products') ?? 'У поставщика нет продуктов',
+                        loc.t('no_products'),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -590,7 +588,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                   if (_selectedSupplier != null) ...[
                     const SizedBox(height: 20),
                     Text(
-                      loc.t('order_list_comment') ?? 'Комментарий',
+                      loc.t('order_list_comment'),
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 4),
@@ -619,15 +617,14 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(
-                              loc.t('order_list_save_with_quantities') ??
-                                  'Сохранить',
+                              loc.t('order_list_save_with_quantities'),
                             ),
                     ),
                     const SizedBox(height: 10),
                     FilledButton.icon(
                       onPressed: _saving ? null : _showSendSheet,
                       icon: const Icon(Icons.send),
-                      label: Text(loc.t('order_list_send') ?? 'Отправить'),
+                      label: Text(loc.t('order_list_send')),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
@@ -667,8 +664,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Text(
-                                loc.t('order_list_save_with_quantities') ??
-                                    'Сохранить',
+                                loc.t('order_list_save_with_quantities'),
                               ),
                       ),
                     ),
@@ -677,7 +673,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                       child: FilledButton.icon(
                         onPressed: _saving ? null : _showSendSheet,
                         icon: const Icon(Icons.send),
-                        label: Text(loc.t('order_list_send') ?? 'Отправить'),
+                        label: Text(loc.t('order_list_send')),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -719,8 +715,7 @@ class _NoSuppliersHint extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              loc.t('order_no_suppliers_hint') ??
-                  'Сначала создайте поставщика во вкладке «Поставщики»',
+              loc.t('order_no_suppliers_hint'),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
@@ -754,7 +749,7 @@ class _SupplierSelector extends StatelessWidget {
         onPressed: () => _showPicker(context),
         icon: const Icon(Icons.store_outlined),
         label: Text(
-          loc.t('order_select_supplier') ?? 'Выберите поставщика',
+          loc.t('order_select_supplier'),
         ),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -785,7 +780,7 @@ class _SupplierSelector extends StatelessWidget {
             : null,
         trailing: TextButton(
           onPressed: () => _showPicker(context),
-          child: Text(loc.t('change') ?? 'Изменить'),
+          child: Text(loc.t('change')),
         ),
       ),
     );
@@ -795,7 +790,7 @@ class _SupplierSelector extends StatelessWidget {
     showDialog<OrderList>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text(loc.t('order_select_supplier') ?? 'Выберите поставщика'),
+        title: Text(loc.t('order_select_supplier')),
         children: [
           ...suppliers.map((s) => SimpleDialogOption(
                 onPressed: () => Navigator.of(ctx).pop(s),

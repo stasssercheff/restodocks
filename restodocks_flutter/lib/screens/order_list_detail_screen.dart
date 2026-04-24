@@ -136,7 +136,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     if (employee == null || establishment == null) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('error_short') ?? 'Ошибка')));
+            SnackBar(content: Text(loc.t('error_short'))));
       return;
     }
     final now = DateTime.now();
@@ -334,15 +334,15 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     onTap: () => Navigator.of(ctx).pop('es')),
                 _LangButton(
                     flag: '🇮🇹',
-                    label: loc.t('order_export_language_it') ?? 'Italiano',
+                    label: loc.t('order_export_language_it'),
                     onTap: () => Navigator.of(ctx).pop('it')),
                 _LangButton(
                     flag: '🇹🇷',
-                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
+                    label: loc.t('order_export_language_tr'),
                     onTap: () => Navigator.of(ctx).pop('tr')),
                 _LangButton(
                     flag: '🇰🇿',
-                    label: loc.t('order_export_language_kk') ?? 'Қазақша',
+                    label: loc.t('order_export_language_kk'),
                     onTap: () => Navigator.of(ctx).pop('kk')),
               ],
             ),
@@ -427,7 +427,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   if ((list.contactPerson ?? '').trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${loc.t('supplier_contact_person') ?? 'Контактное лицо'}: ${list.contactPerson}',
+                      '${loc.t('supplier_contact_person')}: ${list.contactPerson}',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],

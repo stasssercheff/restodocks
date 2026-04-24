@@ -504,7 +504,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           sell != null && sell > 0
               ? NumberFormatUtils.formatSumWithSymbol(
                   sell, widget.currencyCode, widget.currencySym)
-              : (loc.t('foodcost_no_selling_price') ?? '—'),
+              : (loc.t('foodcost_no_selling_price')),
           w.menu,
           fontSize: narrow ? 11.5 : null,
         )),
@@ -922,7 +922,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                           child: widget.dishes.isEmpty
                               ? const Center(child: CircularProgressIndicator())
                               : Text(
-                                  loc.t('menu_empty_dishes') ?? '',
+                                  loc.t('menu_empty_dishes'),
                                   style: Theme.of(context).textTheme.bodyLarge,
                                 ),
                         ),
@@ -954,7 +954,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.markupOnCost,
           label: Text(
-            loc.t('foodcost_mode_markup') ?? 'Наценка к с/с',
+            loc.t('foodcost_mode_markup'),
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.fade,
@@ -965,7 +965,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.costShareOfPrice,
           label: Text(
-            loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене',
+            loc.t('foodcost_mode_cost_share'),
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.fade,
@@ -994,7 +994,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ButtonSegment<int>(
                 value: 0,
                 label: Text(
-                  loc.t('menu') ?? 'Меню',
+                  loc.t('menu'),
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
@@ -1088,7 +1088,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               : (shortViewport ? 2 : 6)),
           TextField(
             decoration: InputDecoration(
-              labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
+              labelText: loc.t('foodcost_search_hint'),
               prefixIcon: const Icon(Icons.search),
               border: const OutlineInputBorder(),
               isDense: true,

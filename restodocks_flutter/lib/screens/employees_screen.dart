@@ -181,14 +181,14 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                loc.t('employees_register_by_pin_hint') ?? 'Сотрудники регистрируются самостоятельно по PIN компании.',
+                loc.t('employees_register_by_pin_hint'),
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 icon: const Icon(Icons.person_add),
-                label: Text(loc.t('register_employee') ?? 'Регистрация сотрудника'),
+                label: Text(loc.t('register_employee')),
                 onPressed: () => context.push('/register'),
               ),
             ],
@@ -234,7 +234,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final establishment = acc.establishment;
     if (establishment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('establishment') ?? 'Заведение не найдено')),
+        SnackBar(content: Text(loc.t('establishment'))),
       );
       return;
     }
@@ -244,15 +244,15 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final result = await showDialog<String?>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('delete_employee') ?? 'Удалить сотрудника'),
+        title: Text(loc.t('delete_employee')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '${loc.t('delete_employee_confirm') ?? 'Вы уверены, что хотите удалить сотрудника'} "${employee.fullName}"? '
-                '${loc.t('delete_employee_pin_hint') ?? 'Введите PIN компании для подтверждения:'}',
+                '${loc.t('delete_employee_confirm')} "${employee.fullName}"? '
+                '${loc.t('delete_employee_pin_hint')}',
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -264,11 +264,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   autofocus: true,
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                    labelText: loc.t('company_pin') ?? 'PIN компании',
-                    hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                    labelText: loc.t('company_pin'),
+                    hintText: loc.t('enter_company_pin'),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                    if (v == null || v.trim().isEmpty) return loc.t('company_pin_required');
                     return null;
                   },
                 ),
@@ -279,7 +279,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -287,7 +287,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               Navigator.of(ctx).pop(pinController.text.trim());
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(loc.t('delete') ?? 'Удалить'),
+            child: Text(loc.t('delete')),
           ),
         ],
       ),
@@ -308,7 +308,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: 16),
-            Expanded(child: Text(loc.t('delete_employee_progress') ?? 'Удаление сотрудника...')),
+            Expanded(child: Text(loc.t('delete_employee_progress'))),
           ],
         ),
       ),
@@ -319,7 +319,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('employee_deleted_success') ?? 'Сотрудник удалён'), backgroundColor: Colors.green),
+          SnackBar(content: Text(loc.t('employee_deleted_success')), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -328,9 +328,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         final msg = e.toString();
         String snack = msg;
         if (msg.toLowerCase().contains('invalid') && msg.toLowerCase().contains('pin')) {
-          snack = loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN';
+          snack = loc.t('delete_establishment_wrong_pin');
         } else if (msg.toLowerCase().contains('owner')) {
-          snack = loc.t('cannot_delete_owner') ?? 'Нельзя удалить владельца';
+          snack = loc.t('cannot_delete_owner');
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(snack), backgroundColor: Colors.red),
@@ -387,19 +387,19 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: _desktopEmployeeAvatarAndGapWidth),
           Expanded(
             flex: _desktopEmployeeNameFlex,
-            child: Text(loc.t('full_name') ?? 'Сотрудник', style: style),
+            child: Text(loc.t('full_name'), style: style),
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
             flex: _desktopEmployeeDepartmentFlex,
-            child: Text(loc.t('subdivision') ?? 'Подразделение', style: style),
+            child: Text(loc.t('subdivision'), style: style),
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
             flex: _desktopEmployeeHeaderPositionFlex,
             child: Transform.translate(
               offset: const Offset(_desktopEmployeePositionHeaderLeftShift, 0),
-              child: Text(loc.t('position') ?? 'Должность', style: style),
+              child: Text(loc.t('position'), style: style),
             ),
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
@@ -444,8 +444,8 @@ class _EmployeeCard extends StatelessWidget {
     final isPerShift = employee.paymentType == 'per_shift';
     if (isRu) return isPerShift ? 'за смену' : 'за час';
     return isPerShift
-        ? (loc.t('payment_per_shift') ?? 'per shift').toLowerCase()
-        : (loc.t('payment_hourly') ?? 'hourly').toLowerCase();
+        ? (loc.t('payment_per_shift')).toLowerCase()
+        : (loc.t('payment_hourly')).toLowerCase();
   }
 
   @override
@@ -818,7 +818,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
       return;
     }
     if (_positionRole == null || _positionRole!.trim().isEmpty) {
-      setState(() => _error = (loc.t('position') ?? 'Должность') + ': ' + (loc.t('required') ?? 'обязательно'));
+      setState(() => _error = (loc.t('position')) + ': ' + (loc.t('required')));
       return;
     }
     final rate = double.tryParse(_rateController.text.trim());
@@ -857,7 +857,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
             (lower.contains('column') && lower.contains('exist'));
         setState(() {
           _error = isPaymentSchemaError
-              ? (loc.t('employee_save_error_schema') ?? 'Не удалось сохранить. В БД нет колонок оплаты. Выполните в Supabase SQL Editor миграцию из файла supabase_migration_employee_payment.sql')
+              ? (loc.t('employee_save_error_schema'))
               : msg;
           _saving = false;
         });
@@ -882,7 +882,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(loc.t('edit_employee') ?? 'Редактировать сотрудника', style: theme.textTheme.titleLarge),
+                  Text(loc.t('edit_employee'), style: theme.textTheme.titleLarge),
                   TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
                 ],
               ),
@@ -897,7 +897,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       TextField(
                         controller: _nameController,
                         decoration: InputDecoration(
-                          labelText: loc.t('full_name') ?? 'ФИО',
+                          labelText: loc.t('full_name'),
                           border: const OutlineInputBorder(),
                           filled: true,
                           isDense: false,
@@ -911,8 +911,8 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         leading: const Icon(Icons.cake, size: 22),
                         title: Text(
                           _birthday == null
-                              ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('not_specified') ?? 'не указано')
-                              : '${loc.t('birthday') ?? 'День рождения'}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
+                              ? (loc.t('birthday')) + ' — ' + (loc.t('not_specified'))
+                              : '${loc.t('birthday')}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         trailing: Row(
@@ -922,7 +922,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                               IconButton(
                                 icon: const Icon(Icons.clear, size: 20),
                                 onPressed: () => setState(() => _birthday = null),
-                                tooltip: loc.t('clear') ?? 'Очистить',
+                                tooltip: loc.t('clear'),
                               ),
                             TextButton(
                               onPressed: () async {
@@ -934,7 +934,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                                 );
                                 if (picked != null && mounted) setState(() => _birthday = picked);
                               },
-                              child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                              child: Text(_birthday == null ? (loc.t('set')) : (loc.t('change'))),
                             ),
                           ],
                         ),
@@ -942,7 +942,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: _department,
-                        decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
+                        decoration: InputDecoration(labelText: loc.t('department'), border: const OutlineInputBorder(), filled: true),
                         items: _departmentKeys
                             .map((k) => DropdownMenuItem(
                                   value: k,
@@ -962,7 +962,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String?>(
                           value: _section,
-                          decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
+                          decoration: InputDecoration(labelText: loc.t('section'), border: const OutlineInputBorder(), filled: true),
                           items: [
                             const DropdownMenuItem(value: null, child: Text('—')),
                             ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(loc.t('section_$s') != 'section_$s' ? loc.t('section_$s') : s))),
@@ -980,7 +980,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       DropdownButtonFormField<String>(
                         value: _positionRole,
                         decoration: InputDecoration(
-                          labelText: loc.t('position') ?? 'Должность',
+                          labelText: loc.t('position'),
                           border: const OutlineInputBorder(),
                           filled: true,
                         ),
@@ -992,17 +992,17 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       const SizedBox(height: 6),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(loc.t('role_owner') ?? 'Собственник'),
+                        title: Text(loc.t('role_owner')),
                         value: _isOwner,
                         onChanged: (v) => setState(() => _isOwner = v),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: _paymentType,
-                        decoration: InputDecoration(labelText: loc.t('payment_type') ?? 'Тип оплаты', border: const OutlineInputBorder(), filled: true),
+                        decoration: InputDecoration(labelText: loc.t('payment_type'), border: const OutlineInputBorder(), filled: true),
                         items: [
-                          DropdownMenuItem(value: 'hourly', child: Text(loc.t('payment_hourly') ?? 'Почасовая')),
-                          DropdownMenuItem(value: 'per_shift', child: Text(loc.t('payment_per_shift') ?? 'За смену')),
+                          DropdownMenuItem(value: 'hourly', child: Text(loc.t('payment_hourly'))),
+                          DropdownMenuItem(value: 'per_shift', child: Text(loc.t('payment_per_shift'))),
                         ],
                         onChanged: (v) => setState(() => _paymentType = v ?? 'hourly'),
                       ),
@@ -1011,7 +1011,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         controller: _rateController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
-                          labelText: _paymentType == 'per_shift' ? (loc.t('rate_per_shift') ?? 'Ставка за смену') : (loc.t('hourly_rate') ?? 'Ставка в час'),
+                          labelText: _paymentType == 'per_shift' ? (loc.t('rate_per_shift')) : (loc.t('hourly_rate')),
                           border: const OutlineInputBorder(),
                           filled: true,
                         ),
@@ -1020,27 +1020,27 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(
-                            loc.t('payment_per_shift_hint') ?? 'Время смены задаётся в графике по дням.',
+                            loc.t('payment_per_shift_hint'),
                             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ),
                       const SizedBox(height: 12),
                       SwitchListTile(
-                        title: Text(loc.t('active') ?? 'Активен'),
+                        title: Text(loc.t('active')),
                         value: _isActive,
                         onChanged: (v) => setState(() => _isActive = v),
                       ),
                       if (widget.canToggleDataAccess && !widget.employee.hasRole('owner'))
                         SwitchListTile(
-                          title: Text(loc.t('data_access') ?? 'Доступ к данным'),
-                          subtitle: Text(loc.t('data_access_hint') ?? 'Без доступа сотрудник видит только график'),
+                          title: Text(loc.t('data_access')),
+                          subtitle: Text(loc.t('data_access_hint')),
                           value: _dataAccessEnabled,
                           onChanged: (v) => setState(() => _dataAccessEnabled = v),
                         ),
                       if (widget.canToggleScheduleEdit && !widget.employee.hasRole('owner') && widget.employee.positionRole != null)
                         SwitchListTile(
-                          title: Text(loc.t('schedule_edit_own') ?? 'Менять график'),
-                          subtitle: Text(loc.t('schedule_edit_own_hint') ?? 'Сотрудник может редактировать свой личный график'),
+                          title: Text(loc.t('schedule_edit_own')),
+                          subtitle: Text(loc.t('schedule_edit_own_hint')),
                           value: _canEditOwnSchedule,
                           onChanged: (v) => setState(() => _canEditOwnSchedule = v),
                         ),
@@ -1050,10 +1050,10 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           value: _employmentStatus,
-                          decoration: InputDecoration(labelText: loc.t('employment_status') ?? 'Статус', border: const OutlineInputBorder(), filled: true),
+                          decoration: InputDecoration(labelText: loc.t('employment_status'), border: const OutlineInputBorder(), filled: true),
                           items: [
-                            DropdownMenuItem(value: 'permanent', child: Text(loc.t('employment_permanent') ?? 'Постоянный')),
-                            DropdownMenuItem(value: 'temporary', child: Text(loc.t('employment_temporary') ?? 'Временный')),
+                            DropdownMenuItem(value: 'permanent', child: Text(loc.t('employment_permanent'))),
+                            DropdownMenuItem(value: 'temporary', child: Text(loc.t('employment_temporary'))),
                           ],
                           onChanged: (v) => setState(() {
                             _employmentStatus = v ?? 'permanent';
@@ -1066,7 +1066,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         if (_employmentStatus == 'temporary') ...[
                           const SizedBox(height: 8),
                           ListTile(
-                            title: Text(loc.t('employment_period') ?? 'Период доступа'),
+                            title: Text(loc.t('employment_period')),
                             subtitle: Text(
                               (_employmentStartDate != null ? '${_employmentStartDate!.day}.${_employmentStartDate!.month}.${_employmentStartDate!.year}' : '—') +
                                   ' – ' +
@@ -1093,7 +1093,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                                   });
                                 }
                               },
-                              child: Text(loc.t('set_period') ?? 'Задать период'),
+                              child: Text(loc.t('set_period')),
                             ),
                           ),
                         ],
@@ -1109,10 +1109,10 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS rate_per_shift REAL;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
                               await Clipboard.setData(const ClipboardData(text: sql));
-                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('copied') ?? 'SQL скопирован в буфер')));
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('copied'))));
                             },
                             icon: const Icon(Icons.copy, size: 18),
-                            label: Text(loc.t('copy_migration_sql') ?? 'Скопировать SQL миграции'),
+                            label: Text(loc.t('copy_migration_sql')),
                           ),
                         ],
                       ],

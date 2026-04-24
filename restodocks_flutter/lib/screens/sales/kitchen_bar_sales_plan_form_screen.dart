@@ -124,7 +124,7 @@ class _KitchenBarSalesPlanFormScreenState
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.t('sales_plan_saved') ?? '')),
+      SnackBar(content: Text(loc.t('sales_plan_saved'))),
     );
     context.pop();
   }
@@ -148,7 +148,7 @@ class _KitchenBarSalesPlanFormScreenState
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text('${loc.t('sales_plan_create') ?? ''} — $deptTitle'),
+          title: Text('${loc.t('sales_plan_create')} — $deptTitle'),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -159,13 +159,13 @@ class _KitchenBarSalesPlanFormScreenState
         leading: appBarBackButton(context),
         title: Text(
           widget.planId == null
-              ? '${loc.t('sales_plan_create') ?? ''} — $deptTitle'
-              : '${loc.t('sales_plan_edit') ?? ''} — $deptTitle',
+              ? '${loc.t('sales_plan_create')} — $deptTitle'
+              : '${loc.t('sales_plan_edit')} — $deptTitle',
         ),
         actions: [
           TextButton(
             onPressed: _save,
-            child: Text(loc.t('save') ?? 'Сохранить'),
+            child: Text(loc.t('save')),
           ),
         ],
       ),
@@ -189,7 +189,7 @@ class _KitchenBarSalesPlanFormScreenState
             },
           ),
           ListTile(
-            title: Text(loc.t('schedule') ?? 'Дата отсчёта'),
+            title: Text(loc.t('schedule')),
             subtitle: Text(
               MaterialLocalizations.of(context).formatFullDate(_anchor),
             ),
@@ -208,14 +208,14 @@ class _KitchenBarSalesPlanFormScreenState
             controller: _cashCtrl,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              labelText: loc.t('sales_plan_target_cash') ?? '',
+              labelText: loc.t('sales_plan_target_cash'),
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Text(
-                loc.t('sales_plan_lines') ?? '',
+                loc.t('sales_plan_lines'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const Spacer(),
@@ -241,17 +241,17 @@ class _KitchenBarSalesPlanFormScreenState
   String _kindLabel(LocalizationService loc, SalesPlanPeriodKind k) {
     switch (k) {
       case SalesPlanPeriodKind.shiftDay:
-        return loc.t('sales_period_shift') ?? '';
+        return loc.t('sales_period_shift');
       case SalesPlanPeriodKind.week:
-        return loc.t('sales_period_week') ?? '';
+        return loc.t('sales_period_week');
       case SalesPlanPeriodKind.month:
-        return loc.t('sales_period_month') ?? '';
+        return loc.t('sales_period_month');
       case SalesPlanPeriodKind.quarter:
-        return loc.t('sales_period_quarter') ?? '';
+        return loc.t('sales_period_quarter');
       case SalesPlanPeriodKind.halfYear:
-        return loc.t('sales_period_half_year') ?? '';
+        return loc.t('sales_period_half_year');
       case SalesPlanPeriodKind.year:
-        return loc.t('sales_period_year') ?? '';
+        return loc.t('sales_period_year');
     }
   }
 }

@@ -49,7 +49,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     if (result.ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('reset_link_sent') ?? 'Ссылка для сброса пароля отправлена на указанную почту')),
+        SnackBar(content: Text(loc.t('reset_link_sent'))),
       );
     }
   }
@@ -61,7 +61,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('forgot_password') ?? 'Восстановление доступа'),
+        title: Text(loc.t('forgot_password')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -75,7 +75,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 Icon(Icons.lock_reset, size: 64, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 24),
                 Text(
-                  loc.t('forgot_password_hint') ?? 'Введите email вашей учетной записи. Мы отправим ссылку для смены пароля.',
+                  loc.t('forgot_password_hint'),
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -98,7 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return loc.t('email_required') ?? 'Введите email';
+                    if (v == null || v.trim().isEmpty) return loc.t('email_required');
                     return null;
                   },
                 ),
@@ -107,12 +107,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   onPressed: _isLoading ? null : _sendResetLink,
                   child: _isLoading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(loc.t('send_reset_link') ?? 'Отправить ссылку'),
+                      : Text(loc.t('send_reset_link')),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.pop(),
-                  child: Text(loc.t('back_to_login') ?? 'Вернуться к входу'),
+                  child: Text(loc.t('back_to_login')),
                 ),
               ],
             ),

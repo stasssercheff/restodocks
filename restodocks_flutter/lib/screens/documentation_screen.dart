@@ -111,12 +111,12 @@ class _DocumentationScreenState extends State<DocumentationScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('documentation') ?? 'Документация'),
+        title: Text(loc.t('documentation')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
-            tooltip: loc.t('refresh') ?? 'Обновить',
+            tooltip: loc.t('refresh'),
           ),
         ],
       ),
@@ -133,7 +133,7 @@ class _DocumentationScreenState extends State<DocumentationScreen> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _load,
-                          child: Text(loc.t('retry') ?? 'Повторить'),
+                          child: Text(loc.t('retry')),
                         ),
                       ],
                     ),
@@ -144,7 +144,7 @@ class _DocumentationScreenState extends State<DocumentationScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          loc.t('documentation_empty') ?? 'Нет документов',
+                          loc.t('documentation_empty'),
                           style: Theme.of(context).textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
@@ -176,7 +176,7 @@ class _DocumentationScreenState extends State<DocumentationScreen> {
                 if (mounted) _load();
               },
               child: const Icon(Icons.add),
-              tooltip: loc.t('documentation_create') ?? 'Создать документ',
+              tooltip: loc.t('documentation_create'),
             )
           : null,
     );

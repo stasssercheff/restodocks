@@ -86,7 +86,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('order_create_supplier') ?? 'Создать поставщика'),
+        title: Text(loc.t('order_create_supplier')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -107,7 +107,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
             TextField(
               controller: _contactPersonCtrl,
               decoration: InputDecoration(
-                labelText: loc.t('supplier_contact_person') ?? 'Контактное лицо',
+                labelText: loc.t('supplier_contact_person'),
                 border: const OutlineInputBorder(),
                 filled: true,
               ),
@@ -115,7 +115,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              loc.t('order_list_supplier') ?? 'Контакты',
+              loc.t('order_list_supplier'),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(height: 8),

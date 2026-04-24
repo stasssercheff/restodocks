@@ -277,14 +277,14 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
 
       if (context.mounted) {
         scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text(loc.t('documentation_pdf_ready') ?? 'PDF')),
+          SnackBar(content: Text(loc.t('documentation_pdf_ready'))),
         );
       }
     } catch (e) {
       if (context.mounted) Navigator.of(context).pop();
       if (context.mounted) {
         scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('${loc.t('error_short') ?? 'Error'}: $e')),
+          SnackBar(content: Text('${loc.t('error_short')}: $e')),
         );
       }
     }
@@ -312,14 +312,14 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null || _doc == null) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -328,7 +328,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
               children: [
                 Text(_error ?? loc.t('document_not_found'), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+                FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back'))),
               ],
             ),
           ),
@@ -347,13 +347,13 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
-            tooltip: loc.t('documentation_save_pdf') ?? 'Сохранить PDF',
+            tooltip: loc.t('documentation_save_pdf'),
             onPressed: () => _exportPdf(context),
           ),
           if (canEdit)
             IconButton(
               icon: const Icon(Icons.edit),
-              tooltip: loc.t('edit') ?? 'Редактировать',
+              tooltip: loc.t('edit'),
               onPressed: () async {
                 await context.push('/documentation/${_doc!.id}/edit');
                 if (mounted) _load();
@@ -385,7 +385,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
-                  loc.t('documentation_empty_body') ?? 'Текст отсутствует',
+                  loc.t('documentation_empty_body'),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -421,13 +421,13 @@ class _DocumentationPdfLanguageDialogState extends State<_DocumentationPdfLangua
   Widget build(BuildContext context) {
     final loc = widget.loc;
     return AlertDialog(
-      title: Text(loc.t('documentation_pdf_dialog_title') ?? 'PDF'),
+      title: Text(loc.t('documentation_pdf_dialog_title')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            loc.t('documentation_pdf_language') ?? 'Язык:',
+            loc.t('documentation_pdf_language'),
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
@@ -450,7 +450,7 @@ class _DocumentationPdfLanguageDialogState extends State<_DocumentationPdfLangua
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_selectedLang),
-          child: Text(loc.t('documentation_pdf_export_btn') ?? 'Сохранить'),
+          child: Text(loc.t('documentation_pdf_export_btn')),
         ),
       ],
     );

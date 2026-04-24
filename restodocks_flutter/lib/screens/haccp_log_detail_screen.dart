@@ -734,7 +734,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(
-            '${loc.t('haccp_entry_view') ?? 'Запись'} — ${HaccpCountryProfiles.resolveLogTypeTitle(logType: log.logType, languageCode: loc.currentLanguageCode, localizedValue: loc.t(log.logType.displayNameKey))}'),
+            '${loc.t('haccp_entry_view')} — ${HaccpCountryProfiles.resolveLogTypeTitle(logType: log.logType, languageCode: loc.currentLanguageCode, localizedValue: loc.t(log.logType.displayNameKey))}'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -782,8 +782,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    loc.t('haccp_entry_immutable_hint') ??
-                        'Только просмотр. Редактирование записей журнала недоступно.',
+                    loc.t('haccp_entry_immutable_hint'),
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),

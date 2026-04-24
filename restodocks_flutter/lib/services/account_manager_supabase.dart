@@ -84,6 +84,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   bool _supportAccessTablesUnavailable = false;
   bool _checkEstablishmentAccessRpcUnavailable = false;
   bool _trialUsageTableUnavailable = false;
+  bool get isTrialUsageServerUnavailable => _trialUsageTableUnavailable;
 
   bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
     final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
@@ -184,7 +185,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       try {
         await AiTtkQuotaCacheService.instance
             .preloadForCurrentSession(force: true)
-            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
       } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
@@ -204,7 +205,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       try {
         await AiTtkQuotaCacheService.instance
             .preloadForCurrentSession(force: true)
-            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
       } catch (_) {}
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
@@ -1702,7 +1703,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     try {
       await AiTtkQuotaCacheService.instance
           .preloadForCurrentSession(force: true)
-          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
     } catch (_) {}
     notifyListeners();
 

@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +35,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Map<String, Employee> _employees = {};
   bool _loading = true;
   bool _sending = false;
+  String? _translatedRoomTitle;
+  String? _roomTitleLang;
 
   RealtimeChannel? _realtimeChannel;
 
@@ -109,6 +113,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           _messages = list;
           _loading = false;
         });
+        unawaited(_translateRoomTitleIfNeeded());
         _scrollToBottom();
       }
     } catch (e) {
@@ -135,11 +140,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('group_chat_rename') ?? 'Переименовать чат'),
+        title: Text(loc.t('group_chat_rename')),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
-            labelText: loc.t('group_chat_name') ?? 'Название',
+            labelText: loc.t('group_chat_name'),
             border: const OutlineInputBorder(),
           ),
           autofocus: true,
@@ -148,11 +153,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-            child: Text(loc.t('save') ?? 'Сохранить'),
+            child: Text(loc.t('save')),
           ),
         ],
       ),
@@ -173,7 +178,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppToastService.show('${loc.t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -240,7 +245,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -266,18 +271,68 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
+    }
+  }
+
+  Future<void> _translateRoomTitleIfNeeded() async {
+    if (!mounted || _room == null) return;
+    final raw = _room!.displayName.trim();
+    if (raw.isEmpty) {
+      if (mounted) setState(() => _translatedRoomTitle = null);
+      return;
+    }
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    if (_roomTitleLang == targetLang && _translatedRoomTitle != null) return;
+    final sourceLang = _detectLanguage(raw);
+    if (sourceLang == targetLang) {
+      if (mounted) {
+        setState(() {
+          _translatedRoomTitle = null;
+          _roomTitleLang = targetLang;
+        });
+      }
+      return;
+    }
+    try {
+      final translated = await context.read<TranslationManager>().getLocalizedText(
+            entityType: TranslationEntityType.ui,
+            entityId: 'group_room_${_room!.id}',
+            fieldName: 'name',
+            sourceText: raw,
+            sourceLanguage: sourceLang,
+            targetLanguage: targetLang,
+          );
+      if (!mounted) return;
+      setState(() {
+        _roomTitleLang = targetLang;
+        _translatedRoomTitle =
+            translated.trim().isEmpty || translated == raw ? null : translated;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _roomTitleLang = targetLang);
     }
   }
 
   String _roomTitle(LocalizationService loc, bool showNameTranslit) {
     if (_room == null) return '';
-    final raw = _room!.displayName.trim();
+    final raw = (_translatedRoomTitle ?? _room!.displayName).trim();
     if (raw.isNotEmpty) {
       return displayStoredPersonName(raw, loc, showNameTranslit: showNameTranslit);
     }
-    return loc.t('group_chat_default_name') ?? 'Групповой чат';
+    return loc.t('group_chat_default_name');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_roomTitleLang != lang) {
+      unawaited(_translateRoomTitleIfNeeded());
+    }
   }
 
   @override
@@ -300,12 +355,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: _loading ? null : _renameRoom,
-            tooltip: loc.t('group_chat_rename') ?? 'Переименовать',
+            tooltip: loc.t('group_chat_rename'),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : () => _load(),
-            tooltip: loc.t('inbox_refresh') ?? 'Обновить',
+            tooltip: loc.t('inbox_refresh'),
           ),
         ],
       ),
@@ -323,7 +378,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                             height: MediaQuery.of(context).size.height * 0.5,
                             child: Center(
                               child: Text(
-                                loc.t('chat_empty') ?? 'Нет сообщений. Напишите первым.',
+                                loc.t('chat_empty'),
                                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                               ),
                             ),
@@ -372,14 +427,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.add_photo_alternate_outlined),
                       onPressed: _sending ? null : _sendPhoto,
-                      tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                      tooltip: loc.t('photo_from_gallery'),
                     ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
                       focusNode: _inputFocusNode,
                       decoration: InputDecoration(
-                        hintText: loc.t('chat_type_message') ?? 'Сообщение...',
+                        hintText: loc.t('chat_type_message'),
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
@@ -398,7 +453,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.send),
-                    tooltip: loc.t('send') ?? 'Отправить',
+                    tooltip: loc.t('send'),
                   ),
                 ],
               ),

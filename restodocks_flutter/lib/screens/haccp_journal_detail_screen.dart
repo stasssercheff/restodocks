@@ -156,7 +156,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                '${loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...'} ($countryLabel, $profileSource)')),
+                '${loc.t('haccp_pdf_preparing')} ($countryLabel, $profileSource)')),
       );
     }
 
@@ -200,7 +200,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                '${loc.t('haccp_pdf_saved') ?? 'PDF сохранён'} ($countryLabel, $profileSource)')),
+                '${loc.t('haccp_pdf_saved')} ($countryLabel, $profileSource)')),
       );
     }
   }
@@ -269,7 +269,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('haccp_save_file') ?? 'Сохранить журнал в PDF',
+                loc.t('haccp_save_file'),
                 style: Theme.of(ctx).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -314,7 +314,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
               ListTile(
                 leading: const Icon(Icons.calendar_month),
                 title:
-                    Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
+                    Text(loc.t('haccp_pdf_period_full_month')),
                 subtitle: Text(loc.t('haccp_pdf_period_full_month_hint') ??
                     'Выбор месяца — с 1 по последнее число'),
                 onTap: () => Navigator.pop(ctx, 'full_month'),
@@ -530,7 +530,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final toDay = DateTime(to.year, to.month, to.day);
     final todayStart = DateTime(today.year, today.month, today.day);
     if (fromDay == toDay && fromDay == todayStart) {
-      return loc.t('haccp_period_today') ?? 'Сегодня';
+      return loc.t('haccp_period_today');
     }
     return '${_formatDate(from)} — ${_formatDate(to)}';
   }
@@ -543,14 +543,14 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('haccp_period') ?? 'Период'),
+        title: Text(loc.t('haccp_period')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ListTile(
               leading: const Icon(Icons.today),
-              title: Text(loc.t('haccp_period_today') ?? 'Сегодня'),
+              title: Text(loc.t('haccp_period_today')),
               onTap: () => Navigator.pop(ctx, 'today'),
             ),
             ListTile(
@@ -563,12 +563,12 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.calendar_view_month),
-              title: Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
+              title: Text(loc.t('haccp_pdf_period_full_month')),
               onTap: () => Navigator.pop(ctx, 'full_month'),
             ),
             ListTile(
               leading: const Icon(Icons.date_range),
-              title: Text(loc.t('haccp_pdf_period_custom') ?? 'С даты по дату'),
+              title: Text(loc.t('haccp_pdf_period_custom')),
               onTap: () => Navigator.pop(ctx, 'custom'),
             ),
           ],
@@ -626,7 +626,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text(loc.t('haccp_journal') ?? 'Журнал'),
+          title: Text(loc.t('haccp_journal')),
         ),
         body: Center(
           child: Padding(
@@ -659,7 +659,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                   onPressed: () => context.pop(),
                   icon: const Icon(Icons.arrow_back),
                   label:
-                      Text(loc.t('haccp_back_to_list') ?? 'К списку журналов'),
+                      Text(loc.t('haccp_back_to_list')),
                 ),
               ],
             ),
@@ -802,7 +802,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                                   color: Theme.of(context).colorScheme.outline),
                               const SizedBox(height: 16),
                               Text(
-                                loc.t('haccp_no_entries') ?? 'Записей пока нет',
+                                loc.t('haccp_no_entries'),
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                               const SizedBox(height: 4),
@@ -856,7 +856,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
           ? FloatingActionButton.extended(
               onPressed: () => _openAddForm(),
               icon: const Icon(Icons.add),
-              label: Text(loc.t('haccp_add_entry') ?? 'Добавить'),
+              label: Text(loc.t('haccp_add_entry')),
             )
           : null,
     );

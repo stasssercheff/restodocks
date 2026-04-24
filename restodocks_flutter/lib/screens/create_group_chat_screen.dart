@@ -33,7 +33,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
     if (emp == null || est == null) return;
     if (_selectedIds.isEmpty) {
       final loc = context.read<LocalizationService>();
-      AppToastService.show(loc.t('group_chat_select_at_least_one') ?? 'Выберите хотя бы одного участника', duration: const Duration(seconds: 2));
+      AppToastService.show(loc.t('group_chat_select_at_least_one'), duration: const Duration(seconds: 2));
       return;
     }
     setState(() => _creating = true);
@@ -53,7 +53,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
     } catch (e) {
       if (mounted) {
         final loc = context.read<LocalizationService>();
-        AppToastService.show('${loc.t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
     } finally {
       if (mounted) setState(() => _creating = false);
@@ -77,7 +77,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
         return Scaffold(
           appBar: AppBar(
             leading: appBarBackButton(context),
-            title: Text(loc.t('group_chat_new') ?? 'Новый групповой чат'),
+            title: Text(loc.t('group_chat_new')),
           ),
           body: Column(
             children: [
@@ -86,9 +86,9 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                 child: TextField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: loc.t('group_chat_name') ?? 'Название чата (необязательно)',
+                    labelText: loc.t('group_chat_name'),
                     border: const OutlineInputBorder(),
-                    hintText: loc.t('group_chat_name_hint') ?? 'Например: Кухня, Смена 15.03',
+                    hintText: loc.t('group_chat_name_hint'),
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
@@ -98,7 +98,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    loc.t('group_chat_select_members') ?? 'Участники',
+                    loc.t('group_chat_select_members'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context).colorScheme.primary,
@@ -155,7 +155,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.group_add),
-                      label: Text(loc.t('group_chat_create') ?? 'Создать чат'),
+                      label: Text(loc.t('group_chat_create')),
                     ),
                   ),
                 ),
