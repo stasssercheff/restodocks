@@ -4628,14 +4628,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _ingredients.add(ing);
           _ensurePlaceholderRowAtEnd();
         }
-        if (tc != null) {
-          unawaited(
-            _warmIngredientNameTranslations(
-              techCardId: tc.id,
-              languageCode: context.read<LocalizationService>().currentLanguageCode,
-            ),
-          );
-        }
       });
       _scheduleDraftSave();
     });
