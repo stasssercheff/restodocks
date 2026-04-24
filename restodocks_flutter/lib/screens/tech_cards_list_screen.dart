@@ -3932,8 +3932,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ? AiServiceSupabase.lastParsedRows
             : null;
         final hasMeta = sig != null && sig.isNotEmpty;
-        context.push(
-          widget.department == 'bar'
+        await _openTechCardEditAndRefresh(
+          path: widget.department == 'bar'
               ? '/tech-cards/new?department=bar'
               : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
@@ -4218,8 +4218,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             await _showAiCreateLimitDialog(loc, acc);
           }
           if (createdCards.length == 1) {
-            context.push(
-              widget.department == 'bar'
+            await _openTechCardEditAndRefresh(
+              path: widget.department == 'bar'
                   ? '/tech-cards/new?department=bar'
                   : '/tech-cards/new',
               extra: <String, Object?>{
@@ -4261,8 +4261,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ingredients: const [],
           isSemiFinished: false,
         );
-        context.push(
-          widget.department == 'bar'
+        await _openTechCardEditAndRefresh(
+          path: widget.department == 'bar'
               ? '/tech-cards/new?department=bar'
               : '/tech-cards/new',
           extra: <String, Object?>{
@@ -4331,8 +4331,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               ),
             ),
           );
-          context.push(
-            widget.department == 'bar'
+          await _openTechCardEditAndRefresh(
+            path: widget.department == 'bar'
                 ? '/tech-cards/new?department=bar'
                 : '/tech-cards/new',
             extra: <String, Object?>{
@@ -4357,17 +4357,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           : null;
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
-        context.push(
-            widget.department == 'bar'
-                ? '/tech-cards/new?department=bar'
-                : '/tech-cards/new',
-            extra: hasMeta || sourceRows != null
-                ? {
-                    'result': list.single,
-                    'headerSignature': sig,
-                    'sourceRows': sourceRows,
-                  }
-                : list.single);
+        await _openTechCardEditAndRefresh(
+          path: widget.department == 'bar'
+              ? '/tech-cards/new?department=bar'
+              : '/tech-cards/new',
+          extra: hasMeta || sourceRows != null
+              ? {
+                  'result': list.single,
+                  'headerSignature': sig,
+                  'sourceRows': sourceRows,
+                }
+              : list.single,
+        );
       } else {
         context.push(
             '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
@@ -4501,17 +4502,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ai is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
-        context.push(
-            widget.department == 'bar'
-                ? '/tech-cards/new?department=bar'
-                : '/tech-cards/new',
-            extra: hasMeta || sourceRows != null
-                ? {
-                    'result': list.single,
-                    'headerSignature': sig,
-                    'sourceRows': sourceRows,
-                  }
-                : list.single);
+        await _openTechCardEditAndRefresh(
+          path: widget.department == 'bar'
+              ? '/tech-cards/new?department=bar'
+              : '/tech-cards/new',
+          extra: hasMeta || sourceRows != null
+              ? {
+                  'result': list.single,
+                  'headerSignature': sig,
+                  'sourceRows': sourceRows,
+                }
+              : list.single,
+        );
       } else {
         context.push(
           '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
@@ -4828,11 +4830,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final path = widget.department == 'bar'
         ? '/tech-cards/new?department=bar'
         : '/tech-cards/new';
-    final needRefresh = await context.push<bool>(path);
-    if (mounted && needRefresh == true) {
-      _TtkListMemoryCache.invalidate();
-      await _load(showLoading: false);
+    await _openTechCardEditAndRefresh(path: path);
+  }
+
+  Future<void> _openTechCardEditAndRefresh({
+    required String path,
+    Object? extra,
+  }) async {
+    final needRefresh = await context.push<bool>(path, extra: extra);
+    if (!mounted || needRefresh != true) return;
+    await _refreshTechCardListAfterSave();
+  }
+
+  Future<void> _refreshTechCardListAfterSave() async {
+    _TtkListMemoryCache.invalidate();
+    final svc = context.read<TechCardServiceSupabase>();
+    svc.clearWebShallowPrefetch();
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est != null) {
+      try {
+        await svc.clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
+        if (est.isBranch) {
+          await svc.clearTechCardsListCacheForEstablishment(est.id);
+        }
+      } catch (_) {}
     }
+    await _load(showLoading: false);
   }
 
   List<Widget> _buildAppBarActions(
