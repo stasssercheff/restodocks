@@ -30,7 +30,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
+                  loc.t('establishment_not_found'))),
         );
       }
       return;
@@ -272,7 +272,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                           mode: mode, selectedEmployees: selected),
                     );
                   },
-                  child: Text(loc.t('download') ?? 'Скачать'),
+                  child: Text(loc.t('download')),
                 ),
               ],
             );
@@ -353,15 +353,15 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       return Scaffold(
         appBar: AppBar(
             leading: appBarBackButton(context),
-            title: Text(loc.t('documentation') ?? 'Документация')),
-        body: Center(child: Text(loc.t('access_denied') ?? 'Доступ запрещен')),
+            title: Text(loc.t('documentation'))),
+        body: Center(child: Text(loc.t('access_denied'))),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('documentation') ?? 'Документация'),
+        title: Text(loc.t('documentation'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -372,9 +372,9 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.business),
-                title: Text(loc.t('requisites') ?? 'Реквизиты'),
+                title: Text(loc.t('requisites')),
                 subtitle: Text(
-                  loc.t('requisites_hint') ?? 'Для бланков и приказов',
+                  loc.t('requisites_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 children: [
@@ -399,7 +399,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Text(
-                    '${loc.t('haccp_legal_text') ?? 'Легитимность цифровых журналов: допускается ведение производственных журналов в электронном виде...'}\n\n'
+                    '${loc.t('haccp_legal_text')}\n\n'
                     '${LegalComplianceProvider.journalPdfComplianceFooterByCountry(loc.currentLanguageCode, countryCode)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -410,7 +410,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               initiallyExpanded: false,
               leading: const Icon(Icons.document_scanner_outlined),
               title:
-                  Text(loc.t('haccp_legal_sp_extract') ?? 'Извлечение из СП'),
+                  Text(loc.t('haccp_legal_sp_extract')),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -551,7 +551,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _legalNameController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_organization') ?? 'Юр. название',
+                  widget.loc.t('requisites_organization'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -560,7 +560,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _innBinController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_inn_bin') ?? 'ИНН / БИН',
+              labelText: widget.loc.t('requisites_inn_bin'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -570,7 +570,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _ogrnOgrnipController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_ogrn_ogrnip') ?? 'ОГРН / ОГРНИП',
+                  widget.loc.t('requisites_ogrn_ogrnip'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -579,7 +579,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _kppController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_kpp') ?? 'КПП',
+              labelText: widget.loc.t('requisites_kpp'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -588,7 +588,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankRsController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bank_account') ?? 'Р/С',
+              labelText: widget.loc.t('requisites_bank_account'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -597,7 +597,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankBikController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bik') ?? 'БИК',
+              labelText: widget.loc.t('requisites_bik'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -606,7 +606,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankNameController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_bank_name') ?? 'Банк',
+              labelText: widget.loc.t('requisites_bank_name'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -616,7 +616,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _directorFioController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_director_fio') ?? 'ФИО руководителя',
+                  widget.loc.t('requisites_director_fio'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -635,7 +635,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _addressController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_address') ?? 'Адрес',
+              labelText: widget.loc.t('requisites_address'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -686,7 +686,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content:
-                                  Text(widget.loc.t('saved') ?? 'Сохранено')),
+                                  Text(widget.loc.t('saved'))),
                         );
                       }
                     } finally {
@@ -694,8 +694,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                     }
                   },
             child: Text(_saving
-                ? (widget.loc.t('saving') ?? 'Сохранение...')
-                : (widget.loc.t('save') ?? 'Сохранить')),
+                ? widget.loc.t('saving')
+                : widget.loc.t('save')),
           ),
         ],
       ),

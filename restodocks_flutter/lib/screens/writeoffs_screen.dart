@@ -374,7 +374,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         .toList();
     if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('writeoff_empty_hint') ?? 'Добавьте позиции с количеством')),
+        SnackBar(content: Text(loc.t('writeoff_empty_hint'))),
       );
       return;
     }
@@ -390,11 +390,11 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         builder: (ctx) {
           final ctrl = TextEditingController();
           return AlertDialog(
-            title: Text(loc.t('writeoff_comment_title') ?? 'Комментарий'),
+            title: Text(loc.t('writeoff_comment_title')),
             content: TextField(
               controller: ctrl,
               decoration: InputDecoration(
-                hintText: loc.t('writeoff_comment_hint') ?? 'Введите комментарий (необязательно)',
+                hintText: loc.t('writeoff_comment_hint'),
                 border: const OutlineInputBorder(),
               ),
               maxLines: 3,
@@ -407,7 +407,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-                child: Text(loc.t('save') ?? 'Сохранить'),
+                child: Text(loc.t('save')),
               ),
             ],
           );
@@ -456,7 +456,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     if (docSaved == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('inventory_document_save_error') ?? 'Не удалось сохранить.'),
+          content: Text(loc.t('inventory_document_save_error')),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -465,7 +465,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('writeoff_saved_to_list') ?? 'Сохранено на экран')),
+        SnackBar(content: Text(loc.t('writeoff_saved_to_list'))),
       );
       final rows = _rowsFor(cat);
       rows.removeWhere((r) => r.total > 0);
@@ -549,10 +549,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       var rows = (payload['rows'] as List<dynamic>? ?? []).map((e) => e as Map<String, dynamic>).toList();
       rows = rows..sort((a, b) => (a['productName']?.toString() ?? '').toLowerCase().compareTo((b['productName']?.toString() ?? '').toLowerCase()));
       sheet.appendRow([
-        TextCellValue(loc.t('inventory_excel_number') ?? '#'),
-        TextCellValue(loc.t('inventory_item_name') ?? 'Наименование'),
-        TextCellValue(loc.t('inventory_unit') ?? 'Ед.'),
-        TextCellValue(loc.t('inventory_excel_total') ?? 'Количество'),
+        TextCellValue(loc.t('inventory_excel_number')),
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('inventory_unit')),
+        TextCellValue(loc.t('inventory_excel_total')),
       ]);
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
@@ -566,7 +566,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       final comment = payload['comment']?.toString();
       if (comment != null && comment.isNotEmpty) {
         sheet.appendRow([]);
-        sheet.appendRow([TextCellValue(loc.t('writeoff_comment') ?? 'Комментарий'), TextCellValue(comment)]);
+        sheet.appendRow([TextCellValue(loc.t('writeoff_comment')), TextCellValue(comment)]);
       }
       excel.setDefaultSheet(sheetName);
       final out = excel.encode();
@@ -579,17 +579,17 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   String _tabLabel(WriteoffCategory cat, LocalizationService loc) {
     switch (cat) {
       case WriteoffCategory.staff:
-        return loc.t('writeoff_category_staff') ?? 'Персонал';
+        return loc.t('writeoff_category_staff');
       case WriteoffCategory.workingThrough:
-        return loc.t('writeoff_category_working') ?? 'Проработка';
+        return loc.t('writeoff_category_working');
       case WriteoffCategory.spoilage:
-        return loc.t('writeoff_category_spoilage') ?? 'Порча';
+        return loc.t('writeoff_category_spoilage');
       case WriteoffCategory.breakage:
-        return loc.t('writeoff_category_breakage') ?? 'Брекераж';
+        return loc.t('writeoff_category_breakage');
       case WriteoffCategory.guestRefusal:
-        return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+        return loc.t('writeoff_category_guest_refusal');
       case WriteoffCategory.generic:
-        return loc.t('writeoff_category_simple') ?? 'Списание';
+        return loc.t('writeoff_category_simple');
     }
   }
 
@@ -619,7 +619,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
             Icon(Icons.folder_open, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('writeoff_saved_empty') ?? 'Нет сохранённых списаний',
+              loc.t('writeoff_saved_empty'),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
@@ -665,7 +665,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                     (c) => c.code == cat,
                     orElse: () => WriteoffCategory.staff,
                   ), loc)),
-                  subtitle: Text('$emp • $totalItems ${loc.t('inventory_pos') ?? 'поз.'}'),
+                  subtitle: Text('$emp • $totalItems ${loc.t('inventory_pos')}'),
                   onTap: () => context.push('/inbox/writeoff/${doc['id']}'),
                 );
               });
@@ -687,7 +687,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('writeoffs') ?? 'Списания'),
+        title: Text(loc.t('writeoffs')),
       ),
       body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -698,8 +698,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: SegmentedButton<bool>(
                     segments: [
-                      ButtonSegment(value: false, label: Text(loc.t('writeoff_create') ?? 'Создать')),
-                      ButtonSegment(value: true, label: Text(loc.t('writeoff_saved') ?? 'Сохранённые')),
+                      ButtonSegment(value: false, label: Text(loc.t('writeoff_create'))),
+                      ButtonSegment(value: true, label: Text(loc.t('writeoff_saved'))),
                     ],
                     selected: {_showSavedList},
                     onSelectionChanged: (s) async {
@@ -842,7 +842,7 @@ class _WriteoffTabContent extends StatelessWidget {
                       Icon(Icons.add_circle_outline, size: 64, color: theme.colorScheme.outline),
                       const SizedBox(height: 16),
                       Text(
-                        loc.t('writeoff_add_items_hint') ?? 'Добавьте продукт или ТТК',
+                        loc.t('writeoff_add_items_hint'),
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -872,11 +872,11 @@ class _WriteoffTabContent extends StatelessWidget {
                             children: [
                               SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                               SizedBox(width: _colGap),
-                              SizedBox(width: colNameW, child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                              SizedBox(width: colNameW, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                               SizedBox(width: _colGap),
-                              SizedBox(width: _colUnitCellWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                              SizedBox(width: _colUnitCellWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                               SizedBox(width: _colGap),
-                              SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                             ],
                           ),
                         ),
@@ -940,7 +940,7 @@ class _WriteoffTabContent extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onAdd,
                     icon: const Icon(Icons.add),
-                    label: Text(loc.t('writeoff_add') ?? 'Добавить'),
+                    label: Text(loc.t('writeoff_add')),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -948,7 +948,7 @@ class _WriteoffTabContent extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: rows.any((r) => r.total > 0) ? onSave : null,
                     icon: const Icon(Icons.save),
-                    label: Text(loc.t('save') ?? 'Сохранить'),
+                    label: Text(loc.t('save')),
                   ),
                 ),
               ],
@@ -1360,9 +1360,9 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
               children: [
                 SegmentedButton<int>(
                   segments: [
-                    ButtonSegment(value: 0, label: Text(widget.loc.t('writeoff_type_product') ?? 'Продукт')),
-                    ButtonSegment(value: 1, label: Text(widget.loc.t('writeoff_type_pf') ?? 'ТТК ПФ')),
-                    ButtonSegment(value: 2, label: Text(widget.loc.t('writeoff_type_dish') ?? 'ТТК Блюдо')),
+                    ButtonSegment(value: 0, label: Text(widget.loc.t('writeoff_type_product'))),
+                    ButtonSegment(value: 1, label: Text(widget.loc.t('writeoff_type_pf'))),
+                    ButtonSegment(value: 2, label: Text(widget.loc.t('writeoff_type_dish'))),
                   ],
                   selected: {_segment},
                   onSelectionChanged: (s) => setState(() => _segment = s.first),
@@ -1401,8 +1401,8 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
                       return ListTile(
                         title: Text(t.getDisplayNameInLists(lang)),
                         subtitle: Text(t.isSemiFinished
-                            ? (widget.loc.t('writeoff_type_pf') ?? 'ПФ')
-                            : (widget.loc.t('writeoff_type_dish') ?? 'Блюдо')),
+                            ? widget.loc.t('writeoff_type_pf')
+                            : widget.loc.t('writeoff_type_dish')),
                         onTap: () => widget.onSelectTechCard(t),
                       );
                     },
