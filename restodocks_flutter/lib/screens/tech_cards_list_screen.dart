@@ -480,7 +480,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
     }
     await _refreshAiTtkRemainingQuota();
-    unawaited(_refreshTrialImportRemainingQuota());
+    await _refreshTrialImportRemainingQuota();
     _tryReconcileTechCards(force: false);
   }
 
@@ -718,7 +718,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Widget _buildTrialImportQuotaBadge() {
-    final text = (_trialTtkImportRemainingQuota ?? 10).toString();
+    final remaining = _trialTtkImportRemainingQuota;
+    if (remaining == null) return const SizedBox.shrink();
+    final text = remaining.toString();
     return Container(
       width: 22,
       height: 22,
