@@ -2723,6 +2723,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return out;
   }
 
+  String _inferSourceLanguageFromTexts(Iterable<String> texts) {
+    var cyrillicChars = 0;
+    var latinChars = 0;
+    for (final text in texts) {
+      for (final rune in text.runes) {
+        if ((rune >= 0x0400 && rune <= 0x04FF) ||
+            (rune >= 0x0500 && rune <= 0x052F)) {
+          cyrillicChars++;
+        } else if ((rune >= 0x0041 && rune <= 0x005A) ||
+            (rune >= 0x0061 && rune <= 0x007A)) {
+          latinChars++;
+        }
+      }
+    }
+    if (cyrillicChars > latinChars) return 'ru';
+    return 'en';
+  }
+
   Future<void> _warmIngredientNameTranslations({
     required String techCardId,
     required String languageCode,
@@ -2803,11 +2821,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     _ingredientTranslationBackfillInFlight.add(key);
     try {
+      final inferredSourceLanguage =
+          _inferSourceLanguageFromTexts(missing.values);
       await context.read<TranslationManager>().handleEntitySave(
             entityType: TranslationEntityType.techCard,
             entityId: cardId,
             textFields: missing,
-            sourceLanguage: '',
+            sourceLanguage: inferredSourceLanguage,
             userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
             targetLanguages: <String>[lang],
           );
