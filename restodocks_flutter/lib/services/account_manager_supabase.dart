@@ -84,6 +84,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   bool _supportAccessTablesUnavailable = false;
   bool _checkEstablishmentAccessRpcUnavailable = false;
   bool _trialUsageTableUnavailable = false;
+  bool get isTrialUsageServerUnavailable => _trialUsageTableUnavailable;
 
   bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
     final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();

@@ -920,6 +920,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   List<Uint8List> _pendingPhotoBytes = [];
   bool _saving = false;
   bool _duplicating = false;
+  Map<String, String> _ingredientNameTranslationsById = const {};
+  String _ingredientNameTranslationsLang = '';
 
   Timer? _ingredientUpdateDebounce;
   Timer? _reconcileOpenCardTimer;
@@ -2000,6 +2002,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _loading = false;
           _contentPhase = 1;
         });
+        if (tc != null) {
+          unawaited(
+            _warmIngredientNameTranslations(
+              techCardId: tc.id,
+              languageCode: context.read<LocalizationService>().currentLanguageCode,
+            ),
+          );
+        }
       }
       // Кэш из списка часто без строк состава — один запрос, без «первого открытия в сессии».
       if (tc != null && tc.ingredients.isEmpty) {
@@ -2602,7 +2612,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       final name = ing.sourceTechCardId != null &&
                               ing.sourceTechCardId!.isNotEmpty
                           ? TechCard.pfLinkedIngredientDisplayName(ing, lang)
-                          : ing.productName;
+                          : (_ingredientNameTranslationsById[ing.id] ??
+                              ing.productName);
                       final w = ing.outputWeight > 0
                           ? ing.outputWeight
                           : ing.netWeight;
@@ -2652,6 +2663,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (_nameController.text != next) {
         _nameController.text = next;
       }
+      unawaited(
+        _warmIngredientNameTranslations(
+          techCardId: tc.id,
+          languageCode: code,
+        ),
+      );
     };
     locSvc.addListener(_localizationListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2679,6 +2696,59 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return;
     }
     await _load();
+  }
+
+  Map<String, String> _ingredientFieldsForTranslation(
+    List<TTIngredient> ingredients,
+  ) {
+    final out = <String, String>{};
+    for (final ing in ingredients) {
+      final id = ing.id.trim();
+      final name = ing.productName.trim();
+      final sourceTc = ing.sourceTechCardId?.trim() ?? '';
+      if (id.isEmpty || name.isEmpty) continue;
+      if (sourceTc.isNotEmpty) continue;
+      out['ingredient_name_$id'] = name;
+    }
+    return out;
+  }
+
+  Future<void> _warmIngredientNameTranslations({
+    required String techCardId,
+    required String languageCode,
+  }) async {
+    final cardId = techCardId.trim();
+    final lang = languageCode.trim().toLowerCase();
+    if (cardId.isEmpty || lang.isEmpty) return;
+    if (_ingredientNameTranslationsLang == lang) {
+      return;
+    }
+    try {
+      final rows = await Supabase.instance.client
+          .from('translations')
+          .select('field_name, translated_text')
+          .eq('entity_type', TranslationEntityType.techCard.name)
+          .eq('entity_id', cardId)
+          .eq('target_language', lang);
+      final next = <String, String>{};
+      if (rows is List) {
+        for (final raw in rows) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          final field = (m['field_name'] as String? ?? '').trim();
+          if (!field.startsWith('ingredient_name_')) continue;
+          final ingId = field.substring('ingredient_name_'.length).trim();
+          final translated = (m['translated_text'] as String? ?? '').trim();
+          if (ingId.isEmpty || translated.isEmpty) continue;
+          next[ingId] = translated;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _ingredientNameTranslationsById = next;
+        _ingredientNameTranslationsLang = lang;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -3275,8 +3345,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         final savedForTranslation = updated;
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': saveName};
+        fieldsToTranslate
+            .addAll(_ingredientFieldsForTranslation(toSaveIngredients));
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
-        final fastTargets = <String>{if (curLang == 'ru') 'en' else 'ru'};
+        final fastTargets = LocalizationService.productLanguageCodes
+            .where((code) => code != curLang)
+            .toSet();
         translationManager
             .handleEntitySave(
           entityType: TranslationEntityType.techCard,
@@ -3437,8 +3511,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
+        fieldsToTranslate
+            .addAll(_ingredientFieldsForTranslation(toSaveIngredients));
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
-        final fastTargets = <String>{if (curLang == 'ru') 'en' else 'ru'};
+        final fastTargets = LocalizationService.productLanguageCodes
+            .where((code) => code != curLang)
+            .toSet();
         translationManager
             .handleEntitySave(
           entityType: TranslationEntityType.techCard,
@@ -4546,6 +4624,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         } else {
           _ingredients.add(ing);
           _ensurePlaceholderRowAtEnd();
+        }
+        if (tc != null) {
+          unawaited(
+            _warmIngredientNameTranslations(
+              techCardId: tc.id,
+              languageCode: context.read<LocalizationService>().currentLanguageCode,
+            ),
+          );
         }
       });
       _scheduleDraftSave();
@@ -5710,6 +5796,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             _technologyController,
                                         productStore: context
                                             .read<ProductStoreSupabase>(),
+                                        ingredientNameTranslationsById:
+                                            _ingredientNameTranslationsById,
                                         establishmentId: (() {
                                           final est = context
                                               .read<AccountManagerSupabase>()

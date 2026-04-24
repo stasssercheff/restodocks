@@ -583,9 +583,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = acc.establishment;
     if (est == null) return 0;
     final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
-    // Migration safeguard: for legacy sessions without a proper trial counter,
-    // treat an already large TTK list as exhausted trial import quota.
-    final inferredUsed = used <= 0 && _list.length >= 10 ? 10 : used;
+    // If server trial usage storage is unavailable on this project,
+    // avoid quota reset after deploy/restart by conservatively using current
+    // total tech cards count as lower-bound for already consumed imports.
+    final inferredFromList = _list.length.clamp(0, 10);
+    final inferredUsed = acc.isTrialUsageServerUnavailable
+        ? (used >= inferredFromList ? used : inferredFromList)
+        : (used <= 0 && _list.length >= 10 ? 10 : used);
     return (10 - inferredUsed).clamp(0, 10);
   }
 

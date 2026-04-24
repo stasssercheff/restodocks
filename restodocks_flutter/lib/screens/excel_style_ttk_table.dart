@@ -21,6 +21,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final TextEditingController? dishNameController;
   final TextEditingController? technologyController;
   final ProductStoreSupabase productStore;
+  final Map<String, String> ingredientNameTranslationsById;
   final String? establishmentId;
   final List<TechCard>? semiFinishedProducts;
   final void Function([int?]) onAdd;
@@ -55,6 +56,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.dishNameController,
     this.technologyController,
     required this.productStore,
+    this.ingredientNameTranslationsById = const {},
     this.establishmentId,
     this.semiFinishedProducts,
     required this.onAdd,
@@ -898,6 +900,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
     final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
     if (product != null) return product.getLocalizedName(lang);
+    final translated = widget.ingredientNameTranslationsById[ingredient.id]?.trim();
+    if (translated != null && translated.isNotEmpty) return translated;
     return ingredient.productName;
   }
 
