@@ -922,6 +922,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   bool _duplicating = false;
   Map<String, String> _ingredientNameTranslationsById = const {};
   String _ingredientNameTranslationsLang = '';
+  String _ingredientNameTranslationsCardId = '';
 
   Timer? _ingredientUpdateDebounce;
   Timer? _reconcileOpenCardTimer;
@@ -2720,7 +2721,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final cardId = techCardId.trim();
     final lang = languageCode.trim().toLowerCase();
     if (cardId.isEmpty || lang.isEmpty) return;
-    if (_ingredientNameTranslationsLang == lang) {
+    if (_ingredientNameTranslationsLang == lang &&
+        _ingredientNameTranslationsCardId == cardId) {
       return;
     }
     try {
@@ -2747,6 +2749,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       setState(() {
         _ingredientNameTranslationsById = next;
         _ingredientNameTranslationsLang = lang;
+        _ingredientNameTranslationsCardId = cardId;
       });
     } catch (_) {}
   }
