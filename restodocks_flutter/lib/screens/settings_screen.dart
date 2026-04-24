@@ -79,7 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case HomeButtonAction.inbox:
         return loc.t('inbox');
       case HomeButtonAction.messages:
-        return loc.t('inbox_tab_messages') ?? 'Сообщения';
+        return loc.t('inbox_tab_messages');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.productOrder:
@@ -280,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                          content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
+                          content: Text('${loc.t('error')}: $e')),
                     );
                   }
                 }
@@ -298,7 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (establishment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+            content: Text(loc.t('establishment'))),
       );
       return;
     }
@@ -308,7 +308,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('clear_all_ttk') ?? 'Удалить все ТТК?'),
+        title: Text(loc.t('clear_all_ttk')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -327,13 +327,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 autofocus: true,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  labelText: loc.t('company_pin') ?? 'PIN компании',
+                  labelText: loc.t('company_pin'),
                   hintText:
-                      loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                      loc.t('enter_company_pin'),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty)
-                    return loc.t('company_pin_required') ?? 'PIN обязателен';
+                    return loc.t('company_pin_required');
                   return null;
                 },
               ),
@@ -360,7 +360,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.of(ctx).pop(pin);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(loc.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+            child: Text(loc.t('clear_all_ttk')),
           ),
         ],
       ),
@@ -374,7 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content:
-                    Text(loc.t('establishment') ?? 'Не найдено заведение')),
+                    Text(loc.t('establishment'))),
           );
         }
         return;
@@ -408,7 +408,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  '${loc.t('clear_all_ttk_done') ?? 'Удалено ТТК'}: $count'),
+                  '${loc.t('clear_all_ttk_done')}: $count'),
               backgroundColor: Colors.green,
             ),
           );
@@ -421,7 +421,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${loc.t('error') ?? 'Ошибка'}: $e'),
+              content: Text('${loc.t('error')}: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -437,7 +437,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (establishment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+            content: Text(loc.t('establishment'))),
       );
       return;
     }
@@ -447,7 +447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('clear_nomenclature') ?? 'Очистить номенклатуру?'),
+        title: Text(loc.t('clear_nomenclature')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -466,13 +466,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 autofocus: true,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  labelText: loc.t('company_pin') ?? 'PIN компании',
+                  labelText: loc.t('company_pin'),
                   hintText:
-                      loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                      loc.t('enter_company_pin'),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty)
-                    return loc.t('company_pin_required') ?? 'PIN обязателен';
+                    return loc.t('company_pin_required');
                   return null;
                 },
               ),
@@ -499,7 +499,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.of(ctx).pop(pin);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(loc.t('clear_nomenclature') ?? 'Удалить всё'),
+            child: Text(loc.t('clear_nomenclature')),
           ),
         ],
       ),
@@ -513,7 +513,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content:
-                    Text(loc.t('establishment') ?? 'Не найдено заведение')),
+                    Text(loc.t('establishment'))),
           );
         }
         return;
@@ -524,7 +524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         barrierDismissible: false,
         builder: (ctx) => LongOperationProgressDialog(
           message:
-              loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру',
+              loc.t('clear_nomenclature_progress'),
           hint: null,
           productCount: count > 0 ? count : null,
         ),
@@ -589,9 +589,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'owner_ttk_kitchen': loc.t('ttk_kitchen'),
         'owner_nomenclature_kitchen':
             '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
-        'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
+        'owner_messages': loc.t('inbox_tab_messages'),
         'owner_employees': loc.t('employees'),
-        'owner_expenses_lite': loc.t('expenses') ?? 'Расходы',
+        'owner_expenses_lite': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
       var order = layoutSvc.getOwnerLiteOrder(emp.id, labels.keys.toList());
@@ -600,7 +600,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
             title: Text(
-                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+                loc.t('home_layout_config')),
             content: SizedBox(
               width: 380,
               height: 500,
@@ -663,9 +663,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final posOn = FeatureFlags.posEnabledForSubscription(ownerSubEnt) &&
           screenPref.showPosSection;
       final labels = <String, String>{
-        'owner_doc': loc.t('documentation') ?? 'Документация',
-        'owner_haccp': loc.t('haccp_journals') ?? 'Журналы и ХАССП',
-        'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
+        'owner_doc': loc.t('documentation'),
+        'owner_haccp': loc.t('haccp_journals'),
+        'owner_messages': loc.t('inbox_tab_messages'),
         'owner_inbox': loc.t('inbox'),
         'owner_employees': loc.t('employees'),
         'owner_schedule_all':
@@ -682,18 +682,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (posOn)
           'owner_pos_sales_kitchen':
-              '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+              '${loc.t('sales_title')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (posOn)
           'owner_pos_warehouse_kitchen':
-              '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+              '${loc.t('pos_nav_warehouse')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (posOn)
           'owner_pos_procurement_kitchen':
-              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+              '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (!posOn)
           'owner_procurement_kitchen':
-              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+              '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         'owner_writeoffs_kitchen':
-            '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+            '${loc.t('writeoffs')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         'owner_checklists_kitchen':
             '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (screenPref.showBarSection && ownerSubEnt.hasUltraLevelFeatures) ...{
@@ -701,7 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_menu_bar':
               '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'bar')})',
-          'owner_ttk_bar': loc.t('ttk_bar') ?? 'ТТК бара',
+          'owner_ttk_bar': loc.t('ttk_bar'),
           'owner_nomenclature_bar':
               '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           if (posOn)
@@ -709,18 +709,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           if (posOn)
             'owner_pos_sales_bar':
-                '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+                '${loc.t('sales_title')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           if (posOn)
             'owner_pos_warehouse_bar':
-                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+                '${loc.t('pos_nav_warehouse')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           if (posOn)
             'owner_pos_procurement_bar':
-                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+                '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           if (!posOn)
             'owner_procurement_bar':
-                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+                '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_writeoffs_bar':
-              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+              '${loc.t('writeoffs')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_checklists_bar':
               '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'bar')})',
         },
@@ -736,26 +736,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           if (posOn)
             'owner_pos_cash_hall':
-                '${loc.t('pos_nav_cash_register') ?? 'Касса'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+                '${loc.t('pos_nav_cash_register')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           if (posOn)
             'owner_pos_tables_hall':
-                '${loc.t('pos_nav_tables') ?? 'Столы'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+                '${loc.t('pos_nav_tables')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           if (posOn)
             'owner_pos_warehouse_hall':
-                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+                '${loc.t('pos_nav_warehouse')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           if (posOn)
             'owner_pos_procurement_hall':
-                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+                '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           if (!posOn)
             'owner_procurement_hall':
-                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+                '${loc.t('pos_nav_procurement')} (${_homeLayoutBranchLabel(loc, 'hall')})',
           'owner_writeoffs_hall':
-              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+              '${loc.t('writeoffs')} (${_homeLayoutBranchLabel(loc, 'hall')})',
         },
         if (screenPref.showBanquetCatering &&
             SubscriptionEntitlements.from(account.establishment)
                 .canAccessBanquetCatering)
-          'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
+          'owner_banquet': loc.t('banquet_catering'),
         if (posOn)
           'owner_pos_warehouse_est':
               loc.t('pos_warehouse_establishment_title') ??
@@ -768,7 +768,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
             title: Text(
-                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+                loc.t('home_layout_config')),
             content: SizedBox(
               width: 360,
               height: 460,
@@ -861,35 +861,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
       order = order.where(allowedLite.contains).toList();
     }
     final tileLabels = <HomeTileId, String>{
-      HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
+      HomeTileId.messages: loc.t('inbox_tab_messages'),
       HomeTileId.schedule: loc.t('schedule'),
-      HomeTileId.documentation: loc.t('documentation') ?? 'Документация',
+      HomeTileId.documentation: loc.t('documentation'),
       HomeTileId.productOrder: loc.t('product_order'),
       HomeTileId.suppliers:
-          loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
+          loc.t('suppliers') ?? loc.t('order_tab_suppliers'),
       HomeTileId.menu: loc.t('menu'),
       HomeTileId.ttk:
           emp.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
       HomeTileId.banquetMenu:
-          '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
+          '${loc.t('menu')} — ${loc.t('banquet_catering')}',
       HomeTileId.banquetTtk:
-          '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
+          '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering')}',
       HomeTileId.checklists: loc.t('checklists'),
       HomeTileId.nomenclature: loc.t('nomenclature'),
       HomeTileId.inventory: loc.t('inventory_blank'),
-      HomeTileId.writeoffs: loc.t('writeoffs') ?? 'Списания',
+      HomeTileId.writeoffs: loc.t('writeoffs'),
       HomeTileId.hallOrders: loc.t('order_tab_orders'),
       HomeTileId.hallCashRegister: loc.t('pos_nav_cash_register'),
       HomeTileId.hallTables: loc.t('pos_nav_tables'),
       HomeTileId.departmentOrders: loc.t('order_tab_orders'),
-      HomeTileId.departmentSales: loc.t('sales_title') ?? 'Продажи',
+      HomeTileId.departmentSales: loc.t('sales_title'),
     };
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) => AlertDialog(
           title:
-              Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+              Text(loc.t('home_layout_config')),
           content: SizedBox(
             width: 320,
             height: 400,
@@ -1092,14 +1092,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title:
-            Text(loc.t('birthday_notify_days') ?? 'Оповещение о днях рождения'),
+            Text(loc.t('birthday_notify_days')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [0, 1, 2, 3, 4, 5].map((days) {
               final label = days == 0
-                  ? (loc.t('birthday_notify_off') ?? 'Без уведомления')
-                  : (loc.t('birthday_notify_days_value') ?? 'За %s дн. до ДР')
+                  ? loc.t('birthday_notify_off')
+                  : loc.t('birthday_notify_days_value')
                       .replaceAll('%s', '$days');
               final selected = current == days;
               return ListTile(
@@ -1126,7 +1126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('birthday_notify_time') ?? 'Время уведомления'),
+        title: Text(loc.t('birthday_notify_time')),
         content: SizedBox(
           width: 200,
           height: 320,
@@ -1202,7 +1202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('training') ?? 'Обучение'),
+        title: Text(loc.t('training')),
         content: SizedBox(
           width: 360,
           child: ListView(
@@ -1212,7 +1212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Text(
-                  loc.t('training_section_tour') ?? 'Тур',
+                  loc.t('training_section_tour'),
                   style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
                         color: Theme.of(ctx).colorScheme.primary,
                         fontWeight: FontWeight.w600,
@@ -1221,7 +1221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.tour_outlined),
-                title: Text(loc.t('tour_replay') ?? 'Пройти тур'),
+                title: Text(loc.t('tour_replay')),
                 subtitle: Text(loc.t('tour_replay_subtitle') ??
                     'Подсветка рабочего стола и нижней панели'),
                 trailing: const Icon(Icons.chevron_right),
@@ -1233,7 +1233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
-                title: Text(loc.t('tour_replay_ttk') ?? 'Пройти тур ТТК'),
+                title: Text(loc.t('tour_replay_ttk')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1246,7 +1246,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Text(
-                  loc.t('training_section_videos') ?? 'Видео',
+                  loc.t('training_section_videos'),
                   style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
                         color: Theme.of(ctx).colorScheme.primary,
                         fontWeight: FontWeight.w600,
@@ -1293,7 +1293,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Text(
-                  loc.t('training_section_getting_started') ?? 'Начало работы',
+                  loc.t('training_section_getting_started'),
                   style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
                         color: Theme.of(ctx).colorScheme.primary,
                         fontWeight: FontWeight.w600,
@@ -1303,7 +1303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.menu_book),
                 title: Text(
-                    loc.t('getting_started') ?? 'Начало работы с Restodocks'),
+                    loc.t('getting_started')),
                 subtitle: Text(loc.t('getting_started_subtitle') ??
                     'Текстовая инструкция с раскрывающимися разделами'),
                 trailing: const Icon(Icons.chevron_right),
@@ -1330,7 +1330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('getting_started') ?? 'Начало работы (текст)'),
+        title: Text(loc.t('getting_started')),
         content: SizedBox(
           width: 400,
           height: 500,
@@ -1367,7 +1367,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            loc.t('notification_display_type') ?? 'Вид уведомлений',
+            loc.t('notification_display_type'),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: Theme.of(context).colorScheme.primary,
                 ),
@@ -1376,11 +1376,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ...NotificationDisplayType.values.map((t) {
             final label = switch (t) {
               NotificationDisplayType.banner =>
-                loc.t('notification_banner') ?? 'Плашка сверху',
+                loc.t('notification_banner'),
               NotificationDisplayType.modal =>
-                loc.t('notification_modal') ?? 'Окошко в центре',
+                loc.t('notification_modal'),
               NotificationDisplayType.disabled =>
-                loc.t('notification_disabled') ?? 'Отключены',
+                loc.t('notification_disabled'),
             };
             return RadioListTile<NotificationDisplayType>(
               title: Text(label),
@@ -1394,14 +1394,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (prefs.displayType != NotificationDisplayType.disabled) ...[
             const SizedBox(height: 16),
             Text(
-              loc.t('notification_categories') ?? 'Какие уведомления включены',
+              loc.t('notification_categories'),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
             const SizedBox(height: 8),
             SwitchListTile(
-              title: Text(loc.t('inbox_tab_messages') ?? 'Сообщения'),
+              title: Text(loc.t('inbox_tab_messages')),
               value: prefs.messages,
               onChanged: (v) => prefs.setMessages(v, empId),
             ),
@@ -1422,24 +1422,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
             SwitchListTile(
-              title: Text(loc.t('inbox_tab_order') ?? 'Заказы'),
+              title: Text(loc.t('inbox_tab_order')),
               value: prefs.orders,
               onChanged: (v) => prefs.setOrders(v, empId),
             ),
             if (isOwner || isManagement) ...[
               SwitchListTile(
-                title: Text(loc.t('inbox_tab_inventory') ?? 'Инвентаризация'),
+                title: Text(loc.t('inbox_tab_inventory')),
                 value: prefs.inventory,
                 onChanged: (v) => prefs.setInventory(v, empId),
               ),
               SwitchListTile(
                 title: Text(
-                    loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'),
+                    loc.t('iiko_inventory_title')),
                 value: prefs.iikoInventory,
                 onChanged: (v) => prefs.setIikoInventory(v, empId),
               ),
               SwitchListTile(
-                title: Text(loc.t('checklists') ?? 'Чеклисты'),
+                title: Text(loc.t('checklists')),
                 subtitle: Text(
                   loc.t('notification_incoming_checklists_hint') ??
                       'Входящие: заполненные чеклисты',
@@ -1449,7 +1449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => prefs.setChecklists(v, empId),
               ),
               SwitchListTile(
-                title: Text(loc.t('writeoffs') ?? 'Списания'),
+                title: Text(loc.t('writeoffs')),
                 subtitle: Text(
                   loc.t('notification_incoming_writeoffs_hint') ??
                       'Входящие: документы списания',
@@ -1460,7 +1460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
             SwitchListTile(
-              title: Text(loc.t('inbox_tab_notifications') ?? 'Уведомления'),
+              title: Text(loc.t('inbox_tab_notifications')),
               subtitle: Text(
                 isLineStaff
                     ? (loc.t('notification_checklist_assigned') ??
@@ -1593,7 +1593,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
+                  loc.t('establishment_not_found'))),
         );
       }
       return;
@@ -1625,7 +1625,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx2).pop(selectedLang),
-                child: Text(loc.t('download') ?? 'Download'),
+                child: Text(loc.t('download')),
               ),
             ],
           ),
@@ -1681,7 +1681,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+              content: Text(loc.t('haccp_agreement_saved'))),
         );
       }
     } catch (e) {
@@ -1896,7 +1896,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('company_pin') ?? 'PIN компании'),
+        title: Text(loc.t('company_pin')),
         content: Form(
           key: pinKey,
           child: TextFormField(
@@ -1905,13 +1905,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             obscureText: true,
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
-              labelText: loc.t('company_pin') ?? 'PIN компании',
-              hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+              labelText: loc.t('company_pin'),
+              hintText: loc.t('enter_company_pin'),
             ),
             validator: (v) {
               final value = (v ?? '').trim();
               if (value.isEmpty) {
-                return loc.t('company_pin_required') ?? 'PIN обязателен';
+                return loc.t('company_pin_required');
               }
               return null;
             },
@@ -2837,7 +2837,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _legalNameController,
             decoration: InputDecoration(
               labelText:
-                  widget.loc.t('requisites_organization') ?? 'Юр. название',
+                  widget.loc.t('requisites_organization'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2846,7 +2846,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _innBinController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_inn_bin') ?? 'ИНН / БИН',
+              labelText: widget.loc.t('requisites_inn_bin'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2918,7 +2918,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _addressController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_address') ?? 'Адрес',
+              labelText: widget.loc.t('requisites_address'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2969,7 +2969,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content:
-                                  Text(widget.loc.t('saved') ?? 'Сохранено')),
+                                  Text(widget.loc.t('saved'))),
                         );
                       }
                     } finally {
@@ -2977,8 +2977,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                     }
                   },
             child: Text(_saving
-                ? (widget.loc.t('saving') ?? 'Сохранение...')
-                : (widget.loc.t('save') ?? 'Сохранить')),
+                ? widget.loc.t('saving')
+                : widget.loc.t('save')),
           ),
         ],
       ),
