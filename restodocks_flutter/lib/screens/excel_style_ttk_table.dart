@@ -974,7 +974,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               if (isPf && widget.onTapPfIngredient != null)
                 IconButton(
                   icon: const Icon(Icons.open_in_new, size: 16),
-                  tooltip: widget.loc.t('ttk_view') ?? 'Просмотр ТТК',
+                  tooltip: widget.loc.t('ttk_view'),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   onPressed: () => widget.onTapPfIngredient!(ingredient.sourceTechCardId!),

@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +35,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Map<String, Employee> _employees = {};
   bool _loading = true;
   bool _sending = false;
+  String? _translatedRoomTitle;
+  String? _roomTitleLang;
 
   RealtimeChannel? _realtimeChannel;
 
@@ -109,6 +113,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           _messages = list;
           _loading = false;
         });
+        unawaited(_translateRoomTitleIfNeeded());
         _scrollToBottom();
       }
     } catch (e) {
@@ -271,13 +276,63 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  Future<void> _translateRoomTitleIfNeeded() async {
+    if (!mounted || _room == null) return;
+    final raw = _room!.displayName.trim();
+    if (raw.isEmpty) {
+      if (mounted) setState(() => _translatedRoomTitle = null);
+      return;
+    }
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    if (_roomTitleLang == targetLang && _translatedRoomTitle != null) return;
+    final sourceLang = _detectLanguage(raw);
+    if (sourceLang == targetLang) {
+      if (mounted) {
+        setState(() {
+          _translatedRoomTitle = null;
+          _roomTitleLang = targetLang;
+        });
+      }
+      return;
+    }
+    try {
+      final translated = await context.read<TranslationManager>().getLocalizedText(
+            entityType: TranslationEntityType.ui,
+            entityId: 'group_room_${_room!.id}',
+            fieldName: 'name',
+            sourceText: raw,
+            sourceLanguage: sourceLang,
+            targetLanguage: targetLang,
+          );
+      if (!mounted) return;
+      setState(() {
+        _roomTitleLang = targetLang;
+        _translatedRoomTitle =
+            translated.trim().isEmpty || translated == raw ? null : translated;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _roomTitleLang = targetLang);
+    }
+  }
+
   String _roomTitle(LocalizationService loc, bool showNameTranslit) {
     if (_room == null) return '';
-    final raw = _room!.displayName.trim();
+    final raw = (_translatedRoomTitle ?? _room!.displayName).trim();
     if (raw.isNotEmpty) {
       return displayStoredPersonName(raw, loc, showNameTranslit: showNameTranslit);
     }
     return loc.t('group_chat_default_name');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_roomTitleLang != lang) {
+      unawaited(_translateRoomTitleIfNeeded());
+    }
   }
 
   @override
@@ -379,7 +434,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       controller: _controller,
                       focusNode: _inputFocusNode,
                       decoration: InputDecoration(
-                        hintText: loc.t('chat_type_message') ?? 'Сообщение...',
+                        hintText: loc.t('chat_type_message'),
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
@@ -398,7 +453,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.send),
-                    tooltip: loc.t('send') ?? 'Отправить',
+                    tooltip: loc.t('send'),
                   ),
                 ],
               ),

@@ -68,24 +68,24 @@ class _SalaryTableHeader extends StatelessWidget {
           const SizedBox(width: 48),
           Expanded(
               flex: 4,
-              child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
+              child: Text(loc.t('full_name'), style: style)),
           const SizedBox(width: 8),
           Expanded(
-              flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+              flex: 2, child: Text(loc.t('rate'), style: style)),
           const SizedBox(width: 8),
           Expanded(
               flex: 1,
-              child: Text(loc.t('salary_hours') ?? 'Часы', style: style)),
+              child: Text(loc.t('salary_hours'), style: style)),
           const SizedBox(width: 8),
           Expanded(
-              flex: 2, child: Text(loc.t('ttk_total') ?? 'База', style: style)),
+              flex: 2, child: Text(loc.t('ttk_total'), style: style)),
           const SizedBox(width: 8),
           Expanded(flex: 2, child: Text('', style: style)),
           const SizedBox(width: 8),
           Expanded(
               flex: 2,
               child:
-                  Text(loc.t('salary_payable') ?? 'К выплате', style: style)),
+                  Text(loc.t('salary_payable'), style: style)),
         ],
       ),
     );
@@ -363,8 +363,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                               size: 16, color: theme.colorScheme.primary),
                           const SizedBox(width: 6),
                           Text(
-                            loc.t('salary_deductions_bonuses') ??
-                                'Удержания и поощрения',
+                            loc.t('salary_deductions_bonuses'),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w600,
@@ -410,7 +409,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 8),
                   Text(
-                    '${loc.t('salary_payable') ?? 'К выплате'}: ${NumberFormatUtils.formatSum(base + adjTotal, currency)} $currency',
+                    '${loc.t('salary_payable')}: ${NumberFormatUtils.formatSum(base + adjTotal, currency)} $currency',
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
@@ -440,7 +439,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
-                loc.t('salary_no_adjustments') ?? 'Нет записей',
+                loc.t('salary_no_adjustments'),
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -490,7 +489,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onAddAdjustment,
               icon: const Icon(Icons.add, size: 16),
-              label: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
+              label: Text(loc.t('salary_add_adjustment')),
               style: OutlinedButton.styleFrom(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -722,8 +721,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(loc.t('salary_add_adjustment_dialog_title') ??
-              'Добавить удержание / поощрение'),
+          title: Text(loc.t('salary_add_adjustment_dialog_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -731,7 +729,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               DropdownButtonFormField<_AdjustmentType>(
                 value: selectedType,
                 decoration: InputDecoration(
-                  labelText: loc.t('salary_adjustment_reason') ?? 'Причина',
+                  labelText: loc.t('salary_adjustment_reason'),
                   border: OutlineInputBorder(),
                   filled: true,
                 ),
@@ -759,7 +757,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText:
-                      '${loc.t('salary_adjustment_amount') ?? 'Сумма'} ($currency)',
+                      '${loc.t('salary_adjustment_amount')} ($currency)',
                   border: const OutlineInputBorder(),
                   filled: true,
                 ),
@@ -784,7 +782,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 });
                 Navigator.pop(ctx);
               },
-              child: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
+              child: Text(loc.t('salary_add_adjustment')),
             ),
           ],
         ),
@@ -913,8 +911,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            loc.t('salary_export_saved') ??
-                'Выгружено: $fileName${pngFiles.isNotEmpty ? ' + ${pngFiles.length} график(ов)' : ''}',
+            loc.t('salary_export_saved'),
           ),
         ),
       );
@@ -923,7 +920,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(loc.t('salary_export_error') ?? 'Ошибка выгрузки: $e'),
+          content: Text(loc.t('salary_export_error')),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -1070,9 +1067,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                 ),
                                 onPressed: () => _exportPayroll(context),
                                 tooltip: canExportPayroll
-                                    ? (loc.t('salary_export_btn') ?? 'Выгрузить')
-                                    : (loc.t('pro_required_expenses') ??
-                                        'Нужен Pro или Ultra'),
+                                    ? (loc.t('salary_export_btn'))
+                                    : (loc.t('pro_required_expenses')),
                               ),
                             ],
                           ],
@@ -1182,8 +1178,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 ),
                 onPressed: () => _exportPayroll(context),
                 tooltip: canExportPayroll
-                    ? (loc.t('salary_export_btn') ?? 'Выгрузить')
-                    : (loc.t('pro_required_expenses') ?? 'Нужен Pro или Ultra'),
+                    ? (loc.t('salary_export_btn'))
+                    : (loc.t('pro_required_expenses')),
               ),
           ],
         ),
@@ -1204,13 +1200,13 @@ class _ExportLanguageDialog extends StatelessWidget {
     String selectedLang = loc.currentLanguageCode;
     return StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: Text(loc.t('salary_export_dialog_title') ?? 'Выгрузить ФЗП'),
+        title: Text(loc.t('salary_export_dialog_title')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              loc.t('salary_export_lang') ?? 'Язык сохранения:',
+              loc.t('salary_export_lang'),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
@@ -1233,7 +1229,7 @@ class _ExportLanguageDialog extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(selectedLang),
-            child: Text(loc.t('salary_export_btn') ?? 'Выгрузить'),
+            child: Text(loc.t('salary_export_btn')),
           ),
         ],
       ),

@@ -612,9 +612,8 @@ class _MenuScreenState extends State<MenuScreen> {
                       icon: const Icon(Icons.checklist),
                       label: Text(
                         selectedIds.isEmpty
-                            ? (loc.t('ttk_select_for_export') ??
-                                'Выбрать позиции')
-                            : '${loc.t('ttk_select_for_export') ?? 'Выбрано'}: ${selectedIds.length}',
+                            ? (loc.t('ttk_select_for_export'))
+                            : '${loc.t('ttk_select_for_export')}: ${selectedIds.length}',
                       ),
                     ),
                   ),
@@ -657,8 +656,8 @@ class _MenuScreenState extends State<MenuScreen> {
                 const SizedBox(height: 6),
                 Text(
                   isFoodcostTab
-                      ? (loc.t('menu_tab_foodcost') ?? 'Фудкост')
-                      : (loc.t('menu') ?? 'Меню'),
+                      ? (loc.t('menu_tab_foodcost'))
+                      : (loc.t('menu')),
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
               ],
@@ -692,7 +691,7 @@ class _MenuScreenState extends State<MenuScreen> {
       selected = allDishes;
     }
     if (selected.isEmpty) {
-      AppToastService.show(loc.t('ttk_none_selected') ?? 'Ничего не выбрано');
+      AppToastService.show(loc.t('ttk_none_selected'));
       return;
     }
     await _exportMenuOrFoodcost(
@@ -712,7 +711,7 @@ class _MenuScreenState extends State<MenuScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: Text(loc.t('ttk_select_for_export') ?? 'Выберите позиции'),
+          title: Text(loc.t('ttk_select_for_export')),
           content: SizedBox(
             width: 520,
             height: 420,
@@ -752,11 +751,11 @@ class _MenuScreenState extends State<MenuScreen> {
                     ..addAll(dishes.map((e) => e.id));
                 });
               },
-              child: Text(loc.t('select_all') ?? 'Выбрать все'),
+              child: Text(loc.t('select_all')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selected),
-              child: Text(loc.t('apply') ?? 'Применить'),
+              child: Text(loc.t('apply')),
             ),
           ],
         ),
@@ -812,7 +811,7 @@ class _MenuScreenState extends State<MenuScreen> {
             '${_exportFileBaseName(isFoodcost: isFoodcost, exportLang: exportLang, establishmentName: estName)}.pdf';
         await saveFileBytes(fileName, bytes);
         if (mounted)
-          AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
+          AppToastService.show('${loc.t('saved')}: $fileName');
         return;
       }
 
@@ -891,7 +890,7 @@ class _MenuScreenState extends State<MenuScreen> {
           '${_exportFileBaseName(isFoodcost: isFoodcost, exportLang: exportLang, establishmentName: estName)}.xlsx';
       file_saver.saveExcelBytes(Uint8List.fromList(bytes), fileName);
       if (mounted)
-        AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
+        AppToastService.show('${loc.t('saved')}: $fileName');
     } catch (e) {
       if (mounted) {
         AppToastService.show(
@@ -1331,7 +1330,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                       ButtonSegment<int>(
                                         value: 0,
                                         label: Text(
-                                          loc.t('menu') ?? 'Меню',
+                                          loc.t('menu'),
                                           maxLines: 1,
                                           softWrap: false,
                                           overflow: TextOverflow.fade,

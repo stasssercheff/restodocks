@@ -44,8 +44,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
             title: Text(loc.t('haccp_agreement_lang_title') ??
-                loc.t('language') ??
-                'Language'),
+                loc.t('language')),
             content: Wrap(
               spacing: 8,
               children: LocalizationService.productLanguageCodes.map((code) {
@@ -63,7 +62,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx2).pop(selectedLang),
-                child: Text(loc.t('download') ?? 'Download'),
+                child: Text(loc.t('download')),
               ),
             ],
           ),
@@ -140,7 +139,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+              content: Text(loc.t('haccp_agreement_saved'))),
         );
       }
     } catch (e) {
@@ -171,8 +170,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
           builder: (ctx2, setState) {
             bool filled = mode == HaccpOrderThirdPageMode.filled;
             return AlertDialog(
-              title: Text(loc.t('haccp_order_print_title') ??
-                  'Order and appendix (print)'),
+              title: Text(loc.t('haccp_order_print_title')),
               content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,24 +178,21 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.empty,
                       groupValue: mode,
-                      title: Text(loc.t('haccp_order_mode_empty') ??
-                          'Empty form (manual fill)'),
+                      title: Text(loc.t('haccp_order_mode_empty')),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.empty),
                     ),
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.filled,
                       groupValue: mode,
-                      title: Text(loc.t('haccp_order_mode_filled') ??
-                          'Filled form (name/position auto)'),
+                      title: Text(loc.t('haccp_order_mode_filled')),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.filled),
                     ),
                     if (filled) ...[
                       const SizedBox(height: 10),
                       Text(
-                        loc.t('haccp_order_choose_employees') ??
-                            'Choose employees for acknowledgement sheet:',
+                        loc.t('haccp_order_choose_employees'),
                         style: Theme.of(ctx2).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),
@@ -244,12 +239,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                                 ..clear()
                                 ..addAll(employees.map((e) => e.id));
                             }),
-                            child: Text(loc.t('select_all') ?? 'Select all'),
+                            child: Text(loc.t('select_all')),
                           ),
                           TextButton(
                             onPressed: () =>
                                 setState(() => selectedIds.clear()),
-                            child: Text(loc.t('clear_selection') ?? 'Clear'),
+                            child: Text(loc.t('clear_selection')),
                           ),
                         ],
                       ),
@@ -315,7 +310,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+              content: Text(loc.t('haccp_agreement_saved'))),
         );
       }
     } catch (e) {
@@ -393,8 +388,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             ExpansionTile(
               initiallyExpanded: true,
               leading: const Icon(Icons.rule_outlined),
-              title: Text(loc.t('haccp_legal_legitimacy') ??
-                  'Юридическая легитимность'),
+              title: Text(loc.t('haccp_legal_legitimacy')),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -415,7 +409,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Text(
-                    loc.t('haccp_legal_sp_paragraphs') ?? '',
+                    loc.t('haccp_legal_sp_paragraphs'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -439,20 +433,18 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             FilledButton.icon(
               onPressed: () => _downloadHaccpAgreement(context, loc),
               icon: const Icon(Icons.download),
-              label: Text(loc.t('haccp_download_agreement') ??
-                  'Скачать Соглашение с сотрудником'),
+              label: Text(loc.t('haccp_download_agreement')),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () => _downloadHaccpOrder(context, loc),
               icon: const Icon(Icons.download),
               label: Text(
-                  loc.t('haccp_download_order') ?? 'Download order (3 pages)'),
+                  loc.t('haccp_download_order')),
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('haccp_print_after_download') ??
-                  'After downloading PDF, print and fill manually where lines are shown.',
+              loc.t('haccp_print_after_download'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -625,8 +617,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorPositionController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_director_position') ??
-                  'Должность руководителя',
+              labelText: widget.loc.t('requisites_director_position'),
               border: const OutlineInputBorder(),
               filled: true,
             ),

@@ -25,7 +25,7 @@ class ExpandableBanquetSection extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
         leading: const Icon(Icons.celebration),
-        title: Text(loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        title: Text(loc.t('banquet_catering')),
         trailing: const Icon(Icons.chevron_right),
         children: [
           ListTile(

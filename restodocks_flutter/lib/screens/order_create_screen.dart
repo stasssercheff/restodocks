@@ -207,8 +207,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         if (orderDoc == null) {
           // Заказ сохранён локально, но входящие не созданы — показываем предупреждение, но не блокируем
           AppToastService.show(
-            loc.t('order_save_inbox_warning') ??
-                '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)',
+            loc.t('order_save_inbox_warning'),
             duration: const Duration(seconds: 5),
           );
           setState(() => _saving = false);
@@ -302,11 +301,11 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     onTap: () => Navigator.of(ctx).pop('es')),
                 _LangButton(
                     flag: '🇮🇹',
-                    label: loc.t('order_export_language_it') ?? 'Italiano',
+                    label: loc.t('order_export_language_it'),
                     onTap: () => Navigator.of(ctx).pop('it')),
                 _LangButton(
                     flag: '🇹🇷',
-                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
+                    label: loc.t('order_export_language_tr'),
                     onTap: () => Navigator.of(ctx).pop('tr')),
                 _LangButton(
                     flag: '🇰🇿',
@@ -434,8 +433,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                       label: Text(
                         _orderForDate != null
                             ? '${loc.t('order_export_order_for')}: ${DateFormat('dd.MM.yyyy').format(_orderForDate!)}'
-                            : (loc.t('order_export_order_for') ??
-                                'На когда заказ'),
+                            : (loc.t('order_export_order_for')),
                       ),
                       style: OutlinedButton.styleFrom(
                         alignment: Alignment.centerLeft,
@@ -619,8 +617,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(
-                              loc.t('order_list_save_with_quantities') ??
-                                  'Сохранить',
+                              loc.t('order_list_save_with_quantities'),
                             ),
                     ),
                     const SizedBox(height: 10),
@@ -667,8 +664,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Text(
-                                loc.t('order_list_save_with_quantities') ??
-                                    'Сохранить',
+                                loc.t('order_list_save_with_quantities'),
                               ),
                       ),
                     ),
@@ -719,8 +715,7 @@ class _NoSuppliersHint extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              loc.t('order_no_suppliers_hint') ??
-                  'Сначала создайте поставщика во вкладке «Поставщики»',
+              loc.t('order_no_suppliers_hint'),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),

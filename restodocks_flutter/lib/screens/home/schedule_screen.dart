@@ -656,7 +656,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           if (establishmentId == null) {
             scaffoldMessenger.showSnackBar(SnackBar(
                 content:
-                    Text(loc.t('no_establishment') ?? 'Заведение не выбрано')));
+                    Text(loc.t('no_establishment'))));
             return;
           }
           try {
@@ -871,7 +871,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       await saveFileBytes(fileName, await doc.save());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -966,7 +966,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       await saveFileBytes(fileName, fileBytes);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1328,8 +1328,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(
-                  loc.t('schedule_view_only_hint') ??
-                      'Редактирование графика доступно шеф-повару и су-шефу.',
+                  loc.t('schedule_view_only_hint'),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ),

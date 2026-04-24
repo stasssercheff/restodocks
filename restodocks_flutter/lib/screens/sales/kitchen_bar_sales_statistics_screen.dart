@@ -279,26 +279,26 @@ class _KitchenBarSalesStatisticsScreenState
     var c = 0;
     int headerRow = 0;
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-      ..value = TextCellValue(loc.t('sales_col_no') ?? '№');
+      ..value = TextCellValue(loc.t('sales_col_no'));
     if (_showSub) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-        ..value = TextCellValue(loc.t('sales_filter_subdivision') ?? '');
+        ..value = TextCellValue(loc.t('sales_filter_subdivision'));
     }
     if (_showType) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-        ..value = TextCellValue(loc.t('sales_filter_dish_type') ?? '');
+        ..value = TextCellValue(loc.t('sales_filter_dish_type'));
     }
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-      ..value = TextCellValue(loc.t('dish_name') ?? '');
+      ..value = TextCellValue(loc.t('dish_name'));
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-      ..value = TextCellValue(loc.t('sales_sort_qty') ?? '');
+      ..value = TextCellValue(loc.t('sales_sort_qty'));
     if (showCost) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-        ..value = TextCellValue(loc.t('sales_col_cost') ?? '');
+        ..value = TextCellValue(loc.t('sales_col_cost'));
     }
     if (showSell) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: headerRow))
-        ..value = TextCellValue(loc.t('sales_col_selling') ?? '');
+        ..value = TextCellValue(loc.t('sales_col_selling'));
     }
 
     final data = _filtered;
@@ -337,7 +337,7 @@ class _KitchenBarSalesStatisticsScreenState
     final tRow = data.length + 2;
     c = 0;
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: tRow))
-      ..value = TextCellValue(loc.t('sales_total_row') ?? 'Итого');
+      ..value = TextCellValue(loc.t('sales_total_row'));
     if (_showSub) c++;
     if (_showType) c++;
     c++;
@@ -364,7 +364,7 @@ class _KitchenBarSalesStatisticsScreenState
     await saveFileBytes(fn, out);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.t('sales_export_saved') ?? 'Excel')),
+      SnackBar(content: Text(loc.t('sales_export_saved'))),
     );
   }
 
@@ -391,7 +391,7 @@ class _KitchenBarSalesStatisticsScreenState
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('sales_statistics') ?? ''} — $deptTitle'),
+        title: Text('${loc.t('sales_statistics')} — $deptTitle'),
         actions: [
           IconButton(
             icon: const Icon(Icons.download_outlined),
@@ -409,7 +409,7 @@ class _KitchenBarSalesStatisticsScreenState
                 children: [
                   if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   Text(
-                    loc.t('sales_period_label') ?? 'Период',
+                    loc.t('sales_period_label'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   Wrap(
@@ -477,8 +477,8 @@ class _KitchenBarSalesStatisticsScreenState
                     ),
                   ],
                   SwitchListTile(
-                    title: Text(loc.t('sales_time_window') ?? ''),
-                    subtitle: Text(loc.t('sales_time_window_hint') ?? ''),
+                    title: Text(loc.t('sales_time_window')),
+                    subtitle: Text(loc.t('sales_time_window_hint')),
                     value: _timeFilter,
                     onChanged: (v) {
                       setState(() => _timeFilter = v);
@@ -607,10 +607,10 @@ class _KitchenBarSalesStatisticsScreenState
                       ),
                   ],
                   ExpansionTile(
-                    title: Text(loc.t('sales_columns_expand') ?? 'Колонки таблицы'),
+                    title: Text(loc.t('sales_columns_expand')),
                     children: [
                       CheckboxListTile(
-                        title: Text(loc.t('sales_filter_subdivision') ?? ''),
+                        title: Text(loc.t('sales_filter_subdivision')),
                         value: _showSub,
                         onChanged: (v) {
                           setState(() => _showSub = v ?? true);
@@ -618,7 +618,7 @@ class _KitchenBarSalesStatisticsScreenState
                         },
                       ),
                       CheckboxListTile(
-                        title: Text(loc.t('sales_filter_dish_type') ?? ''),
+                        title: Text(loc.t('sales_filter_dish_type')),
                         value: _showType,
                         onChanged: (v) {
                           setState(() => _showType = v ?? true);
@@ -627,7 +627,7 @@ class _KitchenBarSalesStatisticsScreenState
                       ),
                       if (seeFin) ...[
                         CheckboxListTile(
-                          title: Text(loc.t('sales_col_cost') ?? ''),
+                          title: Text(loc.t('sales_col_cost')),
                           value: _showCost,
                           onChanged: (v) {
                             setState(() => _showCost = v ?? true);
@@ -635,7 +635,7 @@ class _KitchenBarSalesStatisticsScreenState
                           },
                         ),
                         CheckboxListTile(
-                          title: Text(loc.t('sales_col_selling') ?? ''),
+                          title: Text(loc.t('sales_col_selling')),
                           value: _showSelling,
                           onChanged: (v) {
                             setState(() => _showSelling = v ?? true);
@@ -655,7 +655,7 @@ class _KitchenBarSalesStatisticsScreenState
                     items: [
                       DropdownMenuItem<String?>(
                         value: null,
-                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                        child: Text(loc.t('sales_filter_all')),
                       ),
                       ..._uniqueSubdivisions().map(
                         (e) => DropdownMenuItem(
@@ -682,7 +682,7 @@ class _KitchenBarSalesStatisticsScreenState
                     items: [
                       DropdownMenuItem<String?>(
                         value: null,
-                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                        child: Text(loc.t('sales_filter_all')),
                       ),
                       ..._uniqueDishTypes().map(
                         (e) => DropdownMenuItem(
@@ -709,7 +709,7 @@ class _KitchenBarSalesStatisticsScreenState
                     items: [
                       DropdownMenuItem<String?>(
                         value: null,
-                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                        child: Text(loc.t('sales_filter_all')),
                       ),
                       ..._uniqueDishNames().map(
                         (e) => DropdownMenuItem(
@@ -761,7 +761,7 @@ class _KitchenBarSalesStatisticsScreenState
                     Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        loc.t('sales_no_data') ?? '',
+                        loc.t('sales_no_data'),
                         textAlign: TextAlign.center,
                       ),
                     )
@@ -770,22 +770,22 @@ class _KitchenBarSalesStatisticsScreenState
                       scrollDirection: Axis.horizontal,
                       child: DataTable(
                         columns: [
-                          DataColumn(label: Text(loc.t('sales_col_no') ?? '№')),
+                          DataColumn(label: Text(loc.t('sales_col_no'))),
                           if (_showSub)
                             DataColumn(
-                              label: Text(loc.t('sales_filter_subdivision') ?? ''),
+                              label: Text(loc.t('sales_filter_subdivision')),
                             ),
                           if (_showType)
                             DataColumn(
-                              label: Text(loc.t('sales_filter_dish_type') ?? ''),
+                              label: Text(loc.t('sales_filter_dish_type')),
                             ),
-                          DataColumn(label: Text(loc.t('dish_name') ?? '')),
-                          DataColumn(label: Text(loc.t('sales_sort_qty') ?? '')),
+                          DataColumn(label: Text(loc.t('dish_name'))),
+                          DataColumn(label: Text(loc.t('sales_sort_qty'))),
                           if (seeFin && _showCost)
-                            DataColumn(label: Text(loc.t('sales_col_cost') ?? '')),
+                            DataColumn(label: Text(loc.t('sales_col_cost'))),
                           if (seeFin && _showSelling)
                             DataColumn(
-                              label: Text(loc.t('sales_col_selling') ?? ''),
+                              label: Text(loc.t('sales_col_selling')),
                             ),
                         ],
                         rows: [
@@ -807,7 +807,7 @@ class _KitchenBarSalesStatisticsScreenState
                             ),
                           DataRow(
                             cells: [
-                              DataCell(Text(loc.t('sales_total_row') ?? '')),
+                              DataCell(Text(loc.t('sales_total_row'))),
                               if (_showSub) const DataCell(SizedBox.shrink()),
                               if (_showType) const DataCell(SizedBox.shrink()),
                               const DataCell(SizedBox.shrink()),
@@ -836,19 +836,19 @@ class _KitchenBarSalesStatisticsScreenState
   String _periodLabel(LocalizationService loc, KitchenBarSalesPeriodKind k) {
     switch (k) {
       case KitchenBarSalesPeriodKind.custom:
-        return loc.t('sales_period_custom') ?? '';
+        return loc.t('sales_period_custom');
       case KitchenBarSalesPeriodKind.shiftDay:
-        return loc.t('sales_period_shift') ?? '';
+        return loc.t('sales_period_shift');
       case KitchenBarSalesPeriodKind.week:
-        return loc.t('sales_period_week') ?? '';
+        return loc.t('sales_period_week');
       case KitchenBarSalesPeriodKind.month:
-        return loc.t('sales_period_month') ?? '';
+        return loc.t('sales_period_month');
       case KitchenBarSalesPeriodKind.quarter:
-        return loc.t('sales_period_quarter') ?? '';
+        return loc.t('sales_period_quarter');
       case KitchenBarSalesPeriodKind.halfYear:
-        return loc.t('sales_period_half_year') ?? '';
+        return loc.t('sales_period_half_year');
       case KitchenBarSalesPeriodKind.year:
-        return loc.t('sales_period_year') ?? '';
+        return loc.t('sales_period_year');
     }
   }
 }

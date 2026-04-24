@@ -422,7 +422,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       final header = payload['header'] as Map<String, dynamic>? ?? {};
       var rows = payload['rows'] as List<dynamic>? ?? [];
       sheet.appendRow([
-        TextCellValue(loc.t('inventory_excel_number') ?? '#'),
+        TextCellValue(loc.t('inventory_excel_number')),
         TextCellValue(loc.t('inventory_item_name')),
         TextCellValue(loc.t('inventory_unit')),
         TextCellValue(loc.t('inventory_excel_total')),

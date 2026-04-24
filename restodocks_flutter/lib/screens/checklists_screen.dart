@@ -71,7 +71,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   String _displayName(Checklist c, LocalizationService loc, bool useTranslit) {
     final base = c.name.trim().isNotEmpty
         ? c.name
-        : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'));
+        : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name')));
     var text = _translatedNames[c.id] ?? base;
     if (useTranslit) {
       text = cyrillicToLatin(text);
@@ -328,12 +328,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 segments: [
                   ButtonSegment<bool>(
                     value: false,
-                    label: Text(loc.t('checklists') ?? 'Чеклисты'),
+                    label: Text(loc.t('checklists')),
                     icon: const Icon(Icons.list_alt),
                   ),
                   ButtonSegment<bool>(
                     value: true,
-                    label: Text(loc.t('archive') ?? 'Архив'),
+                    label: Text(loc.t('archive')),
                     icon: const Icon(Icons.archive_outlined),
                   ),
                 ],
@@ -350,8 +350,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               decoration: InputDecoration(
                 hintText: _showArchive
                     ? (loc.t('checklist_archive_search_hint') ??
-                        (loc.t('checklist_search_hint') ??
-                            'Поиск по названию, исполнителю и дате'))
+                        (loc.t('checklist_search_hint')))
                     : loc.t('checklist_search_hint'),
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
@@ -403,9 +402,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       final local = d.toLocal();
       return hasTime ? '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} ${fmtDate(local)}' : fmtDate(utc);
     };
-    final noSection = loc.t('checklist_section_all') ?? 'Все цеха';
-    final noDeadline = loc.t('checklist_no_deadline') ?? 'Без срока';
-    final allEmployees = loc.t('checklist_all_employees') ?? 'Всем';
+    final noSection = loc.t('checklist_section_all');
+    final noDeadline = loc.t('checklist_no_deadline');
+    final allEmployees = loc.t('checklist_all_employees');
 
     final empMap = {
       for (final e in _employees) e.id: employeeDisplayName(e, translit: useEmployeeTranslit),
@@ -510,7 +509,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               const SizedBox(height: 16),
               Text(
                 _showArchive
-                    ? (loc.t('checklist_archive_empty') ?? 'Архив пуст')
+                    ? (loc.t('checklist_archive_empty'))
                     : loc.t('no_checklists'),
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
@@ -518,8 +517,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               const SizedBox(height: 8),
               Text(
                 _showArchive
-                    ? (loc.t('checklist_archive_empty_hint') ??
-                        'Завершенные неповторяющиеся чеклисты появятся здесь')
+                    ? (loc.t('checklist_archive_empty_hint'))
                     : loc.t('no_checklists_hint'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
@@ -544,7 +542,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       if (archived.isEmpty) {
         return Center(
           child: Text(
-            loc.t('no_checklists') ?? 'Нет результатов',
+            loc.t('no_checklists'),
             style: Theme.of(context)
                 .textTheme
                 .bodyLarge
@@ -559,7 +557,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     if (grouped.isEmpty) {
       return Center(
         child: Text(
-          loc.t('no_checklists') ?? 'Нет результатов',
+          loc.t('no_checklists'),
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
         ),
       );
@@ -594,7 +592,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           final lang = loc.currentLanguageCode;
           final secIds = c.effectiveSectionIds;
           final sectionLine = secIds.isEmpty
-              ? (loc.t('checklist_section_all') ?? 'Все цеха')
+              ? (loc.t('checklist_section_all'))
               : secIds.map((code) => KitchenSection.fromCode(code)?.getLocalizedName(lang) ?? code).join(', ');
           final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
           final formatDateTime = (DateTime d) {
@@ -610,7 +608,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           final reminderLine = formatChecklistReminderSubtitle(c.reminderConfig, loc, lang);
           final datePartsData = <String>[
             if (reminderLine != null && reminderLine.isNotEmpty) reminderLine,
-            if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
+            if (c.deadlineAt != null) '${loc.t('checklist_complete_by')}: ${formatDateTime(c.deadlineAt!)}',
           ];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -674,7 +672,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              loc.t('checklist_overdue') ?? 'Просрочен',
+                              loc.t('checklist_overdue'),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -693,7 +691,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                             await context.push('/checklists/${c.id}');
                             if (mounted) _load();
                           },
-                          tooltip: loc.t('edit') ?? 'Редактировать',
+                          tooltip: loc.t('edit'),
                         ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
@@ -706,17 +704,17 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
-                                  title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
+                                  title: Text(loc.t('checklist_delete_confirm')),
                                   content: Text(_displayName(c, loc, useTranslit)),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),
-                                      child: Text(loc.t('back') ?? 'Отмена'),
+                                      child: Text(loc.t('back')),
                                     ),
                                     FilledButton(
                                       onPressed: () => Navigator.of(ctx).pop(true),
                                       style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
-                                      child: Text(loc.t('delete') ?? 'Удалить'),
+                                      child: Text(loc.t('delete')),
                                     ),
                                   ],
                                 ),
@@ -729,7 +727,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                   _archivedList =
                                       _archivedList.where((x) => x.id != toDelete.id).toList();
                                 });
-                                AppToastService.show(loc.t('checklist_deleted') ?? 'Удалено');
+                                AppToastService.show(loc.t('checklist_deleted'));
                                 try {
                                   await context.read<ChecklistServiceSupabase>().deleteChecklist(toDelete.id);
                                 } catch (e) {
@@ -758,12 +756,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                             if (mounted) _load();
                           },
                           itemBuilder: (_) => [
-                            PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
-                            PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist') ?? 'Заполнить')),
+                            PopupMenuItem(value: 'edit', child: Text(loc.t('edit'))),
+                            PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist'))),
                             const PopupMenuDivider(),
                             PopupMenuItem(
                               value: 'delete',
-                              child: Text(loc.t('delete') ?? 'Удалить', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                              child: Text(loc.t('delete'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
                             ),
                           ],
                         ),
@@ -817,7 +815,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               final checklist = entry.checklist;
               final sectionLine = entry.submission.section?.trim().isNotEmpty == true
                   ? entry.submission.section!.trim()
-                  : (loc.t('checklist_no_section') ?? 'Без цеха');
+                  : (loc.t('checklist_no_section'));
               final subtitleParts = <String>[
                 entry.performerName,
                 '${_formatTime(entry.submittedAt.toLocal())} • $sectionLine',
@@ -838,7 +836,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   trailing: canEdit
                       ? IconButton(
                           icon: const Icon(Icons.visibility_outlined),
-                          tooltip: loc.t('open') ?? 'Открыть',
+                          tooltip: loc.t('open'),
                           onPressed: () => context.push('/checklists/${checklist.id}?view=1'),
                         )
                       : const Icon(Icons.chevron_right),

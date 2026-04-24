@@ -609,7 +609,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('ok') ?? 'OK'),
+            child: Text(loc.t('ok')),
           ),
         ],
       ),
@@ -624,7 +624,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('ttk_import_no_establishment') ?? 'Select an establishment')),
+                  loc.t('ttk_import_no_establishment'))),
         );
       }
       return 0;
@@ -756,7 +756,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('ok') ?? 'OK'),
+            child: Text(loc.t('ok')),
           ),
         ],
       ),
@@ -782,7 +782,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('ok') ?? 'OK'),
+            child: Text(loc.t('ok')),
           ),
         ],
       ),
@@ -3351,7 +3351,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           builder: (ctx, setStateDialog) {
             final selected = picked.length;
             return AlertDialog(
-              title: Text(loc.t('ttk_import_file') ?? 'TTK import'),
+              title: Text(loc.t('ttk_import_file')),
               content: SizedBox(
                 width: 560,
                 height: 420,
@@ -3424,7 +3424,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Cancel'),
+                  child: Text(loc.t('cancel')),
                 ),
                 FilledButton(
                   onPressed: selected <= 0
@@ -3441,7 +3441,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           }
                           Navigator.of(ctx).pop(byFile);
                         },
-                  child: Text(loc.t('ok') ?? 'OK'),
+                  child: Text(loc.t('ok')),
                 ),
               ],
             );
@@ -3617,10 +3617,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (files.length > maxFiles) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(mode == _TtkImportMode.single
-            ? (loc.t('ttk_import_max_files') ??
-                'Select up to $_maxFilesSingleTtk files (1 file = 1 tech card)')
-            : (loc.t('ttk_import_max_files_multi') ??
-                'Select up to $_maxFilesMultiTtk files')),
+            ? (loc.t('ttk_import_max_files'))
+            : (loc.t('ttk_import_max_files_multi'))),
       ));
       return;
     }
@@ -3632,10 +3630,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final cardLimitMessage = trialOnly
         ? _trialImportCapMessage(loc)
         : (files.length <= 1
-            ? (loc.t('ttk_import_max_cards_single_file') ??
-                'You can import at most $_maxCardsFromSingleFileImport tech cards from one file.')
-            : (loc.t('ttk_import_max_cards_multi_files') ??
-                'You can import at most $_maxCardsFromMultiFileImport tech cards when uploading multiple files.'));
+            ? (loc.t('ttk_import_max_cards_single_file'))
+            : (loc.t('ttk_import_max_cards_multi_files')));
     Map<int, Map<String, int>>? selectedTrialCandidates;
     if (trialOnly) {
       final candidates = _collectTrialTtkCandidates(files);
@@ -3739,8 +3735,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         if (mode == _TtkImportMode.single && list.length > 1) {
           if (mounted) setState(() => _loadingExcel = false);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text((loc.t('ttk_import_multi_card_in_file') ??
-                    'The file "%s" contains multiple cards. Choose "Multiple tech cards per document" mode or upload files one by one.')
+            content: Text((loc.t('ttk_import_multi_card_in_file'))
                 .replaceFirst('%s', file.name)),
             duration: const Duration(seconds: 5),
           ));
@@ -3757,8 +3752,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           // Одна карточка в режиме «несколько» — всё равно ведём на проверку (парсер мог не найти все блоки)
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text((loc.t('ttk_import_one_card_in_multi') ??
-                      '1 card was recognized in "%s". If there are more, choose "One tech card per document" mode for each file or check the layout.')
+              content: Text((loc.t('ttk_import_one_card_in_multi'))
                   .replaceFirst('%s', file.name)),
               duration: const Duration(seconds: 4),
             ));
@@ -3857,27 +3851,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               );
             } else if (reason == 'timeout_or_network') {
               msg = loc.t('ai_ttk_pdf_timeout') ??
-                  (loc.t('ai_tech_card_pdf_format_hint') ??
-                      'PDF loading timed out');
+                  (loc.t('ai_tech_card_pdf_format_hint'));
             } else if (reason != null &&
                 reason.startsWith('extraction_failed')) {
               msg = loc.t('ai_ttk_pdf_extraction_failed') ??
-                  (loc.t('ai_tech_card_pdf_format_hint') ??
-                      'Could not extract text from PDF');
+                  (loc.t('ai_tech_card_pdf_format_hint'));
             } else if (reason == 'empty_text') {
               msg = loc.t('ai_ttk_pdf_empty_text') ??
-                  (loc.t('ai_tech_card_pdf_format_hint') ??
-                      'PDF has no extractable text');
+                  (loc.t('ai_tech_card_pdf_format_hint'));
             } else if (reason != null && reason.isNotEmpty) {
               msg =
-                  '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Could not recognize tech card'} ($reason)';
+                  '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint')} ($reason)';
             } else {
-              msg = loc.t('ai_tech_card_excel_format_hint') ??
-                  'Could not recognize tech card';
+              msg = loc.t('ai_tech_card_excel_format_hint');
             }
           } else {
-            msg = loc.t('ai_tech_card_excel_format_hint') ??
-                'Could not recognize tech card';
+            msg = loc.t('ai_tech_card_excel_format_hint');
           }
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(msg),
@@ -3911,7 +3900,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (failedCount > 0 && allCards.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              (loc.t('ttk_import_partial') ?? 'Loaded %s of %s files')
+              (loc.t('ttk_import_partial'))
                   .replaceFirst('%s', '${allCards.length}')
                   .replaceFirst('%s', '${files.length}')),
           duration: const Duration(seconds: 3),
@@ -4069,7 +4058,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
               : null,
           title: Text(
-            loc.t('ttk_import_text') ?? 'Paste from text',
+            loc.t('ttk_import_text'),
             style: titleStyle,
             maxLines: useCompactLayout ? 2 : 4,
             overflow: TextOverflow.ellipsis,
@@ -4348,8 +4337,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('ai_tech_card_excel_format_hint') ??
-                  'Could not recognize tech card in text')),
+              content: Text(loc.t('ai_tech_card_excel_format_hint'))),
         );
         return;
       }
@@ -4493,8 +4481,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (list.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('ai_tech_card_excel_format_hint') ??
-                  'Could not recognize tech card in text')),
+              content: Text(loc.t('ai_tech_card_excel_format_hint'))),
         );
         return;
       }
@@ -4539,7 +4526,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_select_sheet') ?? 'Select sheet'),
+        title: Text(loc.t('ttk_import_select_sheet')),
         content: SizedBox(
           width: 320,
           child: Column(
@@ -4547,8 +4534,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                (loc.t('ttk_import_select_sheet_hint') ??
-                        'The file "%s" has multiple sheets. Only one sheet can be imported at a time.')
+                (loc.t('ttk_import_select_sheet_hint'))
                     .replaceFirst('%s', fileName),
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
@@ -4559,7 +4545,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: List.generate(sheetNames.length, (i) {
                       final name = sheetNames[i].isEmpty
-                          ? '${loc.t('ttk_sheet') ?? 'Sheet'} ${i + 1}'
+                          ? '${loc.t('ttk_sheet')} ${i + 1}'
                           : sheetNames[i];
                       return ListTile(
                         title: Text(name),
@@ -5480,7 +5466,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                     items: [
                       DropdownMenuItem(
-                          value: null, child: Text(loc.t('all') ?? 'All')),
+                          value: null, child: Text(loc.t('all'))),
                       ..._sectionOrder
                           .where((s) => s != 'hidden' && s != 'all')
                           .map((s) => DropdownMenuItem(
@@ -5505,7 +5491,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                     items: [
                       DropdownMenuItem(
-                          value: null, child: Text(loc.t('all') ?? 'All')),
+                          value: null, child: Text(loc.t('all'))),
                       ...filterCatOrder.map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(_categoryLabel(c, loc)),
@@ -5869,7 +5855,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           size: 20,
                         ),
                         tooltip: effectiveCanEdit
-                            ? (loc.t('edit') ?? 'Edit')
+                            ? (loc.t('edit'))
                             : loc.t('ttk_view'),
                         onPressed: effectiveCanEdit
                             ? () => context.push(

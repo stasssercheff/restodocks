@@ -61,11 +61,11 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('writeoff_summary') ?? 'Сводное списание'),
+        title: Text(loc.t('writeoff_summary')),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Сохранить',
+            tooltip: loc.t('download'),
             onPressed: () => _exportExcel(context, loc, aggregated),
           ),
         ],
@@ -90,7 +90,7 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    loc.t('writeoff_no_data') ?? 'Нет данных за эту дату',
+                    loc.t('writeoff_no_data'),
                     style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
@@ -156,10 +156,10 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
       var rows = (aggregated['rows'] as List<dynamic>).map((e) => e as Map<String, dynamic>).toList();
       rows.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
       sheet.appendRow([
-        TextCellValue(loc.t('inventory_excel_number') ?? '#'),
-        TextCellValue(loc.t('inventory_item_name') ?? 'Наименование'),
-        TextCellValue(loc.t('inventory_unit') ?? 'Ед.'),
-        TextCellValue(loc.t('inventory_excel_total') ?? 'Количество'),
+        TextCellValue(loc.t('inventory_excel_number')),
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('inventory_unit')),
+        TextCellValue(loc.t('inventory_excel_total')),
       ]);
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i];
@@ -188,7 +188,7 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
         await saveFileBytes('writeoff_summary_$dateStr.xlsx', out);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
           );
         }
       }

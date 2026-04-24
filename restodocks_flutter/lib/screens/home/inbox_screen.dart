@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
@@ -1855,6 +1857,8 @@ class _MessagesContentState extends State<_MessagesContent> {
   List<String> _chatPartnerIds = [];
   Map<String, int> _unreadCounts = {};
   List<ChatRoom> _groupRooms = [];
+  Map<String, String> _translatedGroupRoomTitles = {};
+  String? _groupRoomTitlesLang;
   bool _loadingEmployees = true;
   RealtimeChannel? _realtimeChannel;
   RealtimeChannel? _groupRealtimeChannel;
@@ -1957,9 +1961,59 @@ class _MessagesContentState extends State<_MessagesContent> {
           _groupRooms = rooms;
           _loadingEmployees = false;
         });
+        unawaited(_translateGroupRoomTitlesIfNeeded(force: true));
       }
     } catch (_) {
       if (mounted) setState(() => _loadingEmployees = false);
+    }
+  }
+
+  String _detectLanguageCode(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return 'en';
+    if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+    return 'en';
+  }
+
+  Future<void> _translateGroupRoomTitlesIfNeeded({bool force = false}) async {
+    if (!mounted || _groupRooms.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    if (!force && _groupRoomTitlesLang == targetLang) return;
+    final tm = context.read<TranslationManager>();
+    final translated = <String, String>{};
+    for (final room in _groupRooms) {
+      final raw = room.displayName.trim();
+      if (raw.isEmpty) continue;
+      final from = _detectLanguageCode(raw);
+      if (from == targetLang) continue;
+      try {
+        final out = await tm.getLocalizedText(
+          entityType: TranslationEntityType.ui,
+          entityId: 'group_room_${room.id}',
+          fieldName: 'name',
+          sourceText: raw,
+          sourceLanguage: from,
+          targetLanguage: targetLang,
+        );
+        if (out.trim().isNotEmpty && out != raw) {
+          translated[room.id] = out;
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _groupRoomTitlesLang = targetLang;
+      _translatedGroupRoomTitles = translated;
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_groupRoomTitlesLang != lang) {
+      unawaited(_translateGroupRoomTitlesIfNeeded());
     }
   }
 
@@ -2095,9 +2149,11 @@ class _MessagesContentState extends State<_MessagesContent> {
                               .onSecondaryContainer),
                     ),
                     title: Text(
-                      room.displayName.isEmpty
+                      (_translatedGroupRoomTitles[room.id] ?? room.displayName)
+                              .isEmpty
                           ? (loc.t('group_chat_default_name'))
-                          : room.displayName,
+                          : (_translatedGroupRoomTitles[room.id] ??
+                              room.displayName),
                     ),
                     trailing: const Icon(Icons.chat_bubble, size: 18),
                     onTap: () => context.push('/inbox/group/${room.id}'),

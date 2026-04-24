@@ -76,14 +76,13 @@ class ManagementHomeContent extends StatelessWidget {
             firstTile,
           HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
-            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            title: loc.t('inbox_tab_messages'),
             onTap: () => context.go('/notifications?tab=messages'),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: Text(
-              loc.t('data_access_required_hint') ??
-                  'Доступ к остальным разделам выдаёт руководитель.',
+              loc.t('data_access_required_hint'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -118,7 +117,7 @@ class ManagementHomeContent extends StatelessWidget {
           ),
           HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
-            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            title: loc.t('inbox_tab_messages'),
             onTap: () => context.go('/notifications?tab=messages'),
           ),
           HomeFeatureTile(
@@ -129,7 +128,7 @@ class ManagementHomeContent extends StatelessWidget {
           if ((isChef || roles.contains('sous_chef')) && !isGeneral)
             HomeFeatureTile(
               icon: Icons.payments,
-              title: kIsWeb ? (loc.t('expenses') ?? 'Расходы') : (loc.t('salary_tab_fzp') ?? 'ФЗП'),
+              title: kIsWeb ? (loc.t('expenses')) : (loc.t('salary_tab_fzp')),
               onTap: () =>
                   context.go('/expenses/salary?department=kitchen'),
             ),
@@ -151,16 +150,16 @@ class ManagementHomeContent extends StatelessWidget {
           firstTile,
         HomeFeatureTile(
             icon: Icons.description_outlined,
-            title: loc.t('documentation') ?? 'Документация',
+            title: loc.t('documentation'),
             onTap: () => context.go('/documentation')),
         HomeFeatureTile(
             icon: Icons.assignment,
-            title: loc.t('haccp_journals') ?? 'Журналы и ХАССП',
+            title: loc.t('haccp_journals'),
             subscriptionLocked: !subOk,
             onTap: () => context.go('/haccp-journals')),
         HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
-            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            title: loc.t('inbox_tab_messages'),
             onTap: () => context.go('/notifications?tab=messages')),
         HomeFeatureTile(
             icon: Icons.inbox,
@@ -201,24 +200,24 @@ class ManagementHomeContent extends StatelessWidget {
         if (!posOn) ...[
           HomeFeatureTile(
             icon: Icons.local_shipping,
-            title: loc.t('pos_nav_procurement') ?? 'Закупка',
+            title: loc.t('pos_nav_procurement'),
             onTap: () => context.push('/procurement/$dept'),
           ),
         ],
         if (posOn && dept == 'hall') ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
-            title: loc.t('order_tab_orders') ?? 'Заказы',
+            title: loc.t('order_tab_orders'),
             onTap: () => context.push('/pos/hall/orders'),
           ),
           HomeFeatureTile(
             icon: Icons.point_of_sale,
-            title: loc.t('pos_nav_cash_register') ?? 'Касса',
+            title: loc.t('pos_nav_cash_register'),
             onTap: () => context.push('/pos/hall/cash-register'),
           ),
           HomeFeatureTile(
             icon: Icons.table_restaurant,
-            title: loc.t('pos_nav_tables') ?? 'Столы',
+            title: loc.t('pos_nav_tables'),
             onTap: () => context.push('/pos/hall/tables'),
           ),
           if (posCanViewPosShiftReport(employee))
@@ -231,24 +230,24 @@ class ManagementHomeContent extends StatelessWidget {
         if (posOn && (dept == 'kitchen' || dept == 'bar')) ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
-            title: loc.t('order_tab_orders') ?? 'Заказы',
+            title: loc.t('order_tab_orders'),
             onTap: () => context.push('/pos/orders/$dept'),
           ),
           HomeFeatureTile(
             icon: Icons.point_of_sale_outlined,
-            title: loc.t('sales_title') ?? 'Продажи',
+            title: loc.t('sales_title'),
             onTap: () => context.push('/sales/$dept'),
           ),
         ],
         if (posOn) ...[
           HomeFeatureTile(
             icon: Icons.warehouse,
-            title: loc.t('pos_nav_warehouse') ?? 'Склад',
+            title: loc.t('pos_nav_warehouse'),
             onTap: () => context.push('/pos/warehouse/$dept'),
           ),
           HomeFeatureTile(
             icon: Icons.local_shipping,
-            title: loc.t('pos_nav_procurement') ?? 'Закупка',
+            title: loc.t('pos_nav_procurement'),
             onTap: () => context.push('/pos/procurement/$dept'),
           ),
         ],
@@ -259,7 +258,7 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.push('/inventory')),
         HomeFeatureTile(
             icon: Icons.remove_circle_outline,
-            title: loc.t('writeoffs') ?? 'Списания',
+            title: loc.t('writeoffs'),
             subscriptionLocked: !subOk,
             onTap: () => context.push('/writeoffs')),
         if ((isChef || roles.contains('sous_chef')) &&
@@ -278,8 +277,7 @@ class ManagementHomeContent extends StatelessWidget {
           if (posOn)
             HomeFeatureTile(
                 icon: Icons.warehouse,
-                title: loc.t('pos_warehouse_establishment_title') ??
-                    'Сводная по заведению',
+                title: loc.t('pos_warehouse_establishment_title'),
                 onTap: () => context.push('/pos/warehouse/establishment')),
           HomeFeatureTile(
               icon: Icons.savings,
@@ -296,7 +294,7 @@ class ManagementHomeContent extends StatelessWidget {
                 isFloorManager))
           HomeFeatureTile(
             icon: Icons.payments,
-            title: loc.t('expenses') ?? 'Расходы',
+            title: loc.t('expenses'),
             onTap: () {
               if (!ent.isLiteTier) {
                 context.go('/expenses');
@@ -316,8 +314,8 @@ class ManagementHomeContent extends StatelessWidget {
             HomeFeatureTile(
                 icon: Icons.payments,
                 title: ent.isLiteTier
-                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
-                    : (loc.t('expenses') ?? 'Расходы'),
+                    ? (loc.t('salary_tab_fzp'))
+                    : (loc.t('expenses')),
                 subscriptionLocked: !subOk,
                 onTap: () =>
                     ent.isLiteTier
@@ -327,8 +325,8 @@ class ManagementHomeContent extends StatelessWidget {
             HomeFeatureTile(
                 icon: Icons.payments,
                 title: ent.isLiteTier
-                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
-                    : (loc.t('expenses') ?? 'Расходы'),
+                    ? (loc.t('salary_tab_fzp'))
+                    : (loc.t('expenses')),
                 subscriptionLocked: !subOk,
                 onTap: () => ent.isLiteTier
                     ? context.go('/expenses/salary?department=hall')
@@ -337,8 +335,8 @@ class ManagementHomeContent extends StatelessWidget {
             HomeFeatureTile(
                 icon: Icons.payments,
                 title: ent.isLiteTier
-                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
-                    : (loc.t('expenses') ?? 'Расходы'),
+                    ? (loc.t('salary_tab_fzp'))
+                    : (loc.t('expenses')),
                 subscriptionLocked: !subOk,
                 onTap: () => ent.isLiteTier
                     ? context.go(

@@ -923,6 +923,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Map<String, String> _ingredientNameTranslationsById = const {};
   String _ingredientNameTranslationsLang = '';
   String _ingredientNameTranslationsCardId = '';
+  final Set<String> _ingredientTranslationBackfillInFlight = <String>{};
 
   Timer? _ingredientUpdateDebounce;
   Timer? _reconcileOpenCardTimer;
@@ -2005,9 +2006,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         });
         if (tc != null) {
           unawaited(
-            _warmIngredientNameTranslations(
-              techCardId: tc.id,
-              languageCode: context.read<LocalizationService>().currentLanguageCode,
+            _refreshIngredientNameTranslationsForCard(
+              tc,
+              context.read<LocalizationService>().currentLanguageCode,
             ),
           );
         }
@@ -2665,9 +2666,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _nameController.text = next;
       }
       unawaited(
-        _warmIngredientNameTranslations(
-          techCardId: tc.id,
-          languageCode: code,
+        _refreshIngredientNameTranslationsForCard(
+          tc,
+          code,
         ),
       );
     };
@@ -2752,6 +2753,63 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _ingredientNameTranslationsCardId = cardId;
       });
     } catch (_) {}
+  }
+
+  Future<void> _refreshIngredientNameTranslationsForCard(
+    TechCard tc,
+    String languageCode,
+  ) async {
+    await _warmIngredientNameTranslations(
+      techCardId: tc.id,
+      languageCode: languageCode,
+    );
+    await _backfillMissingIngredientTranslations(
+      techCardId: tc.id,
+      languageCode: languageCode,
+    );
+  }
+
+  Future<void> _backfillMissingIngredientTranslations({
+    required String techCardId,
+    required String languageCode,
+  }) async {
+    final cardId = techCardId.trim();
+    final lang = languageCode.trim().toLowerCase();
+    if (cardId.isEmpty || lang.isEmpty || lang == 'ru') return;
+    final key = '$cardId:$lang';
+    if (_ingredientTranslationBackfillInFlight.contains(key)) return;
+
+    final sourceFields = _ingredientFieldsForTranslation(_ingredients);
+    if (sourceFields.isEmpty) return;
+
+    final missing = <String, String>{};
+    sourceFields.forEach((field, text) {
+      final ingId = field.substring('ingredient_name_'.length).trim();
+      if ((_ingredientNameTranslationsById[ingId] ?? '').trim().isEmpty) {
+        missing[field] = text;
+      }
+    });
+    if (missing.isEmpty) return;
+
+    _ingredientTranslationBackfillInFlight.add(key);
+    try {
+      await context.read<TranslationManager>().handleEntitySave(
+            entityType: TranslationEntityType.techCard,
+            entityId: cardId,
+            textFields: missing,
+            sourceLanguage: '',
+            userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
+            targetLanguages: <String>[lang],
+          );
+      await _warmIngredientNameTranslations(
+        techCardId: cardId,
+        languageCode: lang,
+      );
+    } catch (_) {
+      // Keep UI responsive if translation provider is temporarily unavailable.
+    } finally {
+      _ingredientTranslationBackfillInFlight.remove(key);
+    }
   }
 
   @override

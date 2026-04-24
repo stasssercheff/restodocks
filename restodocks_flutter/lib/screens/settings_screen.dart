@@ -314,8 +314,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              loc.t('clear_all_ttk_enter_pin') ??
-                  'Введите PIN заведения для подтверждения:',
+              loc.t('clear_all_ttk_enter_pin'),
               style: Theme.of(ctx).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -352,8 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (!establishment.verifyPinCode(pin)) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                      content: Text(loc.t('clear_nomenclature_wrong_pin') ??
-                          'Неверный PIN')),
+                      content: Text(loc.t('clear_nomenclature_wrong_pin'))),
                 );
                 return;
               }
@@ -453,8 +451,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              loc.t('clear_nomenclature_enter_pin') ??
-                  'Введите PIN заведения для подтверждения:',
+              loc.t('clear_nomenclature_enter_pin'),
               style: Theme.of(ctx).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -491,8 +488,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (!establishment.verifyPinCode(pin)) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(
-                      content: Text(loc.t('clear_nomenclature_wrong_pin') ??
-                          'Неверный PIN')),
+                      content: Text(loc.t('clear_nomenclature_wrong_pin'))),
                 );
                 return;
               }
@@ -533,8 +529,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await store.clearAllNomenclature(estId).timeout(
               const Duration(minutes: 2),
               onTimeout: () => throw TimeoutException(
-                loc.t('clear_nomenclature_timeout') ??
-                    'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
+                loc.t('clear_nomenclature_timeout'),
               ),
             );
         if (context.mounted) {
@@ -544,8 +539,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(loc.t('clear_nomenclature_done') ??
-                  'Вся номенклатура очищена'),
+              content: Text(loc.t('clear_nomenclature_done')),
               backgroundColor: Colors.green,
             ),
           );
@@ -758,8 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'owner_banquet': loc.t('banquet_catering'),
         if (posOn)
           'owner_pos_warehouse_est':
-              loc.t('pos_warehouse_establishment_title') ??
-                  'Сводная по заведению',
+              loc.t('pos_warehouse_establishment_title'),
         'owner_expenses': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
@@ -1222,8 +1215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.tour_outlined),
                 title: Text(loc.t('tour_replay')),
-                subtitle: Text(loc.t('tour_replay_subtitle') ??
-                    'Подсветка рабочего стола и нижней панели'),
+                subtitle: Text(loc.t('tour_replay_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1304,8 +1296,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: const Icon(Icons.menu_book),
                 title: Text(
                     loc.t('getting_started')),
-                subtitle: Text(loc.t('getting_started_subtitle') ??
-                    'Текстовая инструкция с раскрывающимися разделами'),
+                subtitle: Text(loc.t('getting_started_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1441,8 +1432,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 title: Text(loc.t('checklists')),
                 subtitle: Text(
-                  loc.t('notification_incoming_checklists_hint') ??
-                      'Входящие: заполненные чеклисты',
+                  loc.t('notification_incoming_checklists_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 value: prefs.checklists,
@@ -1451,8 +1441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 title: Text(loc.t('writeoffs')),
                 subtitle: Text(
-                  loc.t('notification_incoming_writeoffs_hint') ??
-                      'Входящие: документы списания',
+                  loc.t('notification_incoming_writeoffs_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 value: prefs.writeoffs,
@@ -1463,10 +1452,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(loc.t('inbox_tab_notifications')),
               subtitle: Text(
                 isLineStaff
-                    ? (loc.t('notification_checklist_assigned') ??
-                        'Чеклисты, назначенные на вас')
-                    : (loc.t('notification_schedule_changes') ??
-                        'Изменения штатного расписания'),
+                    ? (loc.t('notification_checklist_assigned'))
+                    : (loc.t('notification_schedule_changes')),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               value: prefs.notifications,
@@ -1498,8 +1485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (context.mounted) {
         final msg = e.toString().contains('404') ||
                 e.toString().contains('does not exist')
-            ? (loc.t('haccp_config_table_missing') ??
-                'Таблица настроек журналов не найдена. Примените миграции Supabase (supabase db push или миграции 20260313).')
+            ? (loc.t('haccp_config_table_missing'))
             : '${loc.t('error')}: $e';
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), duration: const Duration(seconds: 5)));
@@ -1606,8 +1592,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
             title: Text(loc.t('haccp_agreement_lang_title') ??
-                loc.t('language') ??
-                'Language'),
+                loc.t('language')),
             content: Wrap(
               spacing: 8,
               children: LocalizationService.productLanguageCodes.map((code) {
@@ -1929,8 +1914,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (!establishment.verifyPinCode(pin)) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(loc.t('clear_nomenclature_wrong_pin') ??
-                        'Неверный PIN'),
+                    content: Text(loc.t('clear_nomenclature_wrong_pin')),
                   ),
                 );
                 return;
@@ -2069,15 +2053,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ExpansionTile(
               initiallyExpanded: false,
               leading: const Icon(Icons.dashboard_customize),
-              title: Text(localization.t('home_layout_config') ??
-                  'Настройка домашнего экрана'),
+              title: Text(localization.t('home_layout_config')),
               children: [
                 if (MediaQuery.of(context).size.shortestSide < 600)
                   Consumer<MobileUiScaleService>(
                     builder: (_, uiScale, __) => ListTile(
                       leading: const SizedBox(width: 24),
-                      title: Text(localization.t('mobile_ui_scale') ??
-                          'Масштаб (мобильная версия)'),
+                      title: Text(localization.t('mobile_ui_scale')),
                       subtitle: Text(
                         uiScale.preset == 1
                             ? '80%'
@@ -2090,8 +2072,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () => showDialog<void>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: Text(localization.t('mobile_ui_scale') ??
-                              'Масштаб (мобильная версия)'),
+                          title: Text(localization.t('mobile_ui_scale')),
                           content: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -2133,18 +2114,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ListTile(
                   leading: const SizedBox(width: 24),
-                  title: Text(localization.t('home_layout_config_hint') ??
-                      'Изменить порядок кнопок на главной'),
+                  title: Text(localization.t('home_layout_config_hint')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showHomeLayoutConfig(context, localization),
                 ),
                 Consumer<HomeButtonConfigService>(
                   builder: (_, homeBtn, __) => ListTile(
                     leading: const SizedBox(width: 24),
-                    title: Text(localization.t('button_display_config') ??
-                        'Настройка кнопки'),
-                    subtitle: Text(localization.t('central_button_hint') ??
-                        'Выбор для отображения желаемого'),
+                    title: Text(localization.t('button_display_config')),
+                    subtitle: Text(localization.t('central_button_hint')),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () =>
                         _showHomeButtonPicker(context, localization, homeBtn),
@@ -2156,8 +2134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.restaurant_menu),
-                      title: Text(localization.t('show_banquet_catering') ??
-                          'Показ «банкеты и кейтринг» на экране'),
+                      title: Text(localization.t('show_banquet_catering')),
                       subtitle: Text(localization
                               .t('show_banquet_catering_hint') ??
                           'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
@@ -2173,8 +2150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.point_of_sale_outlined),
-                        title: Text(localization.t('show_pos_section') ??
-                            'Раздел «POS» на главной'),
+                        title: Text(localization.t('show_pos_section')),
                         subtitle: Text(localization
                                 .t('show_pos_section_hint') ??
                             'Показывать POS-плитки на домашнем экране (заказы, касса, столы, склад, закупка, продажи)'),
@@ -2188,8 +2164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.local_bar),
-                        title: Text(localization.t('show_bar_section') ??
-                            'Раздел «Бар» на главной'),
+                        title: Text(localization.t('show_bar_section')),
                         subtitle: Text(localization
                                 .t('show_bar_section_hint') ??
                             'Показывать секцию Бар (график, меню, ТТК и др.)'),
@@ -2200,10 +2175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.table_restaurant),
-                      title: Text(localization.t('show_hall_section') ??
-                          'Раздел «Зал» на главной'),
-                      subtitle: Text(localization.t('show_hall_section_hint') ??
-                          'Показывать секцию Зал (график, меню, чеклисты и др.)'),
+                      title: Text(localization.t('show_hall_section')),
+                      subtitle: Text(localization.t('show_hall_section_hint')),
                       value: screenPref.showHallSection,
                       onChanged: (v) => screenPref.setShowHallSection(v),
                     ),
@@ -2217,11 +2190,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.tune),
                 title: Text(
-                    localization.t('pos_orders_display_settings_title') ??
-                        'Отображение заказов'),
+                    localization.t('pos_orders_display_settings_title')),
                 subtitle: Text(
-                  localization.t('pos_orders_display_settings_subtitle') ??
-                      'Таймер и размеры шрифтов на экранах заказов',
+                  localization.t('pos_orders_display_settings_subtitle'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 trailing: const Icon(Icons.chevron_right),
@@ -2247,10 +2218,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 initiallyExpanded: false,
                 leading: const Icon(Icons.people),
                 title:
-                    Text(localization.t('settings_employees') ?? 'Сотрудники'),
+                    Text(localization.t('settings_employees')),
                 subtitle: Text(
-                  localization.t('settings_employees_hint') ??
-                      'Имена транслитом и уведомления о днях рождения',
+                  localization.t('settings_employees_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 children: [
@@ -2259,14 +2229,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final days = screenPref.birthdayNotifyDays;
                       return ListTile(
                         leading: const Icon(Icons.cake),
-                        title: Text(localization.t('birthday_notify_days') ??
-                            'Оповещение о днях рождения'),
+                        title: Text(localization.t('birthday_notify_days')),
                         subtitle: Text(
                           days == 0
-                              ? (localization.t('birthday_notify_off') ??
-                                  'Без уведомления')
-                              : (localization.t('birthday_notify_days_value') ??
-                                      'За %s дн. до ДР')
+                              ? (localization.t('birthday_notify_off'))
+                              : (localization.t('birthday_notify_days_value'))
                                   .replaceAll('%s', '$days'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -2283,8 +2250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => ListTile(
                         leading: const Icon(Icons.schedule),
-                        title: Text(localization.t('birthday_notify_time') ??
-                            'Время уведомления'),
+                        title: Text(localization.t('birthday_notify_time')),
                         subtitle: Text(
                           screenPref.birthdayNotifyTime,
                           style: Theme.of(context).textTheme.bodySmall,
@@ -2307,7 +2273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     currentEmployee.hasRole('general_manager'))) ...[
               ListTile(
                 leading: const Icon(Icons.menu_book),
-                title: Text(localization.t('documentation') ?? 'Документация'),
+                title: Text(localization.t('documentation')),
                 subtitle: Text(localization.t('documentation_haccp_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/haccp-documentation'),
@@ -2316,10 +2282,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 initiallyExpanded: false,
                 leading: const Icon(Icons.assignment),
                 title:
-                    Text(localization.t('haccp_journals') ?? 'Журналы и ХАССП'),
+                    Text(localization.t('haccp_journals')),
                 subtitle: Text(
-                  localization.t('haccp_journals_settings_hint') ??
-                      'Выбор журналов для заведения',
+                  localization.t('haccp_journals_settings_hint'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 children: [
@@ -2475,8 +2440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              localization.t('haccp_enabled_journals') ??
-                                  'Включённые журналы',
+                              localization.t('haccp_enabled_journals'),
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             ...supportedLogs.map((t) {
@@ -2524,9 +2488,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               initiallyExpanded: false,
               leading: const Icon(Icons.notifications),
               title: Text(
-                  localization.t('notification_settings') ?? 'Уведомления'),
-              subtitle: Text(localization.t('notification_settings_hint') ??
-                  'Вид уведомлений и какие включены'),
+                  localization.t('notification_settings')),
+              subtitle: Text(localization.t('notification_settings_hint')),
               children: [
                 _buildNotificationSettings(
                     context, localization, currentEmployee, accountManager),
@@ -2618,10 +2581,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 currentEmployee.hasRole('floor_manager')) ...[
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: Text(localization.t('clear_nomenclature') ??
-                    'Очистить номенклатуру'),
-                subtitle: Text(localization.t('clear_nomenclature_hint') ??
-                    'Удалить все продукты из номенклатуры заведения'),
+                title: Text(localization.t('clear_nomenclature')),
+                subtitle: Text(localization.t('clear_nomenclature_hint')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>
                     _showClearNomenclatureConfirm(context, localization),
@@ -2632,7 +2593,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading:
                       const Icon(Icons.restaurant_menu, color: Colors.orange),
                   title: Text(
-                      localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+                      localization.t('clear_all_ttk')),
                   subtitle:
                       Text(localization.t('settings_beta_admin_subtitle')),
                   trailing: const Icon(Icons.chevron_right),
@@ -2680,10 +2641,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (accountManager.isViewOnlyOwner)
                 ListTile(
                   leading: const Icon(Icons.visibility),
-                  title: Text(localization.t('view_only_mode') ??
-                      'Режим только просмотр'),
-                  subtitle: Text(localization.t('view_only_mode_hint') ??
-                      'Соучредитель при нескольких заведениях'),
+                  title: Text(localization.t('view_only_mode')),
+                  subtitle: Text(localization.t('view_only_mode_hint')),
                 ),
             ],
             // Кнопка платформенного кабинета — видна только владельцу платформы
@@ -2705,9 +2664,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.play_circle_outline),
-              title: Text(localization.t('training') ?? 'Обучение'),
-              subtitle: Text(localization.t('training_subtitle') ??
-                  'Видео, тур и начало работы'),
+              title: Text(localization.t('training')),
+              subtitle: Text(localization.t('training_subtitle')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showTrainingDialog(context, localization),
             ),

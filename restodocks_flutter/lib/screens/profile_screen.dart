@@ -439,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (employee.birthday != null) ...[
               const SizedBox(height: 8),
               Text(
-                '${localization.t('birthday') ?? 'День рождения'}: ${DateFormat('dd.MM.yyyy').format(employee.birthday!)}',
+                '${localization.t('birthday')}: ${DateFormat('dd.MM.yyyy').format(employee.birthday!)}',
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
@@ -490,7 +490,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Зарплата за выбранный период
         ListTile(
           leading: const Icon(Icons.date_range),
-          title: Text(localization.t('salary_for_period') ?? 'Зарплата за период'),
+          title: Text(localization.t('salary_for_period')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _showSalaryPeriodPicker(context, employee, establishment, localization),
         ),
@@ -911,8 +911,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildChangePasswordSection(LocalizationService localization) {
     return ListTile(
       leading: const Icon(Icons.lock),
-      title: Text(localization.t('change_password') ?? 'Сменить пароль'),
-      subtitle: Text(localization.t('change_password_hint') ?? 'Введите старый пароль и новый дважды'),
+      title: Text(localization.t('change_password')),
+      subtitle: Text(localization.t('change_password_hint')),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showChangePasswordDialog(context),
     );
@@ -1143,8 +1143,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
         _isLoading = false;
         final msg = e.toString().toLowerCase();
         if (msg.contains('birthday')) {
-          _error = context.read<LocalizationService>().t('employee_save_error_birthday_migration')
-              ?? 'Не удалось сохранить день рождения. В Supabase SQL Editor выполните миграцию 20260317100000_employee_birthday_and_notifications.sql';
+          _error = context.read<LocalizationService>().t('employee_save_error_birthday_migration');
         } else if (msg.contains('payment') || msg.contains('column') || msg.contains('pgrst')) {
           _error = context.read<LocalizationService>().t('employee_save_error_schema');
         } else {

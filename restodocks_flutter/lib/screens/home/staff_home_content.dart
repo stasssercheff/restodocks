@@ -56,14 +56,13 @@ class StaffHomeContent extends StatelessWidget {
             firstTile,
           HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
-            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            title: loc.t('inbox_tab_messages'),
             onTap: () => context.go('/notifications?tab=messages'),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: Text(
-              loc.t('data_access_required_hint') ??
-                  'Доступ к остальным разделам выдаёт руководитель.',
+              loc.t('data_access_required_hint'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -77,12 +76,12 @@ class StaffHomeContent extends StatelessWidget {
     final tiles = <HomeTileId, Widget>{
       HomeTileId.messages: HomeFeatureTile(
         icon: Icons.chat_bubble_outline,
-        title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+        title: loc.t('inbox_tab_messages'),
         onTap: () => context.go('/notifications?tab=messages'),
       ),
       HomeTileId.documentation: HomeFeatureTile(
         icon: Icons.description_outlined,
-        title: loc.t('documentation') ?? 'Документация',
+        title: loc.t('documentation'),
         onTap: () => context.go('/documentation'),
       ),
       HomeTileId.schedule: HomeFeatureTile(
@@ -99,7 +98,7 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.suppliers: HomeFeatureTile(
         icon: Icons.add_business,
         title:
-            loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
+            loc.t('suppliers') ?? loc.t('order_tab_suppliers'),
         onTap: () => context.push('/suppliers/$deptRoute'),
       ),
       HomeTileId.menu: HomeFeatureTile(
@@ -133,32 +132,32 @@ class StaffHomeContent extends StatelessWidget {
           onTap: () => context.push('/inventory')),
       HomeTileId.writeoffs: HomeFeatureTile(
           icon: Icons.remove_circle_outline,
-          title: loc.t('writeoffs') ?? 'Списания',
+          title: loc.t('writeoffs'),
           subscriptionLocked: !subOk,
           onTap: () => context.push('/writeoffs')),
       HomeTileId.hallOrders: HomeFeatureTile(
         icon: Icons.receipt_long,
-        title: loc.t('order_tab_orders') ?? 'Заказы',
+        title: loc.t('order_tab_orders'),
         onTap: () => context.push('/pos/hall/orders'),
       ),
       HomeTileId.hallCashRegister: HomeFeatureTile(
         icon: Icons.point_of_sale,
-        title: loc.t('pos_nav_cash_register') ?? 'Касса',
+        title: loc.t('pos_nav_cash_register'),
         onTap: () => context.push('/pos/hall/cash-register'),
       ),
       HomeTileId.hallTables: HomeFeatureTile(
         icon: Icons.table_restaurant,
-        title: loc.t('pos_nav_tables') ?? 'Столы',
+        title: loc.t('pos_nav_tables'),
         onTap: () => context.push('/pos/hall/tables'),
       ),
       HomeTileId.departmentOrders: HomeFeatureTile(
         icon: Icons.receipt_long,
-        title: loc.t('order_tab_orders') ?? 'Заказы',
+        title: loc.t('order_tab_orders'),
         onTap: () => context.push('/pos/orders/$deptRoute'),
       ),
       HomeTileId.departmentSales: HomeFeatureTile(
         icon: Icons.point_of_sale_outlined,
-        title: loc.t('sales_title') ?? 'Продажи',
+        title: loc.t('sales_title'),
         onTap: () => context.push('/sales/$deptRoute'),
       ),
     };
