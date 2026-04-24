@@ -83,7 +83,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
       if (mounted) {
         setState(() => _saving = false);
         final loc = context.read<LocalizationService>();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('shift_confirmations_saved') ?? 'Подтверждения смены сохранены')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('shift_confirmations_saved'))));
       }
     } catch (_) {
       if (mounted) setState(() => _saving = false);
@@ -100,7 +100,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
+          title: Text(loc.t('shift_confirmation')),
         ),
         body: Center(
           child: Padding(
@@ -111,7 +111,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                 Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
-                  loc.t('shift_confirmation_chef_only') ?? 'Подтверждать смены могут только шеф-повар и су-шеф.',
+                  loc.t('shift_confirmation_chef_only'),
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -126,7 +126,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
+          title: Text(loc.t('shift_confirmation')),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -138,7 +138,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
+        title: Text(loc.t('shift_confirmation')),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,9 +153,9 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
             ),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 1, child: Text(loc.t('inbox_header_confirmation') ?? 'Подтверждение', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_section'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 1, child: Text(loc.t('inbox_header_confirmation'), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
               ],
             ),
           ),
@@ -163,7 +163,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Text(loc.t('shift_date') ?? 'Дата смены:', style: Theme.of(context).textTheme.titleSmall),
+                Text(loc.t('shift_date'), style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(width: 12),
                 TextButton.icon(
                   onPressed: () async {
@@ -193,7 +193,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                           Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text(
-                            loc.t('shift_no_one_scheduled') ?? 'На эту дату в графике нет смен',
+                            loc.t('shift_no_one_scheduled'),
                             style: Theme.of(context).textTheme.bodyLarge,
                             textAlign: TextAlign.center,
                           ),
@@ -240,7 +240,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                   onPressed: _saving ? null : _save,
                   child: _saving
                       ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(loc.t('save') ?? 'Сохранить'),
+                      : Text(loc.t('save')),
                 ),
               ),
             )

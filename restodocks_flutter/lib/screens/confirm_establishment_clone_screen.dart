@@ -67,7 +67,7 @@ class _ConfirmEstablishmentCloneScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.t('clone_confirm_title') ?? 'Копирование данных'),
+        title: Text(loc.t('clone_confirm_title')),
       ),
       body: SafeArea(
         child: Padding(
@@ -96,8 +96,8 @@ class _ConfirmEstablishmentCloneScreenState
                         const SizedBox(height: 16),
                         Text(
                           _ok
-                              ? (loc.t('clone_confirm_success') ?? '')
-                              : (_error ?? loc.t('clone_confirm_error') ?? ''),
+                              ? loc.t('clone_confirm_success')
+                              : (_error ?? loc.t('clone_confirm_error')),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge,
                         ),
@@ -105,7 +105,7 @@ class _ConfirmEstablishmentCloneScreenState
                           const SizedBox(height: 24),
                           FilledButton(
                             onPressed: () => context.go('/login'),
-                            child: Text(loc.t('login') ?? 'Войти'),
+                            child: Text(loc.t('login')),
                           ),
                         ],
                       ],

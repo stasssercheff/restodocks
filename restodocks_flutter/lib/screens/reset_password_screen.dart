@@ -60,7 +60,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     if (result.ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('password_changed') ?? 'Пароль успешно изменён')),
+        SnackBar(content: Text(loc.t('password_changed'))),
       );
       context.go('/login');
     }
@@ -73,7 +73,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (_token.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(loc.t('reset_password') ?? 'Смена пароля'),
+          title: Text(loc.t('reset_password')),
         ),
         body: Center(
           child: Padding(
@@ -84,13 +84,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 Icon(Icons.link_off, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
-                  loc.t('invalid_reset_link') ?? 'Ссылка недействительна или устарела. Запросите новую.',
+                  loc.t('invalid_reset_link'),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () => context.push('/forgot-password'),
-                  child: Text(loc.t('forgot_password') ?? 'Восстановление доступа'),
+                  child: Text(loc.t('forgot_password')),
                 ),
               ],
             ),
@@ -101,7 +101,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.t('reset_password') ?? 'Смена пароля'),
+        title: Text(loc.t('reset_password')),
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
@@ -116,7 +116,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 Icon(Icons.lock_outline, size: 64, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 24),
                 Text(
-                  loc.t('enter_new_password') ?? 'Введите новый пароль',
+                  loc.t('enter_new_password'),
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -124,9 +124,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 if (_errorMessage != null) ...[
                   Text(
                     _errorMessage == 'invalid_or_expired_token'
-                        ? (loc.t('invalid_reset_link') ?? 'Ссылка недействительна или устарела')
+                        ? loc.t('invalid_reset_link')
                         : _errorMessage == 'password_min_6_chars'
-                            ? (loc.t('password_min_6') ?? 'Пароль должен быть не менее 6 символов')
+                            ? loc.t('password_min_6')
                             : _errorMessage!,
                     style: TextStyle(color: Theme.of(context).colorScheme.error),
                     textAlign: TextAlign.center,
@@ -137,12 +137,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _passwordController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: loc.t('new_password') ?? 'Новый пароль',
+                    labelText: loc.t('new_password'),
                     prefixIcon: const Icon(Icons.lock),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    if (v == null || v.length < 6) return loc.t('password_min_6') ?? 'Минимум 6 символов';
+                    if (v == null || v.length < 6) return loc.t('password_min_6');
                     return null;
                   },
                 ),
@@ -151,12 +151,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _confirmController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: loc.t('confirm_password') ?? 'Подтвердите пароль',
+                    labelText: loc.t('confirm_password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    if (v != _passwordController.text) return loc.t('passwords_mismatch') ?? 'Пароли не совпадают';
+                    if (v != _passwordController.text) return loc.t('passwords_mismatch');
                     return null;
                   },
                 ),
@@ -165,12 +165,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   onPressed: _isLoading ? null : _submit,
                   child: _isLoading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(loc.t('save') ?? 'Сохранить'),
+                      : Text(loc.t('save')),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.go('/login'),
-                  child: Text(loc.t('back_to_login') ?? 'Вернуться к входу'),
+                  child: Text(loc.t('back_to_login')),
                 ),
               ],
             ),
