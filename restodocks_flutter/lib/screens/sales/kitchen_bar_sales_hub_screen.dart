@@ -22,7 +22,7 @@ class KitchenBarSalesHubScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('sales_title') ?? 'Продажи'} — $deptTitle'),
+        title: Text('${loc.t('sales_title')} — $deptTitle'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -30,7 +30,7 @@ class KitchenBarSalesHubScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: const Icon(Icons.bar_chart_outlined),
-              title: Text(loc.t('sales_statistics') ?? 'Статистика'),
+              title: Text(loc.t('sales_statistics')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/sales/$dept/statistics'),
             ),
@@ -38,7 +38,7 @@ class KitchenBarSalesHubScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: const Icon(Icons.calendar_month_outlined),
-              title: Text(loc.t('sales_plan_menu') ?? 'План продаж'),
+              title: Text(loc.t('sales_plan_menu')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/sales/$dept/plan'),
             ),

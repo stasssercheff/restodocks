@@ -92,7 +92,7 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text('${loc.t('sales_plan_menu') ?? ''} — $deptTitle'),
+          title: Text('${loc.t('sales_plan_menu')} — $deptTitle'),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -105,11 +105,11 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('sales_plan_calendar') ?? ''} — $deptTitle'),
+        title: Text('${loc.t('sales_plan_calendar')} — $deptTitle'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: loc.t('sales_plan_create') ?? '',
+            tooltip: loc.t('sales_plan_create'),
             onPressed: () => context.push('/sales/$dept/plan/form'),
           ),
         ],
@@ -186,12 +186,12 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
                       segments: [
                         ButtonSegment(
                           value: SalesPlanCalendarDisplayMode.percent,
-                          label: Text(loc.t('sales_plan_display_percent') ?? '%'),
+                          label: Text(loc.t('sales_plan_display_percent')),
                         ),
                         ButtonSegment(
                           value: SalesPlanCalendarDisplayMode.amountFraction,
                           label: Text(
-                            loc.t('sales_plan_display_amount') ?? 'Σ',
+                            loc.t('sales_plan_display_amount'),
                             maxLines: 2,
                             textAlign: TextAlign.center,
                           ),
@@ -225,7 +225,7 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
                     });
                     context.push('/sales/$dept/plan/form?id=${active.first.id}');
                   },
-                  child: Text(loc.t('sales_plan_adjust') ?? ''),
+                  child: Text(loc.t('sales_plan_adjust')),
                 ),
               ),
               const SizedBox(height: 2),

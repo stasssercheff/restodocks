@@ -102,11 +102,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   String _departmentLabel(LocalizationService loc) {
     switch (widget.department) {
       case 'kitchen':
-        return loc.t('dept_kitchen') ?? 'Кухня';
+        return loc.t('dept_kitchen');
       case 'bar':
-        return loc.t('dept_bar') ?? 'Бар';
+        return loc.t('dept_bar');
       case 'hall':
-        return loc.t('dept_hall') ?? 'Зал';
+        return loc.t('dept_hall');
       default:
         return widget.department;
     }
@@ -586,7 +586,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               leading: appBarBackButton(context),
               title: ScrollToTopAppBarTitle(
                 child: Text(
-                    '${loc.t('order_tab_suppliers') ?? 'Поставщики'} — ${_departmentLabel(loc)}'),
+                    '${loc.t('order_tab_suppliers')} — ${_departmentLabel(loc)}'),
               ),
               actions: [
                 IconButton(
@@ -676,7 +676,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             children: [
               Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: Text(loc.t('retry') ?? 'Повторить')),
+              FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
             ],
           ),
         ),
@@ -692,7 +692,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               Icon(Icons.store_outlined, size: 72, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 20),
               Text(
-                loc.t('order_suppliers_empty') ?? 'Нет поставщиков',
+                loc.t('order_suppliers_empty'),
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
@@ -723,7 +723,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            loc.t('order_no_results') ?? 'Ничего не найдено',
+            loc.t('order_no_results'),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -759,7 +759,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.edit_outlined),
-                tooltip: loc.t('edit') ?? 'Редактировать',
+                tooltip: loc.t('edit'),
                 onPressed: () => _editSupplier(s),
               ),
               subtitle: Column(
@@ -774,7 +774,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        '${loc.t('supplier_contact_person') ?? 'Контакт'}: ${s.contactPerson}',
+                        '${loc.t('supplier_contact_person')}: ${s.contactPerson}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -799,7 +799,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${loc.t('order_products_count') ?? 'Продуктов'}: ${s.items.length}',
+                        '${loc.t('order_products_count')}: ${s.items.length}',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
                             ),
@@ -832,7 +832,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              (loc.t('order_products_and_more') ?? '... и ещё {n}').replaceAll('{n}', '${s.items.length - 20}'),
+                              loc.t('order_products_and_more').replaceAll('{n}', '${s.items.length - 20}'),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),

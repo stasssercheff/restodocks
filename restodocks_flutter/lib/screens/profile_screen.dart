@@ -330,7 +330,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
+                      SnackBar(content: Text('${loc.t('error')}: $e')),
                     );
                   }
                 }
@@ -508,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         start: DateTime(now.year, now.month, 1),
         end: now,
       ),
-      helpText: loc.t('salary_period') ?? 'Период',
+      helpText: loc.t('salary_period'),
     );
     if (range == null || !context.mounted) return;
     showDialog(
@@ -527,7 +527,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('salary_for_period') ?? 'Зарплата за период'),
+        title: Text(loc.t('salary_for_period')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,7 +543,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('close') ?? 'Закрыть'),
+            child: Text(loc.t('close')),
           ),
         ],
       ),
@@ -1236,7 +1236,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                   leading: const Icon(Icons.cake),
                   title: Text(
                     _birthday == null
-                        ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('not_specified') ?? 'не указано')
+                        ? loc.t('birthday') + ' — ' + loc.t('not_specified')
                         : DateFormat('dd.MM.yyyy').format(_birthday!),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
@@ -1247,7 +1247,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                         IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () => setState(() => _birthday = null),
-                          tooltip: loc.t('clear') ?? 'Очистить',
+                          tooltip: loc.t('clear'),
                         ),
                       TextButton(
                         onPressed: () async {
@@ -1259,7 +1259,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                           );
                           if (picked != null && mounted) setState(() => _birthday = picked);
                         },
-                        child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                        child: Text(_birthday == null ? loc.t('set') : loc.t('change')),
                       ),
                     ],
                   ),
@@ -1271,7 +1271,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    Expanded(child: OutlinedButton(onPressed: widget.onCancel, child: Text(loc.t('cancel') ?? 'Отмена'))),
+                    Expanded(child: OutlinedButton(onPressed: widget.onCancel, child: Text(loc.t('cancel')))),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
@@ -1353,12 +1353,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       } else {
         final e = result.error;
         _error = e == 'invalid_old_password'
-            ? (loc.t('invalid_old_password') ?? 'Неверный текущий пароль')
+            ? loc.t('invalid_old_password')
             : e == 'password_min_6_chars'
-                ? (loc.t('password_min_6') ?? 'Пароль не менее 6 символов')
+                ? loc.t('password_min_6')
                 : e == 'invalid_session'
-                    ? (loc.t('session_expired') ?? 'Сессия истекла. Войдите снова.')
-                    : e ?? loc.t('error') ?? 'Ошибка';
+                    ? loc.t('session_expired')
+                    : e ?? loc.t('error');
       }
     });
   }
@@ -1369,7 +1369,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final loc = context.read<LocalizationService>();
 
     return AlertDialog(
-      title: Text(loc.t('change_password') ?? 'Сменить пароль'),
+      title: Text(loc.t('change_password')),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1378,7 +1378,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('change_password_description') ?? 'Введите текущий пароль и новый дважды. На почту придёт ссылка для подтверждения.',
+                loc.t('change_password_description'),
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
@@ -1386,12 +1386,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _oldController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: loc.t('current_password') ?? 'Текущий пароль',
+                  labelText: loc.t('current_password'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return loc.t('password_required') ?? 'Введите пароль';
+                  if (v == null || v.isEmpty) return loc.t('password_required');
                   return null;
                 },
               ),
@@ -1400,12 +1400,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _newController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: loc.t('new_password') ?? 'Новый пароль',
+                  labelText: loc.t('new_password'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock),
                 ),
                 validator: (v) {
-                  if (v == null || v.length < 6) return loc.t('password_min_6') ?? 'Минимум 6 символов';
+                  if (v == null || v.length < 6) return loc.t('password_min_6');
                   return null;
                 },
               ),
@@ -1414,12 +1414,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _confirmController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: loc.t('confirm_password') ?? 'Подтвердите пароль',
+                  labelText: loc.t('confirm_password'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 validator: (v) {
-                  if (v != _newController.text) return loc.t('passwords_mismatch') ?? 'Пароли не совпадают';
+                  if (v != _newController.text) return loc.t('passwords_mismatch');
                   return null;
                 },
               ),
@@ -1434,13 +1434,13 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : widget.onCancel,
-          child: Text(loc.t('cancel') ?? 'Отмена'),
+          child: Text(loc.t('cancel')),
         ),
         FilledButton(
           onPressed: _isLoading ? null : _submit,
           child: _isLoading
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(loc.t('send_confirmation') ?? 'Отправить'),
+              : Text(loc.t('send_confirmation')),
         ),
       ],
     );
