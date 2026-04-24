@@ -5890,6 +5890,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             hideTechnologyInTable: true,
                                             productStore: context
                                                 .read<ProductStoreSupabase>(),
+                                            ingredientNameTranslationsById:
+                                                _ingredientNameTranslationsById,
                                             onTapPfIngredient: (id) =>
                                                 context.push(
                                                     '/tech-cards/$id?view=1'),
@@ -7495,6 +7497,7 @@ class _TtkCookTable extends StatefulWidget {
     this.weightPerPortion = 100,
     this.onTapPfIngredient,
     this.productStore,
+    this.ingredientNameTranslationsById = const {},
   });
 
   final LocalizationService loc;
@@ -7510,6 +7513,7 @@ class _TtkCookTable extends StatefulWidget {
 
   /// Хранилище продуктов для получения локализованных названий.
   final ProductStoreSupabase? productStore;
+  final Map<String, String> ingredientNameTranslationsById;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
   // Ширины как в _TtkTable (таблица создания)
@@ -7710,6 +7714,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         ing.sourceTechCardId!.trim().isNotEmpty
                     ? TechCard.pfLinkedIngredientDisplayName(ing, cookLang)
                     : (cookProduct?.getLocalizedName(cookLang) ??
+                        widget.ingredientNameTranslationsById[ing.id] ??
                         ing.productName);
                 // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
                 return TableRow(
