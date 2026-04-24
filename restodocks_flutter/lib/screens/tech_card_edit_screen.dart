@@ -2004,14 +2004,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _loading = false;
           _contentPhase = 1;
         });
-        if (tc != null) {
-          unawaited(
-            _refreshIngredientNameTranslationsForCard(
-              tc,
-              context.read<LocalizationService>().currentLanguageCode,
-            ),
-          );
-        }
+        // Не прогреваем переводы состава здесь: из кэша списка карточка часто без ingredients,
+        // а `_warmIngredientNameTranslations` запоминает card+lang и тогда пропускает повторный
+        // запрос после догрузки состава. Переводы запускаются после заполнения `_ingredients` ниже.
       }
       // Кэш из списка часто без строк состава — один запрос, без «первого открытия в сессии».
       if (tc != null && tc.ingredients.isEmpty) {
@@ -2790,6 +2785,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     await _warmIngredientNameTranslations(
       techCardId: tc.id,
       languageCode: languageCode,
+      force: true,
     );
     await _backfillMissingIngredientTranslations(
       techCardId: tc.id,
