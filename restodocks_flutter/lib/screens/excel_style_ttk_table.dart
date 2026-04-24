@@ -898,10 +898,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       if (pf != null) return pf.getDisplayNameInLists(lang);
       return TechCard.pfLinkedIngredientDisplayName(ingredient, lang);
     }
-    final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
-    if (product != null) return product.getLocalizedName(lang);
     final translated = widget.ingredientNameTranslationsById[ingredient.id]?.trim();
     if (translated != null && translated.isNotEmpty) return translated;
+    final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+    if (product != null) return product.getLocalizedName(lang);
     return ingredient.productName;
   }
 

@@ -7713,8 +7713,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 final cookDisplayName = ing.sourceTechCardId != null &&
                         ing.sourceTechCardId!.trim().isNotEmpty
                     ? TechCard.pfLinkedIngredientDisplayName(ing, cookLang)
-                    : (cookProduct?.getLocalizedName(cookLang) ??
-                        widget.ingredientNameTranslationsById[ing.id] ??
+                    : (widget.ingredientNameTranslationsById[ing.id] ??
+                        cookProduct?.getLocalizedName(cookLang) ??
                         ing.productName);
                 // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
                 return TableRow(
