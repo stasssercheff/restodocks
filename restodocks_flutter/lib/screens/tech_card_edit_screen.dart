@@ -2200,6 +2200,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
+        if (tc != null) {
+          unawaited(
+            _refreshIngredientNameTranslationsForCard(
+              tc,
+              context.read<LocalizationService>().currentLanguageCode,
+            ),
+          );
+        }
         // Дополнить цены из номенклатуры (если productId есть, cost=0)
         if (tc != null && est != null)
           _enrichPricesFromNomenclature(
@@ -2718,11 +2726,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Future<void> _warmIngredientNameTranslations({
     required String techCardId,
     required String languageCode,
+    bool force = false,
   }) async {
     final cardId = techCardId.trim();
     final lang = languageCode.trim().toLowerCase();
     if (cardId.isEmpty || lang.isEmpty) return;
-    if (_ingredientNameTranslationsLang == lang &&
+    if (!force &&
+        _ingredientNameTranslationsLang == lang &&
         _ingredientNameTranslationsCardId == cardId) {
       return;
     }
@@ -2804,6 +2814,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       await _warmIngredientNameTranslations(
         techCardId: cardId,
         languageCode: lang,
+        force: true,
       );
     } catch (_) {
       // Keep UI responsive if translation provider is temporarily unavailable.
@@ -5399,7 +5410,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 tooltip: loc.t('back'),
               )
             : appBarBackButton(context),
-        title: Text(_isNew ? loc.t('create_tech_card') : 'ТТК'),
+        title: Text(
+          _isNew ? loc.t('create_tech_card') : loc.t('appbar_title_ttk_short'),
+        ),
         actions: [
           if (effectiveCanEdit)
             IconButton(
