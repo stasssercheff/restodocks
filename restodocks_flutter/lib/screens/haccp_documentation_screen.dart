@@ -361,7 +361,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('documentation'),
+        title: Text(loc.t('documentation')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

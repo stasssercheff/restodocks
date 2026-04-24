@@ -1409,7 +1409,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   : _th(loc, 'haccp_pick_date_short', 'Выбрать')),
             )),
             _tableCell(_signatureFromAccount()),
-            _tableCell(_textField('note', loc.t('haccp_note')),
+            _tableCell(_textField('note', loc.t('haccp_note'))),
           ],
         ),
       ],
