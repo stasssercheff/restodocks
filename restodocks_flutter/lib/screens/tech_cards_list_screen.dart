@@ -479,7 +479,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         });
       }
     }
-    unawaited(_refreshAiTtkRemainingQuota());
+    await _refreshAiTtkRemainingQuota();
     unawaited(_refreshTrialImportRemainingQuota());
     _tryReconcileTechCards(force: false);
   }
