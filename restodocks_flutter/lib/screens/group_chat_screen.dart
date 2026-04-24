@@ -135,11 +135,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('group_chat_rename') ?? 'Переименовать чат'),
+        title: Text(loc.t('group_chat_rename')),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
-            labelText: loc.t('group_chat_name') ?? 'Название',
+            labelText: loc.t('group_chat_name'),
             border: const OutlineInputBorder(),
           ),
           autofocus: true,
@@ -148,11 +148,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(loc.t('cancel') ?? 'Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-            child: Text(loc.t('save') ?? 'Сохранить'),
+            child: Text(loc.t('save')),
           ),
         ],
       ),
@@ -173,7 +173,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppToastService.show('${loc.t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -240,7 +240,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -266,7 +266,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -277,7 +277,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     if (raw.isNotEmpty) {
       return displayStoredPersonName(raw, loc, showNameTranslit: showNameTranslit);
     }
-    return loc.t('group_chat_default_name') ?? 'Групповой чат';
+    return loc.t('group_chat_default_name');
   }
 
   @override
@@ -300,12 +300,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: _loading ? null : _renameRoom,
-            tooltip: loc.t('group_chat_rename') ?? 'Переименовать',
+            tooltip: loc.t('group_chat_rename'),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : () => _load(),
-            tooltip: loc.t('inbox_refresh') ?? 'Обновить',
+            tooltip: loc.t('inbox_refresh'),
           ),
         ],
       ),
@@ -323,7 +323,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                             height: MediaQuery.of(context).size.height * 0.5,
                             child: Center(
                               child: Text(
-                                loc.t('chat_empty') ?? 'Нет сообщений. Напишите первым.',
+                                loc.t('chat_empty'),
                                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                               ),
                             ),
@@ -372,7 +372,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.add_photo_alternate_outlined),
                       onPressed: _sending ? null : _sendPhoto,
-                      tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                      tooltip: loc.t('photo_from_gallery'),
                     ),
                   Expanded(
                     child: TextField(

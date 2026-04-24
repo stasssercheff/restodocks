@@ -304,17 +304,17 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
   String _categoryName(LocalizationService loc, String? code) {
     switch (code) {
       case 'staff':
-        return loc.t('writeoff_category_staff') ?? 'Персонал';
+        return loc.t('writeoff_category_staff');
       case 'workingThrough':
-        return loc.t('writeoff_category_working') ?? 'Проработка';
+        return loc.t('writeoff_category_working');
       case 'spoilage':
-        return loc.t('writeoff_category_spoilage') ?? 'Порча';
+        return loc.t('writeoff_category_spoilage');
       case 'breakage':
-        return loc.t('writeoff_category_breakage') ?? 'Брекераж';
+        return loc.t('writeoff_category_breakage');
       case 'guestRefusal':
-        return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+        return loc.t('writeoff_category_guest_refusal');
       case 'generic':
-        return loc.t('writeoff_category_simple') ?? 'Списание';
+        return loc.t('writeoff_category_simple');
       default:
         return code ?? '—';
     }
@@ -329,13 +329,13 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) => AlertDialog(
-          title: Text(loc.t('writeoff_save_lang_title') ?? 'Язык сохранения'),
+          title: Text(loc.t('writeoff_save_lang_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                loc.t('inventory_export_lang'),
                 style: Theme.of(ctx2).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -358,7 +358,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selectedLang),
-              child: Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+              child: Text(loc.t('inventory_export_excel')),
             ),
           ],
         ),
@@ -401,7 +401,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: Text(
-                    loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+                    loc.t('inventory_excel_downloaded'))),
           );
         }
       }
@@ -409,7 +409,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')));
+            SnackBar(content: Text('${loc.t('error')}: $e')));
       }
     }
   }
@@ -423,9 +423,9 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       var rows = payload['rows'] as List<dynamic>? ?? [];
       sheet.appendRow([
         TextCellValue(loc.t('inventory_excel_number') ?? '#'),
-        TextCellValue(loc.t('inventory_item_name') ?? 'Наименование'),
-        TextCellValue(loc.t('inventory_unit') ?? 'Ед.'),
-        TextCellValue(loc.t('inventory_excel_total') ?? 'Количество'),
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('inventory_unit')),
+        TextCellValue(loc.t('inventory_excel_total')),
       ]);
       rows = rows.map((e) => e as Map<String, dynamic>).toList();
       final store = context.read<ProductStoreSupabase>();
@@ -447,7 +447,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       if (comment != null && comment.isNotEmpty) {
         sheet.appendRow([]);
         sheet.appendRow([
-          TextCellValue(loc.t('writeoff_comment') ?? 'Комментарий'),
+          TextCellValue(loc.t('writeoff_comment')),
           TextCellValue(comment)
         ]);
       }
@@ -482,7 +482,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
               const SizedBox(height: 16),
               FilledButton(
                   onPressed: () => context.pop(),
-                  child: Text(loc.t('back') ?? 'Назад')),
+                  child: Text(loc.t('back'))),
             ],
           ),
         ),
@@ -526,11 +526,11 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('writeoffs') ?? 'Списания'),
+        title: Text(loc.t('writeoffs')),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Сохранить',
+            tooltip: loc.t('download'),
             onPressed: _showSaveLanguageAndExport,
           ),
         ],
@@ -544,12 +544,12 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
                 header['establishmentName'] ?? '—'),
             _headerRow(loc.t('inventory_employee'), empHeader),
             _headerRow(loc.t('inventory_date'), header['date'] ?? '—'),
-            _headerRow(loc.t('writeoffs') ?? 'Списания',
+            _headerRow(loc.t('writeoffs'),
                 _categoryName(loc, payload['category']?.toString())),
             if (comment != null && comment.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                loc.t('writeoff_comment') ?? 'Комментарий',
+                loc.t('writeoff_comment'),
                 style: theme.textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
@@ -570,7 +570,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
             ],
             const SizedBox(height: 24),
             Text(
-              loc.t('inventory_item_name') ?? 'Наименование',
+              loc.t('inventory_item_name'),
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),

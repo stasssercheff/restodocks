@@ -216,7 +216,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -238,7 +238,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     if (!await voiceHasMicPermission()) {
       if (!mounted) return;
       final l = context.read<LocalizationService>();
-      AppToastService.show(l.t('chat_voice_mic_denied') ?? 'Нужен доступ к микрофону');
+      AppToastService.show(l.t('chat_voice_mic_denied'));
       return;
     }
     final path = await voiceStartRecordingToPath();
@@ -258,7 +258,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         _voiceTimer?.cancel();
         _stopVoiceRecorderHardware();
         final l = context.read<LocalizationService>();
-        AppToastService.show(l.t('chat_voice_max_duration') ?? 'Максимум 2 мин.');
+        AppToastService.show(l.t('chat_voice_max_duration'));
       }
     });
   }
@@ -328,12 +328,12 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
       });
       if (bytes == null || bytes.isEmpty) {
         setState(() => _sending = false);
-        AppToastService.show(loc.t('chat_voice_error') ?? 'Ошибка записи');
+        AppToastService.show(loc.t('chat_voice_error'));
         return;
       }
       if (bytes.length > EmployeeMessageService.maxChatVoiceUploadBytes) {
         setState(() => _sending = false);
-        AppToastService.show(loc.t('chat_voice_file_too_large') ?? 'Файл слишком большой');
+        AppToastService.show(loc.t('chat_voice_file_too_large'));
         return;
       }
       final msgSvc = context.read<EmployeeMessageService>();
@@ -346,7 +346,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         _scrollToBottom();
       } else if (mounted) {
         setState(() => _sending = false);
-        AppToastService.show(loc.t('chat_voice_error') ?? 'Ошибка отправки');
+        AppToastService.show(loc.t('chat_voice_error'));
       }
     } catch (e) {
       if (mounted) {
@@ -358,7 +358,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
           _voiceElapsed = 0;
           _voiceRecorderStopped = false;
         });
-        AppToastService.show('${loc.t('chat_voice_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${loc.t('chat_voice_error')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -438,7 +438,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
           _sending = false;
           _pendingLinks = linksCopy;
         });
-        AppToastService.show('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('${context.read<LocalizationService>().t('error_short')}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -466,7 +466,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : () => _load(),
-            tooltip: loc.t('inbox_refresh') ?? 'Обновить',
+            tooltip: loc.t('inbox_refresh'),
           ),
         ],
       ),
@@ -484,7 +484,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                             height: MediaQuery.of(context).size.height * 0.5,
                             child: Center(
                               child: Text(
-                                loc.t('chat_empty') ?? 'Нет сообщений. Напишите первым.',
+                                loc.t('chat_empty'),
                                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                               ),
                             ),
@@ -553,17 +553,17 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                         Icon(Icons.fiber_manual_record, color: theme.colorScheme.error, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          '${loc.t('chat_voice_recording') ?? 'Запись'} ${_formatVoiceElapsed(_voiceElapsed)}',
+                          '${loc.t('chat_voice_recording')} ${_formatVoiceElapsed(_voiceElapsed)}',
                           style: theme.textTheme.bodyMedium,
                         ),
                         const Spacer(),
                         TextButton(
                           onPressed: _sending ? null : _cancelVoiceRecording,
-                          child: Text(loc.t('chat_voice_cancel') ?? 'Отмена'),
+                          child: Text(loc.t('chat_voice_cancel')),
                         ),
                         FilledButton(
                           onPressed: _sending ? null : _commitVoiceRecording,
-                          child: Text(loc.t('chat_voice_send') ?? 'Отправить'),
+                          child: Text(loc.t('chat_voice_send')),
                         ),
                       ],
                     )
@@ -574,18 +574,18 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                           IconButton(
                             icon: const Icon(Icons.add_photo_alternate_outlined),
                             onPressed: _sending ? null : _sendPhoto,
-                            tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                            tooltip: loc.t('photo_from_gallery'),
                           ),
                           if (canUseChatSystemLinks)
                             IconButton(
                               icon: const Icon(Icons.add_circle_outline),
                               onPressed: _sending ? null : _pickSystemLink,
-                              tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
+                              tooltip: loc.t('chat_attach_link_title'),
                             ),
                           IconButton(
                             icon: const Icon(Icons.mic_none_outlined),
                             onPressed: _sending ? null : _startVoiceRecording,
-                            tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
+                            tooltip: loc.t('chat_voice_tooltip'),
                           ),
                         ],
                         Expanded(
@@ -593,7 +593,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                             controller: _controller,
                             focusNode: _inputFocusNode,
                             decoration: InputDecoration(
-                              hintText: loc.t('chat_type_message') ?? 'Сообщение...',
+                              hintText: loc.t('chat_type_message'),
                               border: const OutlineInputBorder(),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
@@ -612,7 +612,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.send),
-                          tooltip: loc.t('send') ?? 'Отправить',
+                          tooltip: loc.t('send'),
                         ),
                       ],
                     ),
