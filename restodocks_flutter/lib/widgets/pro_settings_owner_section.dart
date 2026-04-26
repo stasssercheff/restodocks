@@ -436,7 +436,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     final paidAccess = estSafe?.hasPaidProAccess ?? false;
     final until = estSafe?.proPaidUntil;
 
-    if (promo.hasPromo && promo.isDisabled) {
+    final iosOnlyIapMode = AppleIapService.isIOSPlatform;
+
+    if (!iosOnlyIapMode && promo.hasPromo && promo.isDisabled) {
       lines.add(loc.t('pro_payment_hub_line_promo_disabled_admin'));
     }
 
@@ -449,7 +451,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       lines.add(loc.t('pro_payment_hub_line_subscription_active'));
     }
 
-    if (promo.isPromoGrantActive && promo.expiresAt != null) {
+    if (!iosOnlyIapMode && promo.isPromoGrantActive && promo.expiresAt != null) {
       lines.add(loc.t('pro_payment_hub_line_promo_until',
           args: {'date': _formatProDate(promo.expiresAt!)}));
     }
@@ -466,10 +468,15 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     EstablishmentPromoInfo? promo,
     Establishment? est,
   ) {
-    if (promo != null && promo.isPromoGrantActive) {
+    if (!AppleIapService.isIOSPlatform &&
+        promo != null &&
+        promo.isPromoGrantActive) {
       return loc.t('pro_iap_already_active_promo');
     }
-    if (promo != null && promo.hasPromo && promo.isDisabled) {
+    if (!AppleIapService.isIOSPlatform &&
+        promo != null &&
+        promo.hasPromo &&
+        promo.isDisabled) {
       return loc.t('pro_payment_subtitle_promo_disabled');
     }
     final until = est?.proPaidUntil;
@@ -651,9 +658,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             );
           },
         ),
-        FutureBuilder<EstablishmentPromoInfo>(
-          future: _promoFuture,
-          builder: (context, snap) {
+        if (!AppleIapService.isIOSPlatform)
+          FutureBuilder<EstablishmentPromoInfo>(
+            future: _promoFuture,
+            builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done) {
               return ListTile(
                 leading: const Icon(Icons.local_offer_outlined),
@@ -763,8 +771,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                     }
                   : _showApplyPromoDialog,
             );
-          },
-        ),
+            },
+          ),
         ListTile(
           leading: const Icon(Icons.list_alt_outlined),
           title: Text(loc.t('subscription_plans_list_tile_title')),
