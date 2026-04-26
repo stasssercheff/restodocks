@@ -110,7 +110,8 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         return;
       }
 
-      final promoRaw = _promoController.text.trim();
+      final promoRaw =
+          AppleIapService.isIOSPlatform ? '' : _promoController.text.trim();
       final promoCode = promoRaw.toUpperCase();
       final accountManager = context.read<AccountManagerSupabase>();
       final name = _nameController.text.trim();
@@ -364,16 +365,18 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _promoController,
-                  decoration: InputDecoration(
-                    labelText: loc.t('promo_code_optional'),
-                    hintText: loc.t('enter_promo_code_optional'),
-                    prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                if (!AppleIapService.isIOSPlatform) ...[
+                  TextFormField(
+                    controller: _promoController,
+                    decoration: InputDecoration(
+                      labelText: loc.t('promo_code_optional'),
+                      hintText: loc.t('enter_promo_code_optional'),
+                      prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
                   ),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+                ],
                 Text(loc.t('generated_pin'), style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
                 Text(
