@@ -130,6 +130,19 @@ class TranslationService {
           sourceText: text,
           targetLanguage: to,
         );
+        translatedText = _normalizeDishNameTranslation(
+          translatedText,
+          sourceText: text,
+          targetLanguage: to,
+          fieldName: fieldName,
+        );
+        translatedText = await _refineDishNameForCuisineContext(
+          translatedText,
+          sourceText: text,
+          sourceLanguage: from,
+          targetLanguage: to,
+          fieldName: fieldName,
+        );
         final translation = Translation(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           entityType: entityType,
@@ -163,6 +176,19 @@ class TranslationService {
             translatedText,
             sourceText: text,
             targetLanguage: to,
+          );
+          translatedText = _normalizeDishNameTranslation(
+            translatedText,
+            sourceText: text,
+            targetLanguage: to,
+            fieldName: fieldName,
+          );
+          translatedText = await _refineDishNameForCuisineContext(
+            translatedText,
+            sourceText: text,
+            sourceLanguage: from,
+            targetLanguage: to,
+            fieldName: fieldName,
           );
           final translation = Translation(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -295,6 +321,85 @@ class TranslationService {
     if (withoutPrefix.isEmpty) return translatedText;
     final prefix = _semiFinishedPrefixForLanguage(targetLanguage.toLowerCase());
     return '$prefix $withoutPrefix';
+  }
+
+  String _normalizeDishNameTranslation(
+    String translatedText, {
+    required String sourceText,
+    required String targetLanguage,
+    required String fieldName,
+  }) {
+    if (fieldName != 'dish_name') return translatedText;
+    final src = sourceText.trim().toLowerCase();
+    final to = targetLanguage.trim().toLowerCase();
+    if (src.isEmpty || to.isEmpty) return translatedText;
+
+    final enIdioms = <String, String>{
+      'селедка под шубой': 'Dressed Herring Salad',
+      'сельдь под шубой': 'Dressed Herring Salad',
+      'оливье': 'Russian Potato Salad (Olivier)',
+      'винегрет': 'Russian Beetroot Vinaigrette',
+      'борщ': 'Borscht',
+      'щи': 'Cabbage Soup (Shchi)',
+      'пельмени': 'Pelmeni Dumplings',
+      'блины': 'Blini',
+    };
+
+    if (to == 'en') {
+      final idiom = enIdioms[src];
+      if (idiom != null && idiom.isNotEmpty) {
+        return idiom;
+      }
+    }
+    return translatedText;
+  }
+
+  Future<String> _refineDishNameForCuisineContext(
+    String translatedText, {
+    required String sourceText,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required String fieldName,
+  }) async {
+    if (fieldName != 'dish_name') return translatedText;
+    final source = sourceText.trim();
+    final translated = translatedText.trim();
+    final from = sourceLanguage.trim().toLowerCase();
+    final to = targetLanguage.trim().toLowerCase();
+    if (source.isEmpty || translated.isEmpty) return translatedText;
+    if (from == to) return translatedText;
+    if (source.length > 120 || translated.length > 140) return translatedText;
+
+    final prompt = '''
+Ты шеф-переводчик меню.
+Сделай название блюда естественным для носителя языка "$to", а не дословным переводом.
+Сохраняй кулинарный смысл, стиль карточки блюда и узнаваемость национального блюда.
+Если есть устойчивое кулинарное название — используй его.
+Верни ТОЛЬКО итоговое название без пояснений и кавычек.
+
+Исходный язык: $from
+Исходное название: "$source"
+Черновой перевод: "$translated"
+''';
+
+    try {
+      final response = await _aiService.invoke('ai-generate-checklist', {
+        'prompt': prompt,
+      });
+      final refined = response?['result']?.toString().trim() ?? '';
+      if (refined.isEmpty) return translatedText;
+      // Защита: ИИ иногда возвращает фразы вроде "Here is..." — такие ответы игнорируем.
+      if (refined.length > 140 || refined.contains('\n')) return translatedText;
+      final lower = refined.toLowerCase();
+      if (lower.startsWith('here is') ||
+          lower.startsWith('translation:') ||
+          lower.startsWith('перевод:')) {
+        return translatedText;
+      }
+      return refined;
+    } catch (_) {
+      return translatedText;
+    }
   }
 
   /// Перевод для данной версии source_text и целевого языка (любой source_language в строке).

@@ -2976,21 +2976,44 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
 
-    // Найти исходный язык технологии (первый непустой ключ в technologyLocalized)
+    bool looksRussianText(String text) =>
+        RegExp(r'[\u0400-\u04FF]').hasMatch(text);
+
+    String inferSourceLang(String text) {
+      final t = text.trim();
+      if (t.isEmpty) return 'en';
+      if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+      return 'en';
+    }
+
+    // Найти исходный язык технологии (первый непустой ключ в technologyLocalized),
+    // а если карта пустая/неполная — взять текущий текст из контроллера.
     final techMap = tc.technologyLocalized ?? {};
     final sourceLang = techMap.entries
         .where((e) => e.value.trim().isNotEmpty && e.key != targetLang)
         .map((e) => e.key)
         .firstOrNull;
-    final sourceText = sourceLang != null ? techMap[sourceLang]! : '';
+    var sourceText = sourceLang != null ? techMap[sourceLang]!.trim() : '';
+    var effectiveSourceLang = sourceLang;
+    if (sourceText.isEmpty) {
+      final fallbackText = _technologyController.text.trim();
+      if (fallbackText.isNotEmpty) {
+        sourceText = fallbackText;
+        effectiveSourceLang = inferSourceLang(fallbackText);
+      }
+    }
 
-    // Уже есть перевод на целевой язык — ничего не делать
+    // Уже есть перевод на целевой язык — ничего не делать.
+    // Исключение: для не-ru языка в карте может лежать русский текст
+    // (например карточка создана ИИ при UI=en) — такой «перевод» нужно исправить.
     final existing = techMap[targetLang]?.trim() ?? '';
-    if (existing.isNotEmpty) return;
+    final existingLooksMismatched =
+        targetLang != 'ru' && existing.isNotEmpty && looksRussianText(existing);
+    if (existing.isNotEmpty && !existingLooksMismatched) return;
 
     // Нет исходного текста — нечего переводить
-    if (sourceText.trim().isEmpty || sourceLang == null) return;
-    if (sourceLang == targetLang) return;
+    if (sourceText.isEmpty || effectiveSourceLang == null) return;
+    if (effectiveSourceLang == targetLang) return;
 
     if (!mounted) return;
     setState(() => _technologyTranslating = true);
@@ -3003,7 +3026,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         entityId: tc.id,
         fieldName: 'technology',
         sourceText: sourceText,
-        sourceLanguage: sourceLang,
+        sourceLanguage: effectiveSourceLang,
         targetLanguage: targetLang,
       );
 
