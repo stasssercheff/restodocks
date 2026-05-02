@@ -12,6 +12,7 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../core/subscription_entitlements.dart';
+import '../core/registration_client_kind.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
@@ -875,7 +876,10 @@ class AccountManagerSupabase extends ChangeNotifier {
                   _supabase.client.auth.currentSession!.accessToken.isNotEmpty;
           await postEdgeFunctionWithRetry(
             'register-metadata',
-            {'establishment_id': establishmentId},
+            {
+              'establishment_id': establishmentId,
+              'registration_client': getRegistrationClientKind(),
+            },
             maxRetries: 1,
             bearerAlwaysAnon: !hasUserJwt,
           );

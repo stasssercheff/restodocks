@@ -41,6 +41,8 @@ type Establishment = {
   registration_ip?: string | null
   registration_country?: string | null
   registration_city?: string | null
+  /** ios_app | android_app | web_mobile | web_desktop | native_other */
+  registration_client?: string | null
   establishment_type?: 'main' | 'branch' | 'separate'
   subscription_summary?: SubscriptionSummary
   effective_pro?: boolean
@@ -482,6 +484,8 @@ function EstablishmentsTab() {
       (e.registration_ip ?? '').toLowerCase().includes(q) ||
       (e.registration_country ?? '').toLowerCase().includes(q) ||
       (e.registration_city ?? '').toLowerCase().includes(q) ||
+      (e.registration_client ?? '').toLowerCase().includes(q) ||
+      registrationClientLabel(e).toLowerCase().includes(q) ||
       (e.created_at ?? '').toLowerCase().includes(q) ||
       formatDateTime(e.created_at).toLowerCase().includes(q) ||
       subText.includes(q)
@@ -498,6 +502,24 @@ function EstablishmentsTab() {
     if (row.registration_city) parts.push(row.registration_city)
     if (row.registration_country && row.registration_country !== row.registration_city) parts.push(row.registration_country)
     return parts.join(', ')
+  }
+
+  function registrationClientLabel(row: Establishment) {
+    const c = row.registration_client?.trim().toLowerCase()
+    switch (c) {
+      case 'ios_app':
+        return 'iOS (приложение)'
+      case 'android_app':
+        return 'Android (приложение)'
+      case 'web_mobile':
+        return 'Сайт, телефон'
+      case 'web_desktop':
+        return 'Сайт, ПК'
+      case 'native_other':
+        return 'Нативно (другое)'
+      default:
+        return '—'
+    }
   }
 
   const total = data.length
@@ -713,6 +735,12 @@ function EstablishmentsTab() {
                   >
                     Регистрация
                   </th>
+                  <th
+                    className="px-2 py-2.5 sm:px-3 text-left max-w-[7rem]"
+                    title="Откуда зарегистрированы: приложение iOS/Android или сайт (ПК / моб. браузер). Заполняет клиент при первом register-metadata."
+                  >
+                    Клиент
+                  </th>
                   <th className="px-2 py-2.5 sm:px-3 text-left">IP регистрации</th>
                   <th
                     className="px-3 py-3 text-right w-[5.5rem] sticky right-0 z-20 bg-gray-900 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]"
@@ -763,6 +791,12 @@ function EstablishmentsTab() {
                     </td>
                     <td className="px-2 py-2.5 sm:px-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
                       {formatDateTime(row.created_at)}
+                    </td>
+                    <td
+                      className="px-2 py-2.5 sm:px-3 text-gray-300 text-xs max-w-[7rem] leading-snug"
+                      title={row.registration_client ?? ''}
+                    >
+                      {registrationClientLabel(row)}
                     </td>
                     <td className="px-2 py-2.5 sm:px-3 text-gray-400 text-xs font-mono max-w-[min(14rem,22vw)] truncate min-w-0" title={regInfo(row)}>
                       {regInfo(row)}
@@ -815,6 +849,7 @@ function EstablishmentsTab() {
                 <div className="text-gray-600 text-xs mt-1" title={row.created_at}>
                   Регистрация: {formatDateTime(row.created_at)}
                 </div>
+                <div className="text-gray-400 text-xs mt-1">{registrationClientLabel(row)}</div>
                 {row.registration_ip && (
                   <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
                 )}
