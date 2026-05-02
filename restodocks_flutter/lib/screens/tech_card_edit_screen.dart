@@ -2196,6 +2196,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
         if (tc != null) {
+          unawaited(_refreshDishNameTranslationForCurrentLanguage(tc));
+        }
+        if (tc != null) {
           unawaited(
             _refreshIngredientNameTranslationsForCard(
               tc,
@@ -3047,6 +3050,56 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
     } catch (_) {}
     if (mounted) setState(() => _technologyTranslating = false);
+  }
+
+  String _inferLanguageFromText(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return 'en';
+    if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+    return 'en';
+  }
+
+  Future<void> _refreshDishNameTranslationForCurrentLanguage(TechCard tc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode.trim().toLowerCase();
+    if (targetLang == 'ru') return;
+
+    final localized = Map<String, String>.from(tc.dishNameLocalized ?? const {});
+    final sourceText = (localized['ru']?.trim().isNotEmpty ?? false)
+        ? localized['ru']!.trim()
+        : tc.dishName.trim();
+    if (sourceText.isEmpty) return;
+    final sourceLang = _inferLanguageFromText(sourceText);
+    if (sourceLang == targetLang) return;
+
+    final existing = localized[targetLang]?.trim() ?? '';
+    try {
+      final translationManager = context.read<TranslationManager>();
+      final svc = context.read<TechCardServiceSupabase>();
+      final translated = await translationManager.getLocalizedText(
+        entityType: TranslationEntityType.techCard,
+        entityId: tc.id,
+        fieldName: 'dish_name',
+        sourceText: sourceText,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+      final next = translated.trim();
+      if (next.isEmpty || next == sourceText || next == existing) return;
+      if (!mounted) return;
+
+      localized[targetLang] = next;
+      final updated = tc.copyWith(dishNameLocalized: localized);
+      try {
+        await svc.saveTechCard(updated, skipHistory: true);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _techCard = updated;
+        _nameController.text = next;
+      });
+    } catch (_) {}
   }
 
   Future<void> _showAddCustomCategoryDialog() async {
@@ -7269,7 +7322,17 @@ class _TtkTableState extends State<_TtkTable> {
                               ),
                             )),
                           )
-                        : _cell(ing.cookingProcessName ?? loc.t('dash')),
+                        : _cell(
+                            (ing.cookingProcessId != null &&
+                                    ing.cookingProcessId!.trim().isNotEmpty)
+                                ? (CookingProcess.findById(
+                                              ing.cookingProcessId!.trim(),
+                                            )
+                                        ?.getLocalizedName(lang) ??
+                                    ing.cookingProcessName ??
+                                    loc.t('dash'))
+                                : (ing.cookingProcessName ?? loc.t('dash')),
+                          ),
                     widget.effectiveCanEdit
                         ? TableCell(
                             child: wrapCell(ConstrainedBox(
@@ -7929,7 +7992,17 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         ),
                       ),
                     ),
-                    _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
+                    _cell(
+                      (ing.cookingProcessId != null &&
+                              ing.cookingProcessId!.trim().isNotEmpty)
+                          ? (CookingProcess.findById(
+                                        ing.cookingProcessId!.trim(),
+                                      )
+                                  ?.getLocalizedName(cookLang) ??
+                              ing.cookingProcessName ??
+                              widget.loc.t('dash'))
+                          : (ing.cookingProcessName ?? widget.loc.t('dash')),
+                    ),
                     _cell(weightText(ing, ing.outputWeight)),
                     _cell(_portionsAmount(ing)),
                   ],
