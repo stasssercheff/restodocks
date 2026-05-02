@@ -29,12 +29,14 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
+# Web: без Dart --obfuscate (не поддерживается для web); --no-source-maps усложняет реверс исходников.
 echo "==> flutter build web (--no-web-resources-cdn, --no-source-maps)"
 flutter build web --release --no-web-resources-cdn --no-source-maps \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
   --dart-define=ENABLE_TTK_IMPORT=true \
-  --dart-define=IS_BETA=false
+  --dart-define=IS_BETA=false \
+  --dart-define=APP_STORE_PUBLIC_URL="${APP_STORE_PUBLIC_URL:-}"
 
 if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js

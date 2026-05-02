@@ -199,6 +199,13 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                   loc.t('employee_info'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  loc.t('register_description'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 16),
 
                 TextFormField(

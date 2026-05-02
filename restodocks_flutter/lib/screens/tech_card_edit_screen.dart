@@ -2196,6 +2196,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
         if (tc != null) {
+          unawaited(_refreshDishNameTranslationForCurrentLanguage(tc));
+        }
+        if (tc != null) {
           unawaited(
             _refreshIngredientNameTranslationsForCard(
               tc,
@@ -2817,16 +2820,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     _ingredientTranslationBackfillInFlight.add(key);
     try {
-      final inferredSourceLanguage =
-          _inferSourceLanguageFromTexts(missing.values);
-      await context.read<TranslationManager>().handleEntitySave(
-            entityType: TranslationEntityType.techCard,
-            entityId: cardId,
-            textFields: missing,
-            sourceLanguage: inferredSourceLanguage,
-            userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
-            targetLanguages: <String>[lang],
-          );
+      final tm = context.read<TranslationManager>();
+      final userId = context.read<AccountManagerSupabase>().currentEmployee?.id;
+      final entries = missing.entries.toList(growable: false);
+      const batchSize = 6;
+      for (var i = 0; i < entries.length; i += batchSize) {
+        final end = (i + batchSize < entries.length)
+            ? i + batchSize
+            : entries.length;
+        final chunk = entries.sublist(i, end);
+        await Future.wait(
+          chunk.map((entry) {
+            final inferredSourceLanguage =
+                _inferSourceLanguageFromTexts(<String>[entry.value]);
+            return tm.handleEntitySave(
+              entityType: TranslationEntityType.techCard,
+              entityId: cardId,
+              textFields: <String, String>{entry.key: entry.value},
+              sourceLanguage: inferredSourceLanguage,
+              userId: userId,
+              targetLanguages: <String>[lang],
+            );
+          }),
+        );
+      }
       await _warmIngredientNameTranslations(
         techCardId: cardId,
         languageCode: lang,
@@ -2962,21 +2979,44 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
 
-    // Найти исходный язык технологии (первый непустой ключ в technologyLocalized)
+    bool looksRussianText(String text) =>
+        RegExp(r'[\u0400-\u04FF]').hasMatch(text);
+
+    String inferSourceLang(String text) {
+      final t = text.trim();
+      if (t.isEmpty) return 'en';
+      if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+      return 'en';
+    }
+
+    // Найти исходный язык технологии (первый непустой ключ в technologyLocalized),
+    // а если карта пустая/неполная — взять текущий текст из контроллера.
     final techMap = tc.technologyLocalized ?? {};
     final sourceLang = techMap.entries
         .where((e) => e.value.trim().isNotEmpty && e.key != targetLang)
         .map((e) => e.key)
         .firstOrNull;
-    final sourceText = sourceLang != null ? techMap[sourceLang]! : '';
+    var sourceText = sourceLang != null ? techMap[sourceLang]!.trim() : '';
+    var effectiveSourceLang = sourceLang;
+    if (sourceText.isEmpty) {
+      final fallbackText = _technologyController.text.trim();
+      if (fallbackText.isNotEmpty) {
+        sourceText = fallbackText;
+        effectiveSourceLang = inferSourceLang(fallbackText);
+      }
+    }
 
-    // Уже есть перевод на целевой язык — ничего не делать
+    // Уже есть перевод на целевой язык — ничего не делать.
+    // Исключение: для не-ru языка в карте может лежать русский текст
+    // (например карточка создана ИИ при UI=en) — такой «перевод» нужно исправить.
     final existing = techMap[targetLang]?.trim() ?? '';
-    if (existing.isNotEmpty) return;
+    final existingLooksMismatched =
+        targetLang != 'ru' && existing.isNotEmpty && looksRussianText(existing);
+    if (existing.isNotEmpty && !existingLooksMismatched) return;
 
     // Нет исходного текста — нечего переводить
-    if (sourceText.trim().isEmpty || sourceLang == null) return;
-    if (sourceLang == targetLang) return;
+    if (sourceText.isEmpty || effectiveSourceLang == null) return;
+    if (effectiveSourceLang == targetLang) return;
 
     if (!mounted) return;
     setState(() => _technologyTranslating = true);
@@ -2989,7 +3029,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         entityId: tc.id,
         fieldName: 'technology',
         sourceText: sourceText,
-        sourceLanguage: sourceLang,
+        sourceLanguage: effectiveSourceLang,
         targetLanguage: targetLang,
       );
 
@@ -3010,6 +3050,63 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
     } catch (_) {}
     if (mounted) setState(() => _technologyTranslating = false);
+  }
+
+  String _inferLanguageFromText(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return 'en';
+    if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+    return 'en';
+  }
+
+  Future<void> _refreshDishNameTranslationForCurrentLanguage(TechCard tc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode.trim().toLowerCase();
+    if (targetLang == 'ru') return;
+
+    final localized = Map<String, String>.from(tc.dishNameLocalized ?? const {});
+    final sourceText = (localized['ru']?.trim().isNotEmpty ?? false)
+        ? localized['ru']!.trim()
+        : tc.dishName.trim();
+    if (sourceText.isEmpty) return;
+    final sourceLang = _inferLanguageFromText(sourceText);
+    if (sourceLang == targetLang) return;
+
+    final existing = localized[targetLang]?.trim() ?? '';
+    try {
+      final translationManager = context.read<TranslationManager>();
+      final svc = context.read<TechCardServiceSupabase>();
+      final translated = await translationManager.getLocalizedText(
+        entityType: TranslationEntityType.techCard,
+        entityId: tc.id,
+        fieldName: 'dish_name',
+        sourceText: sourceText,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+      final next = translated.trim();
+      if (next.isEmpty || next == sourceText || next == existing) return;
+      if (!mounted) return;
+
+      localized[targetLang] = next;
+      // Поддерживаем консистентность списка/деталей в этой сессии:
+      // overlay используется в списке ТТК даже до перезагрузки карточки из БД.
+      TechCard.setTranslationOverlay(
+        {tc.id: next},
+        languageCode: targetLang,
+        merge: true,
+      );
+      final updated = tc.copyWith(dishNameLocalized: localized);
+      try {
+        await svc.saveTechCard(updated, skipHistory: true);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _techCard = updated;
+        _nameController.text = next;
+      });
+    } catch (_) {}
   }
 
   Future<void> _showAddCustomCategoryDialog() async {
@@ -7232,7 +7329,26 @@ class _TtkTableState extends State<_TtkTable> {
                               ),
                             )),
                           )
-                        : _cell(ing.cookingProcessName ?? loc.t('dash')),
+                        : _cell(
+                            (ing.cookingProcessId != null &&
+                                    ing.cookingProcessId!.trim().isNotEmpty)
+                                ? (CookingProcess.findById(
+                                              ing.cookingProcessId!.trim(),
+                                            )
+                                        ?.getLocalizedName(lang) ??
+                                    ing.cookingProcessName ??
+                                    loc.t('dash'))
+                                : (ing.cookingProcessName != null &&
+                                        ing.cookingProcessName!.trim().isNotEmpty)
+                                    ? (CookingProcess.resolveFromAiToken(
+                                                  ing.cookingProcessName,
+                                                  lang,
+                                                )
+                                            ?.getLocalizedName(lang) ??
+                                        ing.cookingProcessName ??
+                                        loc.t('dash'))
+                                    : loc.t('dash'),
+                          ),
                     widget.effectiveCanEdit
                         ? TableCell(
                             child: wrapCell(ConstrainedBox(
@@ -7892,7 +8008,26 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         ),
                       ),
                     ),
-                    _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
+                    _cell(
+                      (ing.cookingProcessId != null &&
+                              ing.cookingProcessId!.trim().isNotEmpty)
+                          ? (CookingProcess.findById(
+                                        ing.cookingProcessId!.trim(),
+                                      )
+                                  ?.getLocalizedName(cookLang) ??
+                              ing.cookingProcessName ??
+                              widget.loc.t('dash'))
+                          : (ing.cookingProcessName != null &&
+                                  ing.cookingProcessName!.trim().isNotEmpty)
+                              ? (CookingProcess.resolveFromAiToken(
+                                            ing.cookingProcessName,
+                                            cookLang,
+                                          )
+                                      ?.getLocalizedName(cookLang) ??
+                                  ing.cookingProcessName ??
+                                  widget.loc.t('dash'))
+                              : widget.loc.t('dash'),
+                    ),
                     _cell(weightText(ing, ing.outputWeight)),
                     _cell(_portionsAmount(ing)),
                   ],

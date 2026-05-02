@@ -12,6 +12,7 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../core/subscription_entitlements.dart';
+import '../core/registration_client_kind.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
@@ -875,7 +876,10 @@ class AccountManagerSupabase extends ChangeNotifier {
                   _supabase.client.auth.currentSession!.accessToken.isNotEmpty;
           await postEdgeFunctionWithRetry(
             'register-metadata',
-            {'establishment_id': establishmentId},
+            {
+              'establishment_id': establishmentId,
+              'registration_client': getRegistrationClientKind(),
+            },
             maxRetries: 1,
             bearerAlwaysAnon: !hasUserJwt,
           );
@@ -1651,7 +1655,9 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? pin,
     String? email,
     String? password,
-    /// Язык, выбранный на экране входа/регистрации до авторизации; сохраняется в профиль.
+    /// Язык UI до авторизации. Сохраняется в профиль только вместе с явным выбором
+    /// на устройстве ([LocalizationService.prefsKeyLocaleUserSet]); иначе применяется
+    /// [employee.preferred_language] с сервера (не затирается языком стартовой страницы).
     String? interfaceLanguageCode,
   }) async {
     _needsCompanyRegistration = false;
@@ -1665,12 +1671,29 @@ class AccountManagerSupabase extends ChangeNotifier {
         ui.isNotEmpty &&
         LocalizationService.supportedLocales.any((l) => l.languageCode == ui);
 
-    if (useUiLang) {
+    // Язык стартовой страницы (дефолт en на web в инкогнито) не должен перебивать
+    // preferred_language в БД. Учитываем UI только если пользователь явно выбрал язык
+    // на устройстве (диалог на экране входа / настройки) — prefsKeyLocaleUserSet.
+    var userPinnedLocale = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      userPinnedLocale =
+          prefs.getBool(LocalizationService.prefsKeyLocaleUserSet) ?? false;
+    } catch (_) {}
+
+    if (userPinnedLocale && useUiLang) {
       _currentEmployee = _currentEmployee!.copyWith(preferredLanguage: ui);
       onPreferredLanguageLoaded?.call(ui);
       unawaited(savePreferredLanguage(ui));
     } else {
-      onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+      final p = employee.preferredLanguage.trim().toLowerCase();
+      if (p.isNotEmpty &&
+          LocalizationService.supportedLocales
+              .any((l) => l.languageCode == p)) {
+        onPreferredLanguageLoaded?.call(p);
+      } else {
+        onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+      }
     }
 
     devLog('🔐 AccountManager: Saving to secure storage...');

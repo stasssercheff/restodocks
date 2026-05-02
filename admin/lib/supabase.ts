@@ -17,6 +17,14 @@ export const supabase = new Proxy({} as SupabaseClient, {
   },
 })
 
+export type PromoRedemptionDetail = {
+  establishment_id: string
+  establishment_name: string | null
+  owner_email: string | null
+  owner_name: string | null
+  redeemed_at: string | null
+}
+
 export type PromoCode = {
   id: number
   code: string
@@ -45,5 +53,7 @@ export type PromoCode = {
   max_redemptions?: number | null
   /** Число уже выполненных погашений (из GET /api/promo). */
   redemption_count?: number
+  /** Каждое погашение: заведение и владелец (email поднят по цепочке филиал → головное). */
+  redemption_details?: PromoRedemptionDetail[]
   establishments?: { name: string } | null
 }

@@ -71,12 +71,34 @@ class TranslationService {
             '${entityType}_${entityId}_${fieldName}_${from}_${to}';
         final keyActual =
             '${entityType}_${entityId}_${fieldName}_${bySource.sourceLanguage}_${to}';
-        _cache[keyActual] = bySource;
-        _cache[keyRequested] = bySource;
+        final processed = await _postProcessTranslatedText(
+          translatedText: bySource.translatedText,
+          sourceText: text,
+          sourceLanguage: bySource.sourceLanguage,
+          targetLanguage: to,
+          fieldName: fieldName,
+        );
+        final adapted = processed == bySource.translatedText
+            ? bySource
+            : Translation(
+                id: bySource.id,
+                entityType: bySource.entityType,
+                entityId: bySource.entityId,
+                fieldName: bySource.fieldName,
+                sourceText: bySource.sourceText,
+                sourceLanguage: bySource.sourceLanguage,
+                targetLanguage: bySource.targetLanguage,
+                translatedText: processed,
+                createdAt: bySource.createdAt,
+                createdBy: bySource.createdBy,
+                isManualOverride: bySource.isManualOverride,
+              );
+        _cache[keyActual] = adapted;
+        _cache[keyRequested] = adapted;
         if (bySource.isManualOverride && !allowOverride) {
-          return bySource.translatedText;
+          return adapted.translatedText;
         }
-        return bySource.translatedText;
+        return adapted.translatedText;
       }
     } catch (e) {
       devLog('[TranslationService] by-source-text lookup: $e');
@@ -89,23 +111,68 @@ class TranslationService {
     // Проверяем локальный кеш
     if (_cache.containsKey(cacheKey)) {
       final cached = _cache[cacheKey]!;
+      final processed = await _postProcessTranslatedText(
+        translatedText: cached.translatedText,
+        sourceText: text,
+        sourceLanguage: from,
+        targetLanguage: to,
+        fieldName: fieldName,
+      );
+      final adapted = processed == cached.translatedText
+          ? cached
+          : Translation(
+              id: cached.id,
+              entityType: cached.entityType,
+              entityId: cached.entityId,
+              fieldName: cached.fieldName,
+              sourceText: cached.sourceText,
+              sourceLanguage: cached.sourceLanguage,
+              targetLanguage: cached.targetLanguage,
+              translatedText: processed,
+              createdAt: cached.createdAt,
+              createdBy: cached.createdBy,
+              isManualOverride: cached.isManualOverride,
+            );
+      _cache[cacheKey] = adapted;
       // Если есть manual override и он запрещен, не перезаписываем
       if (cached.isManualOverride && !allowOverride) {
-        return cached.translatedText;
+        return adapted.translatedText;
       }
-      return cached.translatedText;
+      return adapted.translatedText;
     }
 
     // Проверяем базу данных
     try {
       final existing = await _getFromDatabase(entityType, entityId, fieldName, from, to);
       if (existing != null) {
-        _cache[cacheKey] = existing;
+        final processed = await _postProcessTranslatedText(
+          translatedText: existing.translatedText,
+          sourceText: text,
+          sourceLanguage: from,
+          targetLanguage: to,
+          fieldName: fieldName,
+        );
+        final adapted = processed == existing.translatedText
+            ? existing
+            : Translation(
+                id: existing.id,
+                entityType: existing.entityType,
+                entityId: existing.entityId,
+                fieldName: existing.fieldName,
+                sourceText: existing.sourceText,
+                sourceLanguage: existing.sourceLanguage,
+                targetLanguage: existing.targetLanguage,
+                translatedText: processed,
+                createdAt: existing.createdAt,
+                createdBy: existing.createdBy,
+                isManualOverride: existing.isManualOverride,
+              );
+        _cache[cacheKey] = adapted;
         // Если есть manual override и он запрещен, не перезаписываем
         if (existing.isManualOverride && !allowOverride) {
-          return existing.translatedText;
+          return adapted.translatedText;
         }
-        return existing.translatedText;
+        return adapted.translatedText;
       }
     } catch (e) {
       // Продолжаем без кеша
@@ -125,10 +192,12 @@ class TranslationService {
         } catch (_) {}
       }
       if (translatedText != null && translatedText.trim().isNotEmpty) {
-        translatedText = _normalizeSemiFinishedPrefix(
-          translatedText,
+        translatedText = await _postProcessTranslatedText(
+          translatedText: translatedText,
           sourceText: text,
+          sourceLanguage: from,
           targetLanguage: to,
+          fieldName: fieldName,
         );
         final translation = Translation(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -159,10 +228,12 @@ class TranslationService {
         var translatedText = await _translateWithAI(text, from, to);
 
         if (translatedText != null && translatedText.trim().isNotEmpty) {
-          translatedText = _normalizeSemiFinishedPrefix(
-            translatedText,
+          translatedText = await _postProcessTranslatedText(
+            translatedText: translatedText,
             sourceText: text,
+            sourceLanguage: from,
             targetLanguage: to,
+            fieldName: fieldName,
           );
           final translation = Translation(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -295,6 +366,113 @@ class TranslationService {
     if (withoutPrefix.isEmpty) return translatedText;
     final prefix = _semiFinishedPrefixForLanguage(targetLanguage.toLowerCase());
     return '$prefix $withoutPrefix';
+  }
+
+  String _normalizeDishNameTranslation(
+    String translatedText, {
+    required String sourceText,
+    required String targetLanguage,
+    required String fieldName,
+  }) {
+    if (fieldName != 'dish_name') return translatedText;
+    final src = sourceText.trim().toLowerCase();
+    final to = targetLanguage.trim().toLowerCase();
+    if (src.isEmpty || to.isEmpty) return translatedText;
+
+    final enIdioms = <String, String>{
+      'селедка под шубой': 'Dressed Herring Salad',
+      'сельдь под шубой': 'Dressed Herring Salad',
+      'оливье': 'Russian Potato Salad (Olivier)',
+      'винегрет': 'Russian Beetroot Vinaigrette',
+      'борщ': 'Borscht',
+      'щи': 'Cabbage Soup (Shchi)',
+      'пельмени': 'Pelmeni Dumplings',
+      'блины': 'Blini',
+    };
+
+    if (to == 'en') {
+      final idiom = enIdioms[src];
+      if (idiom != null && idiom.isNotEmpty) {
+        return idiom;
+      }
+    }
+    return translatedText;
+  }
+
+  Future<String> _postProcessTranslatedText({
+    required String translatedText,
+    required String sourceText,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required String fieldName,
+  }) async {
+    var out = _normalizeSemiFinishedPrefix(
+      translatedText,
+      sourceText: sourceText,
+      targetLanguage: targetLanguage,
+    );
+    out = _normalizeDishNameTranslation(
+      out,
+      sourceText: sourceText,
+      targetLanguage: targetLanguage,
+      fieldName: fieldName,
+    );
+    out = await _refineDishNameForCuisineContext(
+      out,
+      sourceText: sourceText,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage,
+      fieldName: fieldName,
+    );
+    return out;
+  }
+
+  Future<String> _refineDishNameForCuisineContext(
+    String translatedText, {
+    required String sourceText,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required String fieldName,
+  }) async {
+    if (fieldName != 'dish_name') return translatedText;
+    final source = sourceText.trim();
+    final translated = translatedText.trim();
+    final from = sourceLanguage.trim().toLowerCase();
+    final to = targetLanguage.trim().toLowerCase();
+    if (source.isEmpty || translated.isEmpty) return translatedText;
+    if (from == to) return translatedText;
+    if (source.length > 120 || translated.length > 140) return translatedText;
+
+    final prompt = '''
+Ты шеф-переводчик меню.
+Сделай название блюда естественным для носителя языка "$to", а не дословным переводом.
+Сохраняй кулинарный смысл, стиль карточки блюда и узнаваемость национального блюда.
+Если есть устойчивое кулинарное название — используй его.
+Верни ТОЛЬКО итоговое название без пояснений и кавычек.
+
+Исходный язык: $from
+Исходное название: "$source"
+Черновой перевод: "$translated"
+''';
+
+    try {
+      final response = await _aiService.invoke('ai-generate-checklist', {
+        'prompt': prompt,
+      });
+      final refined = response?['result']?.toString().trim() ?? '';
+      if (refined.isEmpty) return translatedText;
+      // Защита: ИИ иногда возвращает фразы вроде "Here is..." — такие ответы игнорируем.
+      if (refined.length > 140 || refined.contains('\n')) return translatedText;
+      final lower = refined.toLowerCase();
+      if (lower.startsWith('here is') ||
+          lower.startsWith('translation:') ||
+          lower.startsWith('перевод:')) {
+        return translatedText;
+      }
+      return refined;
+    } catch (_) {
+      return translatedText;
+    }
   }
 
   /// Перевод для данной версии source_text и целевого языка (любой source_language в строке).

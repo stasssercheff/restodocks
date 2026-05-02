@@ -7,10 +7,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 flutter pub get
-flutter build ipa --release --export-options-plist=ios/ExportOptions-appstore.plist
+# Символы для flutter symbolize при крашах — храните копию каталога вне build/ после сборки.
+OBF_SYM_DIR="$(pwd)/build/obfuscation_symbols/ios_ipa"
+mkdir -p "$OBF_SYM_DIR"
+flutter build ipa --release --export-options-plist=ios/ExportOptions-appstore.plist \
+  --obfuscate \
+  --split-debug-info="$OBF_SYM_DIR"
 IPA="build/ios/ipa/restodocks.ipa"
 echo ""
 echo "Готово: $(pwd)/$IPA"
+echo "Символы обфускации (для symbolize / расследование крашей): $OBF_SYM_DIR"
 echo ""
 echo "Дальше:"
 echo "  1) App Store Connect → «Мои приложения» → приложение с Bundle ID com.stassser.restodocks.dev.srebrikov"

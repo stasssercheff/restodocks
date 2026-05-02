@@ -4,7 +4,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 flutter pub get
-flutter build macos --release
+OBF_SYM_DIR="$(pwd)/build/obfuscation_symbols/macos"
+mkdir -p "$OBF_SYM_DIR"
+flutter build macos --release \
+  --obfuscate \
+  --split-debug-info="$OBF_SYM_DIR"
+echo ""
+echo "Символы обфускации: $OBF_SYM_DIR (сохраните для symbolize)"
 echo ""
 echo "=== TestFlight для macOS (не iPhone) ==="
 echo ""
