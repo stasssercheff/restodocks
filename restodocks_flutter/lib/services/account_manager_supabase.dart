@@ -1651,7 +1651,9 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? pin,
     String? email,
     String? password,
-    /// Язык, выбранный на экране входа/регистрации до авторизации; сохраняется в профиль.
+    /// Язык UI до авторизации. Сохраняется в профиль только вместе с явным выбором
+    /// на устройстве ([LocalizationService.prefsKeyLocaleUserSet]); иначе применяется
+    /// [employee.preferred_language] с сервера (не затирается языком стартовой страницы).
     String? interfaceLanguageCode,
   }) async {
     _needsCompanyRegistration = false;
@@ -1665,12 +1667,29 @@ class AccountManagerSupabase extends ChangeNotifier {
         ui.isNotEmpty &&
         LocalizationService.supportedLocales.any((l) => l.languageCode == ui);
 
-    if (useUiLang) {
+    // Язык стартовой страницы (дефолт en на web в инкогнито) не должен перебивать
+    // preferred_language в БД. Учитываем UI только если пользователь явно выбрал язык
+    // на устройстве (диалог на экране входа / настройки) — prefsKeyLocaleUserSet.
+    var userPinnedLocale = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      userPinnedLocale =
+          prefs.getBool(LocalizationService.prefsKeyLocaleUserSet) ?? false;
+    } catch (_) {}
+
+    if (userPinnedLocale && useUiLang) {
       _currentEmployee = _currentEmployee!.copyWith(preferredLanguage: ui);
       onPreferredLanguageLoaded?.call(ui);
       unawaited(savePreferredLanguage(ui));
     } else {
-      onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+      final p = employee.preferredLanguage.trim().toLowerCase();
+      if (p.isNotEmpty &&
+          LocalizationService.supportedLocales
+              .any((l) => l.languageCode == p)) {
+        onPreferredLanguageLoaded?.call(p);
+      } else {
+        onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+      }
     }
 
     devLog('🔐 AccountManager: Saving to secure storage...');
