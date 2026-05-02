@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,7 @@ import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
 import '../utils/pos_hall_permissions.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/app_store_download_badge.dart';
 import '../widgets/getting_started_document.dart';
 import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/post_registration_trial_dialog.dart';
@@ -2683,6 +2685,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showSupportEmailForm(context, localization),
             ),
+            if (kIsWeb)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Center(
+                  child: AppStoreDownloadBadge(
+                    semanticsLabel:
+                        localization.t('app_store_download_a11y'),
+                  ),
+                ),
+              ),
             if (currentEmployee.hasRole('owner'))
               _buildSupportAccessOwnerSection(localization),
             ListTile(
