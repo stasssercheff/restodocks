@@ -66,7 +66,7 @@ dependencies:
   persian_datetime_picker: ^2.7.0
 
   # Permissions
-  permission_handler: ^11.0.1
+  permission_handler: ^12.0.1
 
   # Только подстановка email с Sign in with Apple (iOS), без регистрации «в один клик»
   sign_in_with_apple: ^6.1.4
