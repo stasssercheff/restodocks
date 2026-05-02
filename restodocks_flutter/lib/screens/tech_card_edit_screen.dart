@@ -3090,6 +3090,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (!mounted) return;
 
       localized[targetLang] = next;
+      // Поддерживаем консистентность списка/деталей в этой сессии:
+      // overlay используется в списке ТТК даже до перезагрузки карточки из БД.
+      TechCard.setTranslationOverlay(
+        {tc.id: next},
+        languageCode: targetLang,
+        merge: true,
+      );
       final updated = tc.copyWith(dishNameLocalized: localized);
       try {
         await svc.saveTechCard(updated, skipHistory: true);
@@ -7331,7 +7338,16 @@ class _TtkTableState extends State<_TtkTable> {
                                         ?.getLocalizedName(lang) ??
                                     ing.cookingProcessName ??
                                     loc.t('dash'))
-                                : (ing.cookingProcessName ?? loc.t('dash')),
+                                : (ing.cookingProcessName != null &&
+                                        ing.cookingProcessName!.trim().isNotEmpty)
+                                    ? (CookingProcess.resolveFromAiToken(
+                                                  ing.cookingProcessName,
+                                                  lang,
+                                                )
+                                            ?.getLocalizedName(lang) ??
+                                        ing.cookingProcessName ??
+                                        loc.t('dash'))
+                                    : loc.t('dash'),
                           ),
                     widget.effectiveCanEdit
                         ? TableCell(
@@ -8001,7 +8017,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                   ?.getLocalizedName(cookLang) ??
                               ing.cookingProcessName ??
                               widget.loc.t('dash'))
-                          : (ing.cookingProcessName ?? widget.loc.t('dash')),
+                          : (ing.cookingProcessName != null &&
+                                  ing.cookingProcessName!.trim().isNotEmpty)
+                              ? (CookingProcess.resolveFromAiToken(
+                                            ing.cookingProcessName,
+                                            cookLang,
+                                          )
+                                      ?.getLocalizedName(cookLang) ??
+                                  ing.cookingProcessName ??
+                                  widget.loc.t('dash'))
+                              : widget.loc.t('dash'),
                     ),
                     _cell(weightText(ing, ing.outputWeight)),
                     _cell(_portionsAmount(ing)),
