@@ -32,6 +32,9 @@ flutter pub get
 echo "==> Generating PWA icons"
 dart run flutter_launcher_icons
 
+# Опционально: APP_STORE_PUBLIC_URL — прямая ссылка на приложение в App Store (для бейджа на /login).
+# Web: Flutter не поддерживает флаг --obfuscate (docs.flutter.dev/deployment/obfuscate);
+# релизный dart2js уже минифицирует код. Доп. обфускация JS — отдельный пост-процесс (риск регрессий).
 echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
 ENABLE_TTK="${ENABLE_TTK_IMPORT:-false}"
 flutter build web --release --no-web-resources-cdn \
@@ -39,7 +42,8 @@ flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
   --dart-define=ENABLE_TTK_IMPORT="$ENABLE_TTK" \
   --dart-define=IS_BETA=true \
-  --dart-define=HIDE_POS_MODULE=false
+  --dart-define=HIDE_POS_MODULE=false \
+  --dart-define=APP_STORE_PUBLIC_URL="${APP_STORE_PUBLIC_URL:-}"
 
 if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js

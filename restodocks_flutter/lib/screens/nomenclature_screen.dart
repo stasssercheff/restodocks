@@ -38,7 +38,6 @@ import '../widgets/app_bar_home_button.dart';
 import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/establishment_currency_picker_dialog.dart';
 import '../services/account_manager_supabase.dart';
-import '../services/product_store.dart';
 import '../services/product_store_supabase.dart';
 import '../services/localization_service.dart';
 import '../services/image_service.dart';
@@ -467,7 +466,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         techCardService,
         screenDepartment: widget.department,
       );
-      // kitchen: отдел из БД уже учтён в ProductStore; bar/зал — по категории как раньше.
+      // kitchen: отдел из БД уже учтён в ProductStoreSupabase; bar/зал — по категории как раньше.
       if (widget.department == 'kitchen') {
         _nomenclatureItems = items;
       } else {

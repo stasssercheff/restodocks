@@ -32,10 +32,12 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
+# Web: Dart --obfuscate недоступен (см. docs.flutter.dev/deployment/obfuscate); релиз минифицируется.
 echo "==> flutter build web (--no-web-resources-cdn: CanvasKit в билде)"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+  --dart-define=APP_STORE_PUBLIC_URL="${APP_STORE_PUBLIC_URL:-}"
 
 # Отключаем service worker (кэширование старых версий)
 if [ -f scripts/sw_cleanup.js ]; then

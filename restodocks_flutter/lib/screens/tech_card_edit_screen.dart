@@ -2817,16 +2817,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     _ingredientTranslationBackfillInFlight.add(key);
     try {
-      final inferredSourceLanguage =
-          _inferSourceLanguageFromTexts(missing.values);
-      await context.read<TranslationManager>().handleEntitySave(
-            entityType: TranslationEntityType.techCard,
-            entityId: cardId,
-            textFields: missing,
-            sourceLanguage: inferredSourceLanguage,
-            userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
-            targetLanguages: <String>[lang],
-          );
+      final tm = context.read<TranslationManager>();
+      final userId = context.read<AccountManagerSupabase>().currentEmployee?.id;
+      final entries = missing.entries.toList(growable: false);
+      const batchSize = 6;
+      for (var i = 0; i < entries.length; i += batchSize) {
+        final end = (i + batchSize < entries.length)
+            ? i + batchSize
+            : entries.length;
+        final chunk = entries.sublist(i, end);
+        await Future.wait(
+          chunk.map((entry) {
+            final inferredSourceLanguage =
+                _inferSourceLanguageFromTexts(<String>[entry.value]);
+            return tm.handleEntitySave(
+              entityType: TranslationEntityType.techCard,
+              entityId: cardId,
+              textFields: <String, String>{entry.key: entry.value},
+              sourceLanguage: inferredSourceLanguage,
+              userId: userId,
+              targetLanguages: <String>[lang],
+            );
+          }),
+        );
+      }
       await _warmIngredientNameTranslations(
         techCardId: cardId,
         languageCode: lang,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PromoCode } from '@/lib/supabase'
+import type { PromoCode, PromoRedemptionDetail } from '@/lib/supabase'
 import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
 import type { SystemHealthPayload } from '@/lib/system-health'
 import {
@@ -866,6 +866,37 @@ function PromoGrantTierSelect({
   )
 }
 
+function PromoRecipientsCell({ row }: { row: PromoCode }) {
+  const details = row.redemption_details
+  if (details && details.length > 0) {
+    return (
+      <div className="space-y-1.5 max-w-[18rem]">
+        {details.map((d: PromoRedemptionDetail, idx: number) => (
+          <div key={`${d.establishment_id}-${idx}`} className="leading-snug">
+            <div className="text-white text-[13px]">
+              {d.establishment_name?.trim() || '—'}
+              {d.owner_email ? <span className="text-indigo-300/95"> · {d.owner_email}</span> : null}
+            </div>
+            {d.owner_name && !d.owner_email ? (
+              <div className="text-gray-500 text-[10px]">{d.owner_name}</div>
+            ) : null}
+            {d.redeemed_at ? (
+              <div className="text-gray-600 text-[10px]">{formatDateTime(d.redeemed_at)}</div>
+            ) : null}
+          </div>
+        ))}
+        {row.note ? (
+          <div className="text-gray-600 text-[10px] pt-1 border-t border-gray-800/80 mt-1">Заметка: {row.note}</div>
+        ) : null}
+      </div>
+    )
+  }
+  if (row.is_used && row.establishments?.name) {
+    return <span className="text-white">{row.establishments.name}</span>
+  }
+  return <span className="text-gray-500">{row.note || '—'}</span>
+}
+
 // ─── Promo Tab ────────────────────────────────────────────────────────────────
 
 function PromoTab() {
@@ -1565,7 +1596,7 @@ function PromoTab() {
                   >
                     Активации
                   </th>
-                  <th className="px-4 py-3 text-left">Заметка / Заведение</th>
+                  <th className="px-4 py-3 text-left">Кому применён</th>
                   <th
                     className="px-4 py-3 text-left"
                     title="Классика: дата «действует до». Новый тип: дни с активации и при необходимости срок ввода кода."
@@ -1640,8 +1671,8 @@ function PromoTab() {
                           <span className="text-gray-400">{row.max_redemptions ?? 1}</span>
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {row.is_used && row.establishments?.name ? <span className="text-white">{row.establishments.name}</span> : row.note || '—'}
+                      <td className="px-4 py-3 text-gray-400 align-top">
+                        <PromoRecipientsCell row={row} />
                       </td>
                       <td className="px-4 py-3 text-gray-400 align-top">
                         {row.activation_duration_days != null && row.activation_duration_days > 0 ? (
@@ -1793,11 +1824,9 @@ function PromoTab() {
                     </button>
                   </div>
 
-                  {(row.note || (row.is_used && row.establishments?.name)) && (
-                    <div className="text-gray-400 text-xs mb-1">
-                      {row.is_used && row.establishments?.name ? row.establishments.name : row.note}
-                    </div>
-                  )}
+                  <div className="text-gray-400 text-xs mb-2">
+                    <PromoRecipientsCell row={row} />
+                  </div>
                   <div className="text-[10px] text-gray-600 mb-1 space-y-1">
                     <div>{(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}</div>
                     <div className="flex flex-col gap-0.5">
