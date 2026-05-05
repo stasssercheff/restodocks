@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -858,6 +859,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return 'kitchen';
   }
 
+  /// Клик вне активного поля ввода — снять фокус с ячейки ТТК (веб/ПК).
+  void _unfocusTtkPointerIfOutsideFocusedField(PointerDownEvent event) {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null) return;
+    final ctx = focus.context;
+    if (ctx == null) return;
+    final ro = ctx.findRenderObject();
+    if (ro is! RenderBox || !ro.attached || !ro.hasSize) {
+      focus.unfocus();
+      return;
+    }
+    final rect = ro.localToGlobal(Offset.zero) & ro.size;
+    if (!rect.contains(event.position)) {
+      focus.unfocus();
+    }
+  }
+
   /// Базовые + пользовательские категории.
   List<String> get _categoryOptions {
     final base = _categoryDepartment == 'bar'
@@ -1485,7 +1503,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     var ing = _ingredients[index];
     final pid = ing.productId?.trim();
     if (pid == null || pid.isEmpty || ing.isPlaceholder) return;
-    if (ing.sourceTechCardId != null && ing.sourceTechCardId!.trim().isNotEmpty) {
+    if (ing.sourceTechCardId != null &&
+        ing.sourceTechCardId!.trim().isNotEmpty) {
       return;
     }
     final store = context.read<ProductStoreSupabase>();
@@ -1564,7 +1583,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (!mounted || suggested == null) return;
     final store = context.read<ProductStoreSupabase>();
     final lang = context.read<LocalizationService>().currentLanguageCode;
-    final product = store.findProductForIngredient(ing.productId, ing.productName);
+    final product =
+        store.findProductForIngredient(ing.productId, ing.productName);
     final proc = CookingProcess.findById(procId);
     if (product == null || proc == null) return;
     setState(() {
@@ -1672,8 +1692,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (!_hasImportVerificationContext) return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
-    final titleKey =
-        widget.fromAiGeneration ? 'ttk_ai_verify_title' : 'ttk_import_verify_title';
+    final titleKey = widget.fromAiGeneration
+        ? 'ttk_ai_verify_title'
+        : 'ttk_import_verify_title';
     final messageKey = widget.fromAiGeneration
         ? 'ttk_ai_verify_message'
         : 'ttk_import_verify_message';
@@ -1835,7 +1856,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       final merged = byId.values.toList()
                         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
                       if (merged.isNotEmpty) {
-                        tcs = merged.map(stripInvalidNestedPfSelfLinks).toList();
+                        tcs =
+                            merged.map(stripInvalidNestedPfSelfLinks).toList();
                         settledFromLocal = true;
                         applyPickerSlice(merged);
                       }
@@ -1930,10 +1952,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 context.read<LocalizationService>().currentLanguageCode;
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
-              final proc =
-                  CookingProcess.resolveFromAiToken(line.cookingMethod, langForAi);
-              final resolvedProc =
-                  proc ?? CookingProcess.findById('mixing');
+              final proc = CookingProcess.resolveFromAiToken(
+                  line.cookingMethod, langForAi);
+              final resolvedProc = proc ?? CookingProcess.findById('mixing');
               var gross = line.grossGrams ?? 0.0;
               var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit =
@@ -2194,7 +2215,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               if (currentTotal > 0) {
                 final factor = targetFromChecklist / currentTotal;
                 if ((factor - 1.0).abs() > 0.0001) {
-                  final scaled = _ingredients.map((i) => i.scaleBy(factor)).toList();
+                  final scaled =
+                      _ingredients.map((i) => i.scaleBy(factor)).toList();
                   _ingredients
                     ..clear()
                     ..addAll(scaled);
@@ -2303,7 +2325,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (!missingRow) continue;
       final name = ing.productName.trim();
       if (name.isEmpty) continue;
-      final prod = store.findProductForIngredient(ing.productId, ing.productName);
+      final prod =
+          store.findProductForIngredient(ing.productId, ing.productName);
       if (prod != null && prod.kbjuManuallyConfirmed) continue;
       if (seen.add(name)) missing.add(name);
     }
@@ -2538,7 +2561,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         return StatefulBuilder(
           builder: (ctx2, setInnerState) {
             return AlertDialog(
-              title: Text(loc.t('ttk_clarify_pf_for').replaceFirst('%s', ingredientName)),
+              title: Text(loc
+                  .t('ttk_clarify_pf_for')
+                  .replaceFirst('%s', ingredientName)),
               content: SizedBox(
                 width: 560,
                 child: SingleChildScrollView(
@@ -2585,7 +2610,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       onPressed: () =>
                                           _showTechCardCompositionDialog(
                                               ctx2, c, lang),
-                                      child: Text(loc.t('ttk_composition_short')),
+                                      child:
+                                          Text(loc.t('ttk_composition_short')),
                                     ),
                                   ],
                                 ),
@@ -2850,9 +2876,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final entries = missing.entries.toList(growable: false);
       const batchSize = 6;
       for (var i = 0; i < entries.length; i += batchSize) {
-        final end = (i + batchSize < entries.length)
-            ? i + batchSize
-            : entries.length;
+        final end =
+            (i + batchSize < entries.length) ? i + batchSize : entries.length;
         final chunk = entries.sublist(i, end);
         await Future.wait(
           chunk.map((entry) {
@@ -3106,12 +3131,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return '';
   }
 
-  Future<void> _refreshDishNameTranslationForCurrentLanguage(TechCard tc) async {
+  Future<void> _refreshDishNameTranslationForCurrentLanguage(
+      TechCard tc) async {
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode.trim().toLowerCase();
 
-    final localized = Map<String, String>.from(tc.dishNameLocalized ?? const {});
+    final localized =
+        Map<String, String>.from(tc.dishNameLocalized ?? const {});
     final sourceText = _canonicalDishNameSource(tc);
     if (sourceText.isEmpty) return;
     final sourceLang = _inferLanguageFromText(sourceText);
@@ -3223,8 +3250,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final list = [..._customCategories];
     if (list.isEmpty) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(loc.t('ttk_no_custom_categories'))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('ttk_no_custom_categories'))));
       return;
     }
     final tcSvc = context.read<TechCardServiceSupabase>();
@@ -3237,8 +3264,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-                loc.t('ttk_manage_custom_categories'),
+            Text(loc.t('ttk_manage_custom_categories'),
                 style: Theme.of(ctx).textTheme.titleMedium),
             const SizedBox(height: 12),
             ...list.map((c) => ListTile(
@@ -3710,8 +3736,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             sellingPrice: sellingPrice,
             photoUrls: photoUrls,
             ingredients: toSaveIngredients);
-        final canPublishDirect = emp.hasRole('owner') ||
-            emp.hasRole('general_manager');
+        final canPublishDirect =
+            emp.hasRole('owner') || emp.hasRole('general_manager');
         if (!canPublishDirect) {
           await TechCardChangeRequestService.instance.submitProposal(
             techCard: updated,
@@ -3727,7 +3753,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
-        final learnEstId = est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
+        final learnEstId =
+            est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
         if (learnEstId.isNotEmpty) {
           unawaited(
             ProductCookingLossLearning.recordSamplesFromIngredients(
@@ -3876,8 +3903,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     final e = entries[i];
                     final dateStr =
                         '${e.changedAt.day.toString().padLeft(2, '0')}.${e.changedAt.month.toString().padLeft(2, '0')}.${e.changedAt.year} ${e.changedAt.hour.toString().padLeft(2, '0')}:${e.changedAt.minute.toString().padLeft(2, '0')}';
-                    final who =
-                        e.changedByName ?? loc.t('ttk_history_unknown');
+                    final who = e.changedByName ?? loc.t('ttk_history_unknown');
                     final changeLines = e.changes
                         .map<String>((c) => _formatHistoryChange(c, loc))
                         .where((s) => s.isNotEmpty)
@@ -4448,7 +4474,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
 
     if (!mounted) return;
-    final nomenclatureProducts = productStore.getNomenclatureProducts(effectiveId);
+    final nomenclatureProducts =
+        productStore.getNomenclatureProducts(effectiveId);
     final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId!;
     Future<TechCard> ensureHydratedTechCard(TechCard tc) async {
       var working = tc;
@@ -4503,8 +4530,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 {cookingLossPctOverride}) =>
                             _addProductIngredient(p, w, proc, waste, unit, gpp,
                                 replaceIndex: replaceIndex,
-                                cookingLossPctOverride:
-                                    cookingLossPctOverride),
+                                cookingLossPctOverride: cookingLossPctOverride),
                       ),
                 _TechCardPicker(
                   techCards: _pickerTechCards,
@@ -4609,8 +4635,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           items: CulinaryUnits.all
                               .map((u) => DropdownMenuItem(
                                   value: u.id,
-                                  child: Text(
-                                      loc.unitLabel(u.id))))
+                                  child: Text(loc.unitLabel(u.id))))
                               .toList(),
                           onChanged: (v) =>
                               setStateDlg(() => selectedUnit = v ?? 'g'),
@@ -4922,11 +4947,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final name = ing.productName.trim();
     if (name.isEmpty) return;
     final store = context.read<ProductStoreSupabase>();
-    final product = store.findProductForIngredient(ing.productId, ing.productName);
+    final product =
+        store.findProductForIngredient(ing.productId, ing.productName);
     double? waste;
     final pid = ing.productId?.trim();
     if (pid != null && pid.isNotEmpty) {
-      waste = await ProductCookingLossLearning.getSuggestedWastePct(productId: pid);
+      waste =
+          await ProductCookingLossLearning.getSuggestedWastePct(productId: pid);
     }
     waste ??= product?.primaryWastePct;
     if (waste == null) {
@@ -4941,7 +4968,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final proc = procId != null && procId.isNotEmpty && procId != 'custom'
         ? CookingProcess.findById(procId)
         : null;
-    setState(() => _ingredients[i] = ing.updatePrimaryWastePct(wFinal, product, proc));
+    setState(() =>
+        _ingredients[i] = ing.updatePrimaryWastePct(wFinal, product, proc));
     _scheduleDraftSave();
   }
 
@@ -5611,164 +5639,34 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 500;
-          return Column(
-            children: [
-              Expanded(
-                child: ClipRect(
-                  child: CustomScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
-                        sliver: SliverToBoxAdapter(
-                          child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
-                        if (!tableOnlyView)
-                          if (narrow) ...[
-                            TextField(
-                              controller: _nameController,
-                              readOnly: !effectiveCanEdit,
-                              style: TextStyle(fontSize: isMobile ? 12 : 14),
-                              decoration: InputDecoration(
-                                labelText: loc.t('ttk_name'),
-                                isDense: true,
-                                filled: false,
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 14),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _CategoryPickerField(
-                              selectedCategory:
-                                  _categoryOptions.contains(_selectedCategory)
-                                      ? _selectedCategory
-                                      : 'misc',
-                              categoryOptions: _categoryDepartment == 'bar'
-                                  ? _barCategoryOptions
-                                  : _kitchenCategoryOptions,
-                              customCategories: _customCategories,
-                              categoryLabel: (c) =>
-                                  _categoryLabel(c, loc.currentLanguageCode),
-                              canEdit: effectiveCanEdit,
-                              onCategorySelected: (v) {
-                                setState(() => _selectedCategory = v);
-                                _scheduleDraftSave();
-                              },
-                              onAddCustom: _showAddCustomCategoryDialog,
-                              onRefreshCustom: _refreshCustomCategories,
-                              onManageCustom: _showManageCustomCategoriesDialog,
-                              loc: loc,
-                            ),
-                            const SizedBox(height: 12),
-                            _SectionPicker(
-                              selected: _selectedSections,
-                              availableSections: _getAvailableSections(
-                                  context
-                                      .read<AccountManagerSupabase>()
-                                      .hasProSubscription,
-                                  loc),
-                              canEdit: effectiveCanEdit,
-                              onChanged: (v) {
-                                setState(() => _selectedSections = v);
-                                _scheduleDraftSave();
-                              },
-                              loc: loc,
-                            ),
-                            const SizedBox(height: 12),
-                            effectiveCanEdit
-                                ? DropdownButtonFormField<bool>(
-                                    value: _isSemiFinished,
-                                    decoration: InputDecoration(
-                                        labelText: loc.t('tt_type_hint'),
-                                        isDense: true,
-                                        border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8))),
-                                    items: [
-                                      DropdownMenuItem(
-                                          value: true,
-                                          child: Row(children: [
-                                            const Icon(Icons.inventory_2,
-                                                size: 20),
-                                            const SizedBox(width: 8),
-                                            Text(loc.t('tt_type_pf'))
-                                          ])),
-                                      DropdownMenuItem(
-                                          value: false,
-                                          child: Row(children: [
-                                            const Icon(Icons.restaurant,
-                                                size: 20),
-                                            const SizedBox(width: 8),
-                                            Text(loc.t('tt_type_dish'))
-                                          ])),
-                                    ],
-                                    onChanged: (v) {
-                                      setState(() {
-                                        final toPf = v ?? true;
-                                        _isSemiFinished = toPf;
-                                        if (toPf) {
-                                          _portionWeight =
-                                              100; // ТТК ПФ: вес порции по умолчанию 100
-                                        } else {
-                                          final sum = _ingredients.fold<double>(
-                                              0, (s, i) => s + i.outputWeight);
-                                          _portionWeight = sum > 0
-                                              ? sum
-                                              : 100; // ТТК блюдо: вес порции = вес выхода итого
-                                        }
-                                      });
-                                      _scheduleDraftSave();
-                                    },
-                                  )
-                                : InputDecorator(
-                                    decoration: InputDecoration(
-                                      labelText: loc.t('tt_type_hint'),
-                                      isDense: true,
-                                      border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                            _isSemiFinished
-                                                ? Icons.inventory_2
-                                                : Icons.restaurant,
-                                            size: 20,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                            _isSemiFinished
-                                                ? loc.t('tt_type_pf')
-                                                : loc.t('tt_type_dish'),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1),
-                                      ],
-                                    ),
-                                  ),
-                          ] else
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 320,
-                                    height: 56,
-                                    child: TextField(
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _unfocusTtkPointerIfOutsideFocusedField,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 500;
+            return Column(
+              children: [
+                Expanded(
+                  child: ClipRect(
+                    child: CustomScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
+                                if (!tableOnlyView)
+                                  if (narrow) ...[
+                                    TextField(
                                       controller: _nameController,
                                       readOnly: !effectiveCanEdit,
-                                      style: TextStyle(fontSize: 14),
+                                      style: TextStyle(
+                                          fontSize: isMobile ? 12 : 14),
                                       decoration: InputDecoration(
                                         labelText: loc.t('ttk_name'),
                                         isDense: true,
@@ -5781,11 +5679,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                                 horizontal: 12, vertical: 14),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 180,
-                                    child: _CategoryPickerField(
+                                    const SizedBox(height: 12),
+                                    _CategoryPickerField(
                                       selectedCategory: _categoryOptions
                                               .contains(_selectedCategory)
                                           ? _selectedCategory
@@ -5808,11 +5703,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           _showManageCustomCategoriesDialog,
                                       loc: loc,
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 180,
-                                    child: _SectionPicker(
+                                    const SizedBox(height: 12),
+                                    _SectionPicker(
                                       selected: _selectedSections,
                                       availableSections: _getAvailableSections(
                                           context
@@ -5825,849 +5717,1129 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         _scheduleDraftSave();
                                       },
                                       loc: loc,
-                                      compact: true,
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                        minWidth: 160, maxWidth: 220),
-                                    child: SizedBox(
-                                      height: 56,
-                                      child: Align(
-                                        alignment: Alignment.center,
-                                        child: effectiveCanEdit
-                                            ? Tooltip(
-                                                message: loc.t('tt_type_hint'),
-                                                child: SegmentedButton<bool>(
-                                                  style:
-                                                      SegmentedButton.styleFrom(
-                                                    foregroundColor:
-                                                        Theme.of(context)
-                                                            .colorScheme
-                                                            .primary,
-                                                    selectedForegroundColor:
-                                                        Theme.of(context)
-                                                            .colorScheme
-                                                            .primary,
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6),
-                                                    tapTargetSize:
-                                                        MaterialTapTargetSize
-                                                            .shrinkWrap,
-                                                    minimumSize:
-                                                        const Size(80, 44),
-                                                  ).copyWith(
-                                                    shape: WidgetStateProperty.all(
-                                                        const StadiumBorder()),
-                                                  ),
-                                                  expandedInsets:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 8),
-                                                  segments: [
-                                                    ButtonSegment(
-                                                      value: true,
-                                                      label: Text(
-                                                          loc.t('tt_type_pf'),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                      icon: const Icon(
-                                                          Icons.inventory_2,
-                                                          size: 16),
-                                                    ),
-                                                    ButtonSegment(
-                                                      value: false,
-                                                      label: Text(
-                                                          loc.t('tt_type_dish'),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                      icon: const Icon(
-                                                          Icons.restaurant,
-                                                          size: 16),
-                                                    ),
-                                                  ],
-                                                  selected: {_isSemiFinished},
-                                                  onSelectionChanged: (v) {
-                                                    setState(() {
-                                                      final toPf = v.first;
-                                                      _isSemiFinished = toPf;
-                                                      _typeManuallyChanged =
-                                                          true;
-                                                      if (toPf) {
-                                                        _portionWeight =
-                                                            100; // ТТК ПФ: вес порции по умолчанию 100
-                                                      } else {
-                                                        final sum = _ingredients
-                                                            .fold<double>(
-                                                                0,
-                                                                (s, i) =>
-                                                                    s +
-                                                                    i.outputWeight);
-                                                        _portionWeight = sum > 0
-                                                            ? sum
-                                                            : 100; // ТТК блюдо: вес порции = вес выхода итого
-                                                      }
-                                                    });
-                                                    _scheduleDraftSave();
-                                                  },
-                                                  showSelectedIcon: false,
-                                                ),
-                                              )
-                                            : InputDecorator(
-                                                decoration: InputDecoration(
-                                                  labelText:
-                                                      loc.t('tt_type_hint'),
-                                                  isDense: true,
-                                                  border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8)),
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 14),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                        _isSemiFinished
-                                                            ? Icons.inventory_2
-                                                            : Icons.restaurant,
-                                                        size: 20,
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurface),
+                                    const SizedBox(height: 12),
+                                    effectiveCanEdit
+                                        ? DropdownButtonFormField<bool>(
+                                            value: _isSemiFinished,
+                                            decoration: InputDecoration(
+                                                labelText:
+                                                    loc.t('tt_type_hint'),
+                                                isDense: true,
+                                                border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8))),
+                                            items: [
+                                              DropdownMenuItem(
+                                                  value: true,
+                                                  child: Row(children: [
+                                                    const Icon(
+                                                        Icons.inventory_2,
+                                                        size: 20),
                                                     const SizedBox(width: 8),
-                                                    Text(
-                                                        _isSemiFinished
-                                                            ? loc
-                                                                .t('tt_type_pf')
-                                                            : loc.t(
-                                                                'tt_type_dish'),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        maxLines: 1),
-                                                  ],
-                                                ),
+                                                    Text(loc.t('tt_type_pf'))
+                                                  ])),
+                                              DropdownMenuItem(
+                                                  value: false,
+                                                  child: Row(children: [
+                                                    const Icon(Icons.restaurant,
+                                                        size: 20),
+                                                    const SizedBox(width: 8),
+                                                    Text(loc.t('tt_type_dish'))
+                                                  ])),
+                                            ],
+                                            onChanged: (v) {
+                                              setState(() {
+                                                final toPf = v ?? true;
+                                                _isSemiFinished = toPf;
+                                                if (toPf) {
+                                                  _portionWeight =
+                                                      100; // ТТК ПФ: вес порции по умолчанию 100
+                                                } else {
+                                                  final sum =
+                                                      _ingredients.fold<double>(
+                                                          0,
+                                                          (s, i) =>
+                                                              s +
+                                                              i.outputWeight);
+                                                  _portionWeight = sum > 0
+                                                      ? sum
+                                                      : 100; // ТТК блюдо: вес порции = вес выхода итого
+                                                }
+                                              });
+                                              _scheduleDraftSave();
+                                            },
+                                          )
+                                        : InputDecorator(
+                                            decoration: InputDecoration(
+                                              labelText: loc.t('tt_type_hint'),
+                                              isDense: true,
+                                              border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                    _isSemiFinished
+                                                        ? Icons.inventory_2
+                                                        : Icons.restaurant,
+                                                    size: 20,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                    _isSemiFinished
+                                                        ? loc.t('tt_type_pf')
+                                                        : loc.t('tt_type_dish'),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    maxLines: 1),
+                                              ],
+                                            ),
+                                          ),
+                                  ] else
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 320,
+                                            height: 56,
+                                            child: TextField(
+                                              controller: _nameController,
+                                              readOnly: !effectiveCanEdit,
+                                              style: TextStyle(fontSize: 14),
+                                              decoration: InputDecoration(
+                                                labelText: loc.t('ttk_name'),
+                                                isDense: true,
+                                                filled: false,
+                                                border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8)),
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 14),
                                               ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 180,
+                                            child: _CategoryPickerField(
+                                              selectedCategory:
+                                                  _categoryOptions.contains(
+                                                          _selectedCategory)
+                                                      ? _selectedCategory
+                                                      : 'misc',
+                                              categoryOptions:
+                                                  _categoryDepartment == 'bar'
+                                                      ? _barCategoryOptions
+                                                      : _kitchenCategoryOptions,
+                                              customCategories:
+                                                  _customCategories,
+                                              categoryLabel: (c) =>
+                                                  _categoryLabel(c,
+                                                      loc.currentLanguageCode),
+                                              canEdit: effectiveCanEdit,
+                                              onCategorySelected: (v) {
+                                                setState(() =>
+                                                    _selectedCategory = v);
+                                                _scheduleDraftSave();
+                                              },
+                                              onAddCustom:
+                                                  _showAddCustomCategoryDialog,
+                                              onRefreshCustom:
+                                                  _refreshCustomCategories,
+                                              onManageCustom:
+                                                  _showManageCustomCategoriesDialog,
+                                              loc: loc,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 180,
+                                            child: _SectionPicker(
+                                              selected: _selectedSections,
+                                              availableSections:
+                                                  _getAvailableSections(
+                                                      context
+                                                          .read<
+                                                              AccountManagerSupabase>()
+                                                          .hasProSubscription,
+                                                      loc),
+                                              canEdit: effectiveCanEdit,
+                                              onChanged: (v) {
+                                                setState(() =>
+                                                    _selectedSections = v);
+                                                _scheduleDraftSave();
+                                              },
+                                              loc: loc,
+                                              compact: true,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                                minWidth: 160, maxWidth: 220),
+                                            child: SizedBox(
+                                              height: 56,
+                                              child: Align(
+                                                alignment: Alignment.center,
+                                                child: effectiveCanEdit
+                                                    ? Tooltip(
+                                                        message: loc
+                                                            .t('tt_type_hint'),
+                                                        child: SegmentedButton<
+                                                            bool>(
+                                                          style: SegmentedButton
+                                                              .styleFrom(
+                                                            foregroundColor:
+                                                                Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .primary,
+                                                            selectedForegroundColor:
+                                                                Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .primary,
+                                                            visualDensity:
+                                                                VisualDensity
+                                                                    .compact,
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        12,
+                                                                    vertical:
+                                                                        6),
+                                                            tapTargetSize:
+                                                                MaterialTapTargetSize
+                                                                    .shrinkWrap,
+                                                            minimumSize:
+                                                                const Size(
+                                                                    80, 44),
+                                                          ).copyWith(
+                                                            shape: WidgetStateProperty
+                                                                .all(
+                                                                    const StadiumBorder()),
+                                                          ),
+                                                          expandedInsets:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      8),
+                                                          segments: [
+                                                            ButtonSegment(
+                                                              value: true,
+                                                              label: Text(
+                                                                  loc.t(
+                                                                      'tt_type_pf'),
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis),
+                                                              icon: const Icon(
+                                                                  Icons
+                                                                      .inventory_2,
+                                                                  size: 16),
+                                                            ),
+                                                            ButtonSegment(
+                                                              value: false,
+                                                              label: Text(
+                                                                  loc.t(
+                                                                      'tt_type_dish'),
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis),
+                                                              icon: const Icon(
+                                                                  Icons
+                                                                      .restaurant,
+                                                                  size: 16),
+                                                            ),
+                                                          ],
+                                                          selected: {
+                                                            _isSemiFinished
+                                                          },
+                                                          onSelectionChanged:
+                                                              (v) {
+                                                            setState(() {
+                                                              final toPf =
+                                                                  v.first;
+                                                              _isSemiFinished =
+                                                                  toPf;
+                                                              _typeManuallyChanged =
+                                                                  true;
+                                                              if (toPf) {
+                                                                _portionWeight =
+                                                                    100; // ТТК ПФ: вес порции по умолчанию 100
+                                                              } else {
+                                                                final sum = _ingredients.fold<
+                                                                        double>(
+                                                                    0,
+                                                                    (s, i) =>
+                                                                        s +
+                                                                        i.outputWeight);
+                                                                _portionWeight =
+                                                                    sum > 0
+                                                                        ? sum
+                                                                        : 100; // ТТК блюдо: вес порции = вес выхода итого
+                                                              }
+                                                            });
+                                                            _scheduleDraftSave();
+                                                          },
+                                                          showSelectedIcon:
+                                                              false,
+                                                        ),
+                                                      )
+                                                    : InputDecorator(
+                                                        decoration:
+                                                            InputDecoration(
+                                                          labelText: loc.t(
+                                                              'tt_type_hint'),
+                                                          isDense: true,
+                                                          border: OutlineInputBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                          contentPadding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      12,
+                                                                  vertical: 14),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                                _isSemiFinished
+                                                                    ? Icons
+                                                                        .inventory_2
+                                                                    : Icons
+                                                                        .restaurant,
+                                                                size: 20,
+                                                                color: Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .onSurface),
+                                                            const SizedBox(
+                                                                width: 8),
+                                                            Text(
+                                                                _isSemiFinished
+                                                                    ? loc.t(
+                                                                        'tt_type_pf')
+                                                                    : loc.t(
+                                                                        'tt_type_dish'),
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                maxLines: 1),
+                                                          ],
+                                                        ),
+                                                      ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
+                                const SizedBox(height: 16),
+                                if (!tableOnlyView) ...[
+                                  Text(loc.t('ttk_composition'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
                                 ],
-                              ),
+                              ],
                             ),
-                        const SizedBox(height: 16),
-                        if (!tableOnlyView) ...[
-                          Text(loc.t('ttk_composition'),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                        ],
-                        ],
                           ),
                         ),
-                      ),
-                    if (false && effectiveCanEdit && !isCook && isMobile)
-                      SliverPersistentHeader(
-                        pinned: true,
-                        delegate: _TtkCompositionPinnedHeaderDelegate(
-                          loc: loc,
-                          hScroll: _compositionTableHScrollController,
-                          surfaceColor:
-                              Theme.of(context).colorScheme.surface,
-                        ),
-                      ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: RawScrollbar(
-                          controller: _compositionTableHScrollController,
-                          scrollbarOrientation: ScrollbarOrientation.bottom,
-                          thumbVisibility: true,
-                          child: SingleChildScrollView(
-                            controller: _compositionTableHScrollController,
-                            scrollDirection: Axis.horizontal,
-                            clipBehavior: Clip.hardEdge,
-                            child: Builder(builder: (ctx) {
-                              // On iOS handhelds InteractiveViewer may render
-                              // the table off-screen after recent layout changes.
-                              // Keep stable table rendering across platforms.
-                              const enableZoomViewer = false;
-                              final table = effectiveCanEdit
-                                  ? RepaintBoundary(
-                                      child: ExcelStyleTtkTable(
-                                        loc: loc,
-                                        dishName: _nameController.text,
-                                        isSemiFinished: _isSemiFinished,
-                                        ingredients: _ingredients,
-                                        canEdit: effectiveCanEdit,
-                                        dishNameController: _nameController,
-                                        technologyController:
-                                            _technologyController,
-                                        productStore: context
-                                            .read<ProductStoreSupabase>(),
-                                        ingredientNameTranslationsById:
-                                            _ingredientNameTranslationsById,
-                                        establishmentId: (() {
-                                          final est = context
-                                              .read<AccountManagerSupabase>()
-                                              .establishment;
-                                          return est != null && est.isBranch
-                                              ? est.id
-                                              : (est?.dataEstablishmentId ??
-                                                  '');
-                                        })(),
-                                        semiFinishedProducts:
-                                            _semiFinishedProducts,
-                                        isCook: isCook,
-                                        weightPerPortion: _portionWeight,
-                                        onWeightPerPortionChanged: (v) {
-                                          _portionWeightUpdateDebounce
-                                              ?.cancel();
-                                          _portionWeight = v;
-                                          _portionWeightUpdateDebounce =
-                                              Timer(
-                                            const Duration(milliseconds: 200),
-                                            () {
-                                              if (!mounted) return;
-                                              setState(() {});
-                                              _scheduleDraftSave();
-                                            },
-                                          );
-                                        },
-                                        onTotalOutputChanged: (newOutput) {
-                                          _scaleIngredientsToTotalOutput(
-                                              newOutput);
-                                        },
-                                        onAdd: _showAddIngredient,
-                                        onUpdate: (i, ing) {
-                                          _lastUserInteractionAt =
-                                              DateTime.now();
-                                          if (_ingredients.isEmpty &&
-                                              i == 0) {
-                                            _ingredients.add(ing);
-                                            if (ing.hasData) {
-                                              _ingredients[0] =
-                                                  ing.isPlaceholder
-                                                      ? ing.withRealId()
-                                                      : ing;
-                                            }
-                                            _ensurePlaceholderRowAtEnd();
-                                          } else if (i <
-                                              _ingredients.length) {
-                                            _ingredients[i] =
-                                                ing.isPlaceholder &&
-                                                        ing.hasData
-                                                    ? ing.withRealId()
-                                                    : ing;
-                                            _ensurePlaceholderRowAtEnd();
-                                          }
-                                          _ingredientUpdateDebounce?.cancel();
-                                          _ingredientUpdateDebounce = Timer(
-                                            const Duration(milliseconds: 250),
-                                            () {
-                                              if (!mounted) return;
-                                              setState(() {});
-                                              _scheduleDraftSave();
-                                            },
-                                          );
-                                        },
-                                        onRemove: _removeIngredient,
-                                        onSuggestWaste: _suggestWasteForRow,
-                                        onSuggestCookingLoss: _suggestCookingLossForRow,
-                                        onAfterProductLinked: _refreshGlobalProcessingHintsForRow,
-                                        hideTechnologyBlock: true,
-                                        omitTableHeader: false,
-                                        shrinkWrap: true,
-                                        onTapPfIngredient: (id) =>
-                                            context.push('/tech-cards/$id'),
-                                      ),
-                                    )
-                                  : ListenableBuilder(
-                                      listenable: context
-                                          .read<ProductStoreSupabase>()
-                                          .catalogRevision,
-                                      builder: (context, _) {
-                                        return ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                              minWidth: constraints.maxWidth),
-                                          child: _TtkCookTable(
+                        if (false && effectiveCanEdit && !isCook && isMobile)
+                          SliverPersistentHeader(
+                            pinned: true,
+                            delegate: _TtkCompositionPinnedHeaderDelegate(
+                              loc: loc,
+                              hScroll: _compositionTableHScrollController,
+                              surfaceColor:
+                                  Theme.of(context).colorScheme.surface,
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: RawScrollbar(
+                              controller: _compositionTableHScrollController,
+                              scrollbarOrientation: ScrollbarOrientation.bottom,
+                              thumbVisibility: true,
+                              child: SingleChildScrollView(
+                                controller: _compositionTableHScrollController,
+                                scrollDirection: Axis.horizontal,
+                                clipBehavior: Clip.hardEdge,
+                                child: Builder(builder: (ctx) {
+                                  // On iOS handhelds InteractiveViewer may render
+                                  // the table off-screen after recent layout changes.
+                                  // Keep stable table rendering across platforms.
+                                  const enableZoomViewer = false;
+                                  final table = effectiveCanEdit
+                                      ? RepaintBoundary(
+                                          child: ExcelStyleTtkTable(
                                             loc: loc,
                                             dishName: _nameController.text,
-                                            ingredients: _ingredients
-                                                .where((i) =>
-                                                    !i.isPlaceholder ||
-                                                    i.hasData)
-                                                .toList(),
-                                            technology:
-                                                _technologyController.text,
-                                            weightPerPortion: _portionWeight,
-                                            hideTechnologyInTable: true,
+                                            isSemiFinished: _isSemiFinished,
+                                            ingredients: _ingredients,
+                                            canEdit: effectiveCanEdit,
+                                            dishNameController: _nameController,
+                                            technologyController:
+                                                _technologyController,
                                             productStore: context
                                                 .read<ProductStoreSupabase>(),
                                             ingredientNameTranslationsById:
                                                 _ingredientNameTranslationsById,
-                                            onTapPfIngredient: (id) =>
-                                                context.push(
-                                                    '/tech-cards/$id?view=1'),
-                                            onIngredientsChanged: (list) {
-                                              _cookTableSyncDebounce?.cancel();
-                                              final snapshot =
-                                                  List<TTIngredient>.from(
-                                                      list);
-                                              _cookTableSyncDebounce = Timer(
+                                            establishmentId: (() {
+                                              final est = context
+                                                  .read<
+                                                      AccountManagerSupabase>()
+                                                  .establishment;
+                                              return est != null && est.isBranch
+                                                  ? est.id
+                                                  : (est?.dataEstablishmentId ??
+                                                      '');
+                                            })(),
+                                            semiFinishedProducts:
+                                                _semiFinishedProducts,
+                                            isCook: isCook,
+                                            weightPerPortion: _portionWeight,
+                                            onWeightPerPortionChanged: (v) {
+                                              _portionWeightUpdateDebounce
+                                                  ?.cancel();
+                                              _portionWeight = v;
+                                              _portionWeightUpdateDebounce =
+                                                  Timer(
                                                 const Duration(
-                                                    milliseconds: 150),
+                                                    milliseconds: 200),
                                                 () {
                                                   if (!mounted) return;
-                                                  setState(() {
-                                                    _ingredients
-                                                      ..clear()
-                                                      ..addAll(snapshot);
-                                                    _ensurePlaceholderRowAtEnd();
-                                                  });
+                                                  setState(() {});
                                                   _scheduleDraftSave();
                                                 },
                                               );
                                             },
+                                            onTotalOutputChanged: (newOutput) {
+                                              _scaleIngredientsToTotalOutput(
+                                                  newOutput);
+                                            },
+                                            onAdd: _showAddIngredient,
+                                            onUpdate: (i, ing) {
+                                              _lastUserInteractionAt =
+                                                  DateTime.now();
+                                              if (_ingredients.isEmpty &&
+                                                  i == 0) {
+                                                _ingredients.add(ing);
+                                                if (ing.hasData) {
+                                                  _ingredients[0] =
+                                                      ing.isPlaceholder
+                                                          ? ing.withRealId()
+                                                          : ing;
+                                                }
+                                                _ensurePlaceholderRowAtEnd();
+                                              } else if (i <
+                                                  _ingredients.length) {
+                                                _ingredients[i] =
+                                                    ing.isPlaceholder &&
+                                                            ing.hasData
+                                                        ? ing.withRealId()
+                                                        : ing;
+                                                _ensurePlaceholderRowAtEnd();
+                                              }
+                                              _ingredientUpdateDebounce
+                                                  ?.cancel();
+                                              _ingredientUpdateDebounce = Timer(
+                                                const Duration(
+                                                    milliseconds: 250),
+                                                () {
+                                                  if (!mounted) return;
+                                                  setState(() {});
+                                                  _scheduleDraftSave();
+                                                },
+                                              );
+                                            },
+                                            onRemove: _removeIngredient,
+                                            onSuggestWaste: _suggestWasteForRow,
+                                            onSuggestCookingLoss:
+                                                _suggestCookingLossForRow,
+                                            onAfterProductLinked:
+                                                _refreshGlobalProcessingHintsForRow,
+                                            hideTechnologyBlock: true,
+                                            omitTableHeader: false,
+                                            shrinkWrap: true,
+                                            onTapPfIngredient: (id) =>
+                                                context.push('/tech-cards/$id'),
                                           ),
+                                        )
+                                      : ListenableBuilder(
+                                          listenable: context
+                                              .read<ProductStoreSupabase>()
+                                              .catalogRevision,
+                                          builder: (context, _) {
+                                            return ConstrainedBox(
+                                              constraints: BoxConstraints(
+                                                  minWidth:
+                                                      constraints.maxWidth),
+                                              child: _TtkCookTable(
+                                                loc: loc,
+                                                dishName: _nameController.text,
+                                                ingredients: _ingredients
+                                                    .where((i) =>
+                                                        !i.isPlaceholder ||
+                                                        i.hasData)
+                                                    .toList(),
+                                                technology:
+                                                    _technologyController.text,
+                                                weightPerPortion:
+                                                    _portionWeight,
+                                                hideTechnologyInTable: true,
+                                                productStore: context.read<
+                                                    ProductStoreSupabase>(),
+                                                ingredientNameTranslationsById:
+                                                    _ingredientNameTranslationsById,
+                                                onTapPfIngredient: (id) =>
+                                                    context.push(
+                                                        '/tech-cards/$id?view=1'),
+                                                onIngredientsChanged: (list) {
+                                                  _cookTableSyncDebounce
+                                                      ?.cancel();
+                                                  final snapshot =
+                                                      List<TTIngredient>.from(
+                                                          list);
+                                                  _cookTableSyncDebounce =
+                                                      Timer(
+                                                    const Duration(
+                                                        milliseconds: 150),
+                                                    () {
+                                                      if (!mounted) return;
+                                                      setState(() {
+                                                        _ingredients
+                                                          ..clear()
+                                                          ..addAll(snapshot);
+                                                        _ensurePlaceholderRowAtEnd();
+                                                      });
+                                                      _scheduleDraftSave();
+                                                    },
+                                                  );
+                                                },
+                                              ),
+                                            );
+                                          },
                                         );
-                                      },
-                                    );
-                              if (!enableZoomViewer) {
-                                return table;
-                              }
-                              return InteractiveViewer(
-                                panEnabled: true,
-                                scaleEnabled: true,
-                                constrained: false,
-                                alignment: Alignment.topLeft,
-                                minScale: 0.5,
-                                maxScale: 2.2,
-                                boundaryMargin: const EdgeInsets.all(64),
-                                child: table,
-                              );
-                            }),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                        // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
-                        if (!tableOnlyView)
-                          Builder(
-                            builder: (context) {
-                              final totalOutput = _ingredients
-                                  .where((i) => i.productName.trim().isNotEmpty)
-                                  .fold<double>(
-                                      0, (s, i) => s + i.outputWeight);
-                              final showAdjust = effectiveCanEdit &&
-                                  _portionWeight > 0 &&
-                                  totalOutput > 0 &&
-                                  (totalOutput - _portionWeight).abs() > 1;
-                              if (!showAdjust) return const SizedBox.shrink();
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 32),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  onPressed: () async {
-                                    final ok = await showDialog<bool>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: Text(loc.t('ttk_adjust_waste_title')),
-                                        content: Text(
-                                          loc
-                                              .t('ttk_adjust_waste_confirm')
-                                              .replaceFirst(
-                                                  '%s',
-                                                  _portionWeight
-                                                      .toStringAsFixed(0))
-                                              .replaceFirst(
-                                                  '%s',
-                                                  totalOutput
-                                                      .toStringAsFixed(0)),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(false),
-                                              child: Text(
-                                                  MaterialLocalizations.of(ctx)
-                                                      .cancelButtonLabel)),
-                                          FilledButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(true),
-                                              child: Text(loc.t('answer_yes')),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (ok == true && mounted)
-                                      _adjustWasteToMatchOutput(_portionWeight);
-                                  },
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.tune,
-                                          size: 16,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                          loc.t('ttk_adjust_waste_to_output'),
-                                          style: const TextStyle(fontSize: 13)),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width > 1000
-                                ? 1000
-                                : MediaQuery.of(context).size.width,
-                            child: Container(
-                              margin: const EdgeInsets.only(top: 12),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                    color:
-                                        Theme.of(context).colorScheme.outline),
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerLowest,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 8, horizontal: 12),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                      border: const Border(
-                                          bottom: BorderSide(
-                                              color: Colors.grey, width: 1)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(loc.t('ttk_technology'),
-                                            style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold)),
-                                        if (_technologyTranslating) ...[
-                                          const SizedBox(width: 8),
-                                          const SizedBox(
-                                              width: 14,
-                                              height: 14,
-                                              child: CircularProgressIndicator(
-                                                  strokeWidth: 2)),
-                                          const SizedBox(width: 6),
-                                          Text(loc.t('loading'),
-                                              style: const TextStyle(
-                                                  fontSize: 12)),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  SingleChildScrollView(
-                                    padding: const EdgeInsets.all(12),
-                                    child: effectiveCanEdit
-                                        ? TextField(
-                                            controller: _technologyController,
-                                            maxLines: null,
-                                            minLines: 2,
-                                            style:
-                                                const TextStyle(fontSize: 13),
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              isDense: true,
-                                              filled: false,
-                                              hintText: loc.t('ttk_technology'),
-                                            ),
-                                          )
-                                        : Text(
-                                            _technologyController.text.isEmpty
-                                                ? '—'
-                                                : _technologyController.text,
-                                            style: const TextStyle(
-                                                fontSize: 13, height: 1.4),
-                                          ),
-                                  ),
-                                ],
+                                  if (!enableZoomViewer) {
+                                    return table;
+                                  }
+                                  return InteractiveViewer(
+                                    panEnabled: true,
+                                    scaleEnabled: true,
+                                    constrained: false,
+                                    alignment: Alignment.topLeft,
+                                    minScale: 0.5,
+                                    maxScale: 2.2,
+                                    boundaryMargin: const EdgeInsets.all(64),
+                                    child: table,
+                                  );
+                                }),
                               ),
                             ),
                           ),
                         ),
-                        // КБЖУ и аллергены (только для блюда)
-                        if (!_isSemiFinished && !tableOnlyView)
-                          RepaintBoundary(
-                            child: Builder(
-                              builder: (ctx) {
-                                final store =
-                                    context.read<ProductStoreSupabase>();
-                                _ensureDishKbjuDerived(loc, store);
-
-                                final totalCal = _dishKbjuTotalCal;
-                                final totalProt = _dishKbjuTotalProt;
-                                final totalFatVal = _dishKbjuTotalFat;
-                                final totalCarbVal = _dishKbjuTotalCarb;
-                                final missingNutritionIngredients =
-                                    _dishKbjuMissingNames;
-                                final allergenStr = _dishKbjuAllergenStr ??
-                                    (loc.currentLanguageCode == 'ru'
-                                        ? 'нет'
-                                        : 'none');
-
-                                final showKbjuBlock = !(totalCal == 0 &&
-                                    totalProt == 0 &&
-                                    totalFatVal == 0 &&
-                                    totalCarbVal == 0);
-
-                                final kbjuMarginTop =
-                                    missingNutritionIngredients.isNotEmpty
-                                        ? 8.0
-                                        : 12.0;
-
-                                String? warningText;
-                                if (missingNutritionIngredients.isNotEmpty) {
-                                  const maxShown = 5;
-                                  final shown = missingNutritionIngredients
-                                      .take(maxShown)
-                                      .join(', ');
-                                  final remaining =
-                                      missingNutritionIngredients.length -
-                                          missingNutritionIngredients
-                                              .take(maxShown)
-                                              .length;
-                                  final listText = remaining > 0
-                                      ? '$shown (+$remaining)'
-                                      : shown;
-                                  warningText = loc
-                                      .t(
-                                          'kbju_incomplete_dish_nutrition_warning')
-                                      .replaceFirst('%s', listText);
-                                }
-
-                                void showMissingNutritionDialog() {
-                                  if (missingNutritionIngredients.isEmpty) {
-                                    return;
-                                  }
-                                  showDialog<void>(
-                                    context: ctx,
-                                    builder: (dCtx) {
-                                      return AlertDialog(
-                                        title: Text(
-                                          loc.t(
-                                              'kbju_incomplete_dish_nutrition_title'),
-                                        ),
-                                        content: SizedBox(
-                                          width: 520,
-                                          height: 320,
-                                          child: ListView.builder(
-                                            itemCount:
-                                                missingNutritionIngredients
-                                                    .length,
-                                            itemBuilder: (c, idx) {
-                                              final name =
-                                                  missingNutritionIngredients[
-                                                      idx];
-                                              return ListTile(
-                                                dense: true,
-                                                title: Text(
-                                                  name,
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
+                                if (!tableOnlyView)
+                                  Builder(
+                                    builder: (context) {
+                                      final totalOutput = _ingredients
+                                          .where((i) =>
+                                              i.productName.trim().isNotEmpty)
+                                          .fold<double>(
+                                              0, (s, i) => s + i.outputWeight);
+                                      final showAdjust = effectiveCanEdit &&
+                                          _portionWeight > 0 &&
+                                          totalOutput > 0 &&
+                                          (totalOutput - _portionWeight).abs() >
+                                              1;
+                                      if (!showAdjust)
+                                        return const SizedBox.shrink();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            minimumSize: const Size(0, 32),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                          onPressed: () async {
+                                            final ok = await showDialog<bool>(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: Text(loc.t(
+                                                    'ttk_adjust_waste_title')),
+                                                content: Text(
+                                                  loc
+                                                      .t(
+                                                          'ttk_adjust_waste_confirm')
+                                                      .replaceFirst(
+                                                          '%s',
+                                                          _portionWeight
+                                                              .toStringAsFixed(
+                                                                  0))
+                                                      .replaceFirst(
+                                                          '%s',
+                                                          totalOutput
+                                                              .toStringAsFixed(
+                                                                  0)),
                                                 ),
-                                              );
-                                            },
+                                                actions: [
+                                                  TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.of(ctx)
+                                                              .pop(false),
+                                                      child: Text(
+                                                          MaterialLocalizations
+                                                                  .of(ctx)
+                                                              .cancelButtonLabel)),
+                                                  FilledButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(ctx)
+                                                            .pop(true),
+                                                    child: Text(
+                                                        loc.t('answer_yes')),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            if (ok == true && mounted)
+                                              _adjustWasteToMatchOutput(
+                                                  _portionWeight);
+                                          },
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.tune,
+                                                  size: 16,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                  loc.t(
+                                                      'ttk_adjust_waste_to_output'),
+                                                  style: const TextStyle(
+                                                      fontSize: 13)),
+                                            ],
                                           ),
                                         ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(dCtx).pop(),
-                                            child:
-                                                Text(loc.t('dialog_ok')),
-                                          ),
-                                        ],
                                       );
                                     },
-                                  );
-                                }
-
-                                if (!showKbjuBlock) {
-                                  if (warningText == null) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 12),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .errorContainer
-                                              .withOpacity(0.18),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
+                                  ),
+                                // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: SizedBox(
+                                    width:
+                                        MediaQuery.of(context).size.width > 1000
+                                            ? 1000
+                                            : MediaQuery.of(context).size.width,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(top: 12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
                                             color: Theme.of(context)
                                                 .colorScheme
-                                                .error
-                                                .withOpacity(0.35),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          warningText,
-                                          style: const TextStyle(fontSize: 13),
-                                        ),
+                                                .outline),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerLowest,
                                       ),
-                                      Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: TextButton(
-                                          onPressed: showMissingNutritionDialog,
-                                          child: Text(
-                                            loc.t(
-                                                'kbju_incomplete_dish_nutrition_show_list'),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }
-
-                                return Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (warningText != null)
-                                      Container(
-                                        margin: const EdgeInsets.only(
-                                            top: 12, bottom: 8),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .errorContainer
-                                              .withOpacity(0.18),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .error
-                                                .withOpacity(0.35),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              warningText,
-                                              style: const TextStyle(
-                                                  fontSize: 13),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8, horizontal: 12),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                              border: const Border(
+                                                  bottom: BorderSide(
+                                                      color: Colors.grey,
+                                                      width: 1)),
                                             ),
-                                            Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: TextButton(
-                                                onPressed:
-                                                    showMissingNutritionDialog,
-                                                child: Text(
+                                            child: Row(
+                                              children: [
+                                                Text(loc.t('ttk_technology'),
+                                                    style: const TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                                if (_technologyTranslating) ...[
+                                                  const SizedBox(width: 8),
+                                                  const SizedBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                              strokeWidth: 2)),
+                                                  const SizedBox(width: 6),
+                                                  Text(loc.t('loading'),
+                                                      style: const TextStyle(
+                                                          fontSize: 12)),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          SingleChildScrollView(
+                                            padding: const EdgeInsets.all(12),
+                                            child: effectiveCanEdit
+                                                ? TextField(
+                                                    controller:
+                                                        _technologyController,
+                                                    maxLines: null,
+                                                    minLines: 2,
+                                                    style: const TextStyle(
+                                                        fontSize: 13),
+                                                    decoration: InputDecoration(
+                                                      border: InputBorder.none,
+                                                      isDense: true,
+                                                      filled: false,
+                                                      hintText: loc
+                                                          .t('ttk_technology'),
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    _technologyController
+                                                            .text.isEmpty
+                                                        ? '—'
+                                                        : _technologyController
+                                                            .text,
+                                                    style: const TextStyle(
+                                                        fontSize: 13,
+                                                        height: 1.4),
+                                                  ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // КБЖУ и аллергены (только для блюда)
+                                if (!_isSemiFinished && !tableOnlyView)
+                                  RepaintBoundary(
+                                    child: Builder(
+                                      builder: (ctx) {
+                                        final store = context
+                                            .read<ProductStoreSupabase>();
+                                        _ensureDishKbjuDerived(loc, store);
+
+                                        final totalCal = _dishKbjuTotalCal;
+                                        final totalProt = _dishKbjuTotalProt;
+                                        final totalFatVal = _dishKbjuTotalFat;
+                                        final totalCarbVal = _dishKbjuTotalCarb;
+                                        final missingNutritionIngredients =
+                                            _dishKbjuMissingNames;
+                                        final allergenStr =
+                                            _dishKbjuAllergenStr ??
+                                                (loc.currentLanguageCode == 'ru'
+                                                    ? 'нет'
+                                                    : 'none');
+
+                                        final showKbjuBlock = !(totalCal == 0 &&
+                                            totalProt == 0 &&
+                                            totalFatVal == 0 &&
+                                            totalCarbVal == 0);
+
+                                        final kbjuMarginTop =
+                                            missingNutritionIngredients
+                                                    .isNotEmpty
+                                                ? 8.0
+                                                : 12.0;
+
+                                        String? warningText;
+                                        if (missingNutritionIngredients
+                                            .isNotEmpty) {
+                                          const maxShown = 5;
+                                          final shown =
+                                              missingNutritionIngredients
+                                                  .take(maxShown)
+                                                  .join(', ');
+                                          final remaining =
+                                              missingNutritionIngredients
+                                                      .length -
+                                                  missingNutritionIngredients
+                                                      .take(maxShown)
+                                                      .length;
+                                          final listText = remaining > 0
+                                              ? '$shown (+$remaining)'
+                                              : shown;
+                                          warningText = loc
+                                              .t('kbju_incomplete_dish_nutrition_warning')
+                                              .replaceFirst('%s', listText);
+                                        }
+
+                                        void showMissingNutritionDialog() {
+                                          if (missingNutritionIngredients
+                                              .isEmpty) {
+                                            return;
+                                          }
+                                          showDialog<void>(
+                                            context: ctx,
+                                            builder: (dCtx) {
+                                              return AlertDialog(
+                                                title: Text(
                                                   loc.t(
-                                                      'kbju_incomplete_dish_nutrition_show_list'),
+                                                      'kbju_incomplete_dish_nutrition_title'),
                                                 ),
+                                                content: SizedBox(
+                                                  width: 520,
+                                                  height: 320,
+                                                  child: ListView.builder(
+                                                    itemCount:
+                                                        missingNutritionIngredients
+                                                            .length,
+                                                    itemBuilder: (c, idx) {
+                                                      final name =
+                                                          missingNutritionIngredients[
+                                                              idx];
+                                                      return ListTile(
+                                                        dense: true,
+                                                        title: Text(
+                                                          name,
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(dCtx)
+                                                            .pop(),
+                                                    child: Text(
+                                                        loc.t('dialog_ok')),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        }
+
+                                        if (!showKbjuBlock) {
+                                          if (warningText == null) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Container(
+                                                margin: const EdgeInsets.only(
+                                                    top: 12),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 10),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .errorContainer
+                                                      .withOpacity(0.18),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .error
+                                                        .withOpacity(0.35),
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  warningText,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
+                                              ),
+                                              Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: TextButton(
+                                                  onPressed:
+                                                      showMissingNutritionDialog,
+                                                  child: Text(
+                                                    loc.t(
+                                                        'kbju_incomplete_dish_nutrition_show_list'),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }
+
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            if (warningText != null)
+                                              Container(
+                                                margin: const EdgeInsets.only(
+                                                    top: 12, bottom: 8),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 10),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .errorContainer
+                                                      .withOpacity(0.18),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .error
+                                                        .withOpacity(0.35),
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      warningText,
+                                                      style: const TextStyle(
+                                                          fontSize: 13),
+                                                    ),
+                                                    Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: TextButton(
+                                                        onPressed:
+                                                            showMissingNutritionDialog,
+                                                        child: Text(
+                                                          loc.t(
+                                                              'kbju_incomplete_dish_nutrition_show_list'),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            Container(
+                                              margin: EdgeInsets.only(
+                                                  top: kbjuMarginTop),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primaryContainer
+                                                    .withOpacity(0.3),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withOpacity(0.3),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                loc
+                                                    .t('kbju_allergens_in_dish')
+                                                    .replaceFirst(
+                                                        '%s',
+                                                        totalCal
+                                                            .round()
+                                                            .toString())
+                                                    .replaceFirst(
+                                                        '%s',
+                                                        totalProt
+                                                            .toStringAsFixed(1))
+                                                    .replaceFirst(
+                                                        '%s',
+                                                        totalFatVal
+                                                            .toStringAsFixed(1))
+                                                    .replaceFirst(
+                                                        '%s',
+                                                        totalCarbVal
+                                                            .toStringAsFixed(1))
+                                                    .replaceFirst(
+                                                        '%s', allergenStr),
+                                                style: const TextStyle(
+                                                    fontSize: 13),
                                               ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                    Container(
-                                      margin:
-                                          EdgeInsets.only(top: kbjuMarginTop),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primaryContainer
-                                            .withOpacity(0.3),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withOpacity(0.3),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        loc
-                                            .t('kbju_allergens_in_dish')
-                                            .replaceFirst('%s',
-                                                totalCal.round().toString())
-                                            .replaceFirst('%s',
-                                                totalProt.toStringAsFixed(1))
-                                            .replaceFirst('%s',
-                                                totalFatVal.toStringAsFixed(1))
-                                            .replaceFirst('%s',
-                                                totalCarbVal.toStringAsFixed(1))
-                                            .replaceFirst('%s', allergenStr),
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
+                                        );
+                                      },
                                     ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
-                        if (!tableOnlyView)
-                          _buildPhotoSection(loc, effectiveCanEdit),
-                        // Описание и состав для зала (только для блюд)
-                        if (!_isSemiFinished && !tableOnlyView)
-                          _buildHallFieldsSection(loc, effectiveCanEdit),
-                        if (effectiveCanEdit)
-                          SafeArea(
-                            top: false,
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    children: [
-                                      FilledButton(
-                                        onPressed: _saving ? null : _save,
-                                        child: _saving
-                                            ? SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .onPrimary))
-                                            : Text(loc.t('save')),
-                                        style: FilledButton.styleFrom(
-                                            minimumSize: const Size(120, 48),
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 24, vertical: 14)),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      TextButton.icon(
-                                        icon: Icon(Icons.clear_all,
-                                            size: 20,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface),
-                                        label: Text(loc.t('clear_ttk_form')),
-                                        onPressed: () =>
-                                            _confirmClearForm(context, loc),
-                                        style: TextButton.styleFrom(
-                                            minimumSize: const Size(100, 48),
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 16)),
-                                      ),
-                                      if (!_isNew) ...[
-                                        const SizedBox(width: 16),
-                                        TextButton.icon(
-                                          icon: Icon(Icons.delete_outline,
-                                              size: 20,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .error),
-                                          label: Text(loc.t('delete_tech_card'),
-                                              style: TextStyle(
+                                  ),
+                                // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
+                                if (!tableOnlyView)
+                                  _buildPhotoSection(loc, effectiveCanEdit),
+                                // Описание и состав для зала (только для блюд)
+                                if (!_isSemiFinished && !tableOnlyView)
+                                  _buildHallFieldsSection(
+                                      loc, effectiveCanEdit),
+                                if (effectiveCanEdit)
+                                  SafeArea(
+                                    top: false,
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          12, 12, 12, 12),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              FilledButton(
+                                                onPressed:
+                                                    _saving ? null : _save,
+                                                child: _saving
+                                                    ? SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                color: Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .onPrimary))
+                                                    : Text(loc.t('save')),
+                                                style: FilledButton.styleFrom(
+                                                    minimumSize:
+                                                        const Size(120, 48),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 24,
+                                                        vertical: 14)),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              TextButton.icon(
+                                                icon: Icon(Icons.clear_all,
+                                                    size: 20,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface),
+                                                label: Text(
+                                                    loc.t('clear_ttk_form')),
+                                                onPressed: () =>
+                                                    _confirmClearForm(
+                                                        context, loc),
+                                                style: TextButton.styleFrom(
+                                                    minimumSize:
+                                                        const Size(100, 48),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 16)),
+                                              ),
+                                              if (!_isNew) ...[
+                                                const SizedBox(width: 16),
+                                                TextButton.icon(
+                                                  icon: Icon(
+                                                      Icons.delete_outline,
+                                                      size: 20,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .error),
+                                                  label: Text(
+                                                      loc.t('delete_tech_card'),
+                                                      style: TextStyle(
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .error)),
+                                                  onPressed: () =>
+                                                      _confirmDelete(
+                                                          context, loc),
+                                                  style: TextButton.styleFrom(
+                                                      minimumSize:
+                                                          const Size(120, 48),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 16)),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          if (!_isNew) ...[
+                                            const SizedBox(height: 8),
+                                            TextButton.icon(
+                                              icon: Icon(Icons.history,
+                                                  size: 16,
                                                   color: Theme.of(context)
                                                       .colorScheme
-                                                      .error)),
-                                          onPressed: () =>
-                                              _confirmDelete(context, loc),
-                                          style: TextButton.styleFrom(
-                                              minimumSize: const Size(120, 48),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 16)),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  if (!_isNew) ...[
-                                    const SizedBox(height: 8),
-                                    TextButton.icon(
-                                      icon: Icon(Icons.history,
-                                          size: 16,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant),
-                                      label: Text(loc.t('ttk_history'),
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurfaceVariant)),
-                                      onPressed: () =>
-                                          _showTechCardHistory(context),
-                                      style: TextButton.styleFrom(
-                                          minimumSize: const Size(0, 36),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 0)),
+                                                      .onSurfaceVariant),
+                                              label: Text(loc.t('ttk_history'),
+                                                  style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant)),
+                                              onPressed: () =>
+                                                  _showTechCardHistory(context),
+                                              style: TextButton.styleFrom(
+                                                  minimumSize:
+                                                      const Size(0, 36),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 0)),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
-                                  ],
-                                ],
-                              ),
+                                  ),
+                              ],
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
-            ),
-          ),
+            );
+          },
         ),
-      ],
-    );
-        },
       ),
     );
   }
@@ -6676,7 +6848,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 /// Закреп шапки таблицы состава при вертикальном скролле страницы.
 /// Горизонталь — не второй ScrollView (один [ScrollController] может быть только у одного скролла),
 /// а сдвиг содержимого по [hScroll.offset] тела таблицы — как закреплённая строка в Excel.
-class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
+class _TtkCompositionPinnedHeaderDelegate
+    extends SliverPersistentHeaderDelegate {
   _TtkCompositionPinnedHeaderDelegate({
     required this.loc,
     required this.hScroll,
@@ -6697,7 +6870,7 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
 
   @override
   Widget build(
-    BuildContext context, double shrinkOffset, bool overlapsContent) {
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Material(
       color: surfaceColor,
       elevation: overlapsContent ? 2 : 0,
@@ -6732,7 +6905,8 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
   }
 
   @override
-  bool shouldRebuild(covariant _TtkCompositionPinnedHeaderDelegate oldDelegate) {
+  bool shouldRebuild(
+      covariant _TtkCompositionPinnedHeaderDelegate oldDelegate) {
     return oldDelegate.loc != loc ||
         oldDelegate.surfaceColor != surfaceColor ||
         oldDelegate.hScroll != hScroll;
@@ -7182,16 +7356,14 @@ class _TtkTableState extends State<_TtkTable> {
                               SizedBox.expand(
                                 child: _EditableGrossCell(
                                   grams: ing.grossWeight,
-                                  decimalPlaces:
-                                      unitPrefs.isImperial ? 2 : 0,
-                                  canonicalToDisplay: (v) => UnitConverter
-                                      .toDisplay(
-                                        canonicalValue: v,
-                                        canonicalUnit: ing.unit,
-                                        system: unitPrefs.unitSystem,
-                                        gramsPerPiece: ing.gramsPerPiece,
-                                      )
-                                      .value,
+                                  decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                                  canonicalToDisplay: (v) =>
+                                      UnitConverter.toDisplay(
+                                    canonicalValue: v,
+                                    canonicalUnit: ing.unit,
+                                    system: unitPrefs.unitSystem,
+                                    gramsPerPiece: ing.gramsPerPiece,
+                                  ).value,
                                   displayToCanonical: (v) =>
                                       UnitConverter.fromDisplay(
                                     displayValue: v,
@@ -7227,8 +7399,8 @@ class _TtkTableState extends State<_TtkTable> {
                                           widget.onUpdate(
                                               i,
                                               ing.copyWith(
-                                                  primaryWastePct: v
-                                                      .clamp(0.0, 99.9)));
+                                                  primaryWastePct:
+                                                      v.clamp(0.0, 99.9)));
                                       },
                                     ),
                                   ),
@@ -7257,16 +7429,14 @@ class _TtkTableState extends State<_TtkTable> {
                               SizedBox.expand(
                                 child: _EditableNetCell(
                                   value: ing.effectiveGrossWeight,
-                                  decimalPlaces:
-                                      unitPrefs.isImperial ? 2 : 0,
-                                  canonicalToDisplay: (v) => UnitConverter
-                                      .toDisplay(
-                                        canonicalValue: v,
-                                        canonicalUnit: ing.unit,
-                                        system: unitPrefs.unitSystem,
-                                        gramsPerPiece: ing.gramsPerPiece,
-                                      )
-                                      .value,
+                                  decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                                  canonicalToDisplay: (v) =>
+                                      UnitConverter.toDisplay(
+                                    canonicalValue: v,
+                                    canonicalUnit: ing.unit,
+                                    system: unitPrefs.unitSystem,
+                                    gramsPerPiece: ing.gramsPerPiece,
+                                  ).value,
                                   displayToCanonical: (v) =>
                                       UnitConverter.fromDisplay(
                                     displayValue: v,
@@ -7287,7 +7457,8 @@ class _TtkTableState extends State<_TtkTable> {
                           )
                         : _cell(
                             UnitConverter.roundUi(
-                              _displayWeight(ing.effectiveGrossWeight, ing).value,
+                              _displayWeight(ing.effectiveGrossWeight, ing)
+                                  .value,
                               fractionDigits: unitPrefs.isImperial ? 2 : 0,
                             ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
                           ),
@@ -7362,18 +7533,18 @@ class _TtkTableState extends State<_TtkTable> {
                             (ing.cookingProcessId != null &&
                                     ing.cookingProcessId!.trim().isNotEmpty)
                                 ? (CookingProcess.findById(
-                                              ing.cookingProcessId!.trim(),
-                                            )
-                                        ?.getLocalizedName(lang) ??
+                                      ing.cookingProcessId!.trim(),
+                                    )?.getLocalizedName(lang) ??
                                     ing.cookingProcessName ??
                                     loc.t('dash'))
                                 : (ing.cookingProcessName != null &&
-                                        ing.cookingProcessName!.trim().isNotEmpty)
+                                        ing.cookingProcessName!
+                                            .trim()
+                                            .isNotEmpty)
                                     ? (CookingProcess.resolveFromAiToken(
-                                                  ing.cookingProcessName,
-                                                  lang,
-                                                )
-                                            ?.getLocalizedName(lang) ??
+                                          ing.cookingProcessName,
+                                          lang,
+                                        )?.getLocalizedName(lang) ??
                                         ing.cookingProcessName ??
                                         loc.t('dash'))
                                     : loc.t('dash'),
@@ -7393,8 +7564,7 @@ class _TtkTableState extends State<_TtkTable> {
                                       final output = eff > 0
                                           ? eff *
                                               (1.0 -
-                                                  pct.clamp(0.0, 99.9) /
-                                                      100.0)
+                                                  pct.clamp(0.0, 99.9) / 100.0)
                                           : 0.0;
                                       widget.onUpdate(
                                           i,
@@ -7898,6 +8068,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
       return UnitConverter.roundUi(dv.value, fractionDigits: digits)
           .toStringAsFixed(digits);
     }
+
     final borderColor = Colors.grey;
     final colScale = _TtkCookTable._webColumnScale(context);
     return Stack(
@@ -7989,7 +8160,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                             ing.sourceTechCardId!.isNotEmpty &&
                             widget.onTapPfIngredient != null
                         ? TableCell(
-                            verticalAlignment: TableCellVerticalAlignment.middle,
+                            verticalAlignment:
+                                TableCellVerticalAlignment.middle,
                             child: InkWell(
                               onTap: () => widget
                                   .onTapPfIngredient!(ing.sourceTechCardId!),
@@ -8026,7 +8198,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                             ),
                           )
                         : TableCell(
-                            verticalAlignment: TableCellVerticalAlignment.middle,
+                            verticalAlignment:
+                                TableCellVerticalAlignment.middle,
                             child: Padding(
                               padding: _TtkCookTable._cellPad,
                               child: Align(
@@ -8081,18 +8254,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                       (ing.cookingProcessId != null &&
                               ing.cookingProcessId!.trim().isNotEmpty)
                           ? (CookingProcess.findById(
-                                        ing.cookingProcessId!.trim(),
-                                      )
-                                  ?.getLocalizedName(cookLang) ??
+                                ing.cookingProcessId!.trim(),
+                              )?.getLocalizedName(cookLang) ??
                               ing.cookingProcessName ??
                               widget.loc.t('dash'))
                           : (ing.cookingProcessName != null &&
                                   ing.cookingProcessName!.trim().isNotEmpty)
                               ? (CookingProcess.resolveFromAiToken(
-                                            ing.cookingProcessName,
-                                            cookLang,
-                                          )
-                                      ?.getLocalizedName(cookLang) ??
+                                    ing.cookingProcessName,
+                                    cookLang,
+                                  )?.getLocalizedName(cookLang) ??
                                   ing.cookingProcessName ??
                                   widget.loc.t('dash'))
                               : widget.loc.t('dash'),
@@ -8650,8 +8821,8 @@ class _ProductPickerState extends State<_ProductPicker> {
                 onTap: () => _askWeight(p, loc),
                 child: ListTile(
                   title: Text(_getDisplayName(p, lang)),
-                  subtitle: Text(loc.unitLabel(
-                      (p.unit ?? 'g').trim().toLowerCase())),
+                  subtitle:
+                      Text(loc.unitLabel((p.unit ?? 'g').trim().toLowerCase())),
                 ),
               );
             },
@@ -8716,8 +8887,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                           items: CulinaryUnits.all
                               .map((u) => DropdownMenuItem(
                                     value: u.id,
-                                    child: Text(
-                                        loc.unitLabel(u.id)),
+                                    child: Text(loc.unitLabel(u.id)),
                                   ))
                               .toList(),
                           onChanged: (v) =>
@@ -8925,8 +9095,7 @@ class _TechCardPicker extends StatelessWidget {
                       items: CulinaryUnits.all
                           .map((u) => DropdownMenuItem(
                                 value: u.id,
-                                child:
-                                    Text(loc.unitLabel(u.id)),
+                                child: Text(loc.unitLabel(u.id)),
                               ))
                           .toList(),
                       onChanged: (v) =>

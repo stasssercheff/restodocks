@@ -5464,7 +5464,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     isExpanded: true,
                     value: _filterSection,
                     decoration: InputDecoration(
-                      labelText: loc.t('ttk_section_label'),
+                      labelText: loc.t('ttk_col_section'),
                       isDense: true,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(
