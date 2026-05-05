@@ -18,8 +18,8 @@ const double _kTtkHeaderRowHeight = 44.0;
 /// Строки с продуктами/вводом — на 20% ниже базовой 44px.
 const double _kTtkIngredientRowHeight = 44.0 * 0.8;
 
-/// Строка «Итого» — на 20% выше, чтобы полоса скролла не пересекала цифры.
-const double _kTtkTotalRowHeight = 44.0 * 1.2;
+/// Строка «Итого» слегка выше базовой (компактная версия для веб).
+const double _kTtkTotalRowHeight = 44.0 * 1.02;
 
 class ExcelStyleTtkTable extends StatefulWidget {
   final LocalizationService loc;
@@ -1075,62 +1075,59 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         final name = _getIngredientDisplayName(ingredient, lang);
         final isPf = ingredient.sourceTechCardId != null &&
             ingredient.sourceTechCardId!.isNotEmpty;
-        return Container(
+        return SizedBox(
           height: _kTtkIngredientRowHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400, width: 1),
-            borderRadius: BorderRadius.circular(4),
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    if (isPf && widget.onTapPfIngredient != null) {
-                      widget.onTapPfIngredient!(ingredient.sourceTechCardId!);
-                      return;
-                    }
-                    final selected = await _showProductPickerDialog(
-                      initialQuery: name,
-                    );
-                    if (selected != null) {
-                      _handleProductSelection(ingredient, rowIndex, selected);
-                    }
-                  },
-                  child: Tooltip(
-                    message: name,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isPf
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
-                          decoration: isPf ? TextDecoration.underline : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      if (isPf && widget.onTapPfIngredient != null) {
+                        widget.onTapPfIngredient!(ingredient.sourceTechCardId!);
+                        return;
+                      }
+                      final selected = await _showProductPickerDialog(
+                        initialQuery: name,
+                      );
+                      if (selected != null) {
+                        _handleProductSelection(ingredient, rowIndex, selected);
+                      }
+                    },
+                    child: Tooltip(
+                      message: name,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isPf
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                            decoration: isPf ? TextDecoration.underline : null,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (isPf && widget.onTapPfIngredient != null)
-                IconButton(
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  tooltip: widget.loc.t('ttk_view'),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 28, minHeight: 28),
-                  onPressed: () =>
-                      widget.onTapPfIngredient!(ingredient.sourceTechCardId!),
-                ),
-              const Icon(Icons.edit, size: 16, color: Colors.grey),
-            ],
+                if (isPf && widget.onTapPfIngredient != null)
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    tooltip: widget.loc.t('ttk_view'),
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: () =>
+                        widget.onTapPfIngredient!(ingredient.sourceTechCardId!),
+                  ),
+                const Icon(Icons.edit, size: 16, color: Colors.grey),
+              ],
+            ),
           ),
         );
       }
@@ -1621,7 +1618,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       controller.text = value;
     }
 
-    final numericVPad = rowHeight <= 36 ? 4.0 : 12.0;
     return SizedBox(
       height: rowHeight,
       child: widget.canEdit
@@ -1637,15 +1633,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               textAlign: TextAlign.center,
               textAlignVertical: TextAlignVertical.center,
               textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: numericVPad,
-                ),
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
                 isDense: true,
-                filled: true,
-                fillColor: Colors.white,
+                filled: false,
               ),
               onChanged: (v) {
                 _debounceTimers[key]?.cancel();
@@ -1692,69 +1689,67 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     return SizedBox(
       height: _kTtkIngredientRowHeight,
-      child: Center(
-        child: widget.canEdit
-            ? DropdownButton<String?>(
-                isExpanded: true,
-                hint: Text(widget.loc.t('ttk_cooking_method'),
-                    style: const TextStyle(fontSize: 12)),
-                value: cookingMethodDropdownValue(ingredient),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(widget.loc.t('dash'),
+      child: widget.canEdit
+          ? DropdownButton<String?>(
+              isExpanded: true,
+              hint: Text(widget.loc.t('ttk_cooking_method'),
+                  style: const TextStyle(fontSize: 12)),
+              value: cookingMethodDropdownValue(ingredient),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(widget.loc.t('dash'),
+                      style: const TextStyle(fontSize: 12)),
+                ),
+                ...CookingProcess.defaultProcesses.map((process) {
+                  return DropdownMenuItem<String?>(
+                    value: process.id,
+                    child: Text(widget.loc.cookingProcessLabel(process),
                         style: const TextStyle(fontSize: 12)),
-                  ),
-                  ...CookingProcess.defaultProcesses.map((process) {
-                    return DropdownMenuItem<String?>(
-                      value: process.id,
-                      child: Text(widget.loc.cookingProcessLabel(process),
-                          style: const TextStyle(fontSize: 12)),
-                    );
-                  }),
-                ],
-                onChanged: (processId) {
-                  if (processId == null) {
-                    _updateIngredient(
-                        rowIndex,
-                        ingredient.copyWith(
-                          cookingProcessId: null,
-                          cookingProcessName: null,
-                        ));
-                    return;
-                  }
-                  final process = CookingProcess.defaultProcesses
-                      .firstWhere((p) => p.id == processId);
+                  );
+                }),
+              ],
+              onChanged: (processId) {
+                if (processId == null) {
                   _updateIngredient(
                       rowIndex,
                       ingredient.copyWith(
-                        cookingProcessId: processId,
-                        cookingProcessName:
-                            widget.loc.cookingProcessLabel(process),
+                        cookingProcessId: null,
+                        cookingProcessName: null,
                       ));
-                  widget.onSuggestCookingLoss?.call(rowIndex);
-                },
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, size: 16),
-                style: const TextStyle(fontSize: 12, color: Colors.black),
-              )
-            : Text(
-                () {
-                  final id = ingredient.cookingProcessId;
-                  if (id != null) {
-                    final p = CookingProcess.findById(id);
-                    if (p != null) {
-                      return widget.loc.cookingProcessLabel(p);
-                    }
+                  return;
+                }
+                final process = CookingProcess.defaultProcesses
+                    .firstWhere((p) => p.id == processId);
+                _updateIngredient(
+                    rowIndex,
+                    ingredient.copyWith(
+                      cookingProcessId: processId,
+                      cookingProcessName:
+                          widget.loc.cookingProcessLabel(process),
+                    ));
+                widget.onSuggestCookingLoss?.call(rowIndex);
+              },
+              underline: const SizedBox(),
+              icon: const Icon(Icons.arrow_drop_down, size: 16),
+              style: const TextStyle(fontSize: 12, color: Colors.black),
+            )
+          : Text(
+              () {
+                final id = ingredient.cookingProcessId;
+                if (id != null) {
+                  final p = CookingProcess.findById(id);
+                  if (p != null) {
+                    return widget.loc.cookingProcessLabel(p);
                   }
-                  return ingredient.cookingProcessName ?? '';
-                }(),
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-      ),
+                }
+                return ingredient.cookingProcessName ?? '';
+              }(),
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
     );
   }
 
@@ -2184,12 +2179,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           onTap: _openPicker,
           child: Container(
             height: _kTtkIngredientRowHeight,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400, width: 1),
-              borderRadius: BorderRadius.circular(4),
-            ),
             child: Text(
               _searchController.text.isEmpty
                   ? widget.loc.t('ttk_choose_product')
