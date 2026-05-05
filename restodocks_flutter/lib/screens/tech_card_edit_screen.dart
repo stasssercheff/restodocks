@@ -6248,10 +6248,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               .read<ProductStoreSupabase>()
                                               .catalogRevision,
                                           builder: (context, _) {
-                                            return ConstrainedBox(
-                                              constraints: BoxConstraints(
-                                                  minWidth:
-                                                      constraints.maxWidth),
+                                            return SizedBox(
+                                              width: _TtkCookTable
+                                                  .intrinsicTableWidth(context),
                                               child: _TtkCookTable(
                                                 loc: loc,
                                                 dishName: _nameController.text,
@@ -8265,7 +8264,9 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                     TableCell(
                       verticalAlignment: TableCellVerticalAlignment.middle,
                       child: Container(
-                        height: _TtkCookTable._kCookIngredientRowHeight,
+                        constraints: const BoxConstraints(
+                          minHeight: _TtkCookTable._kCookIngredientRowHeight,
+                        ),
                         color: Colors.white,
                       ),
                     ),
@@ -8305,6 +8306,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                     ),
                                     textAlign: TextAlign.start,
                                     softWrap: true,
+                                    maxLines: null,
+                                    overflow: TextOverflow.visible,
                                   ),
                                 ),
                               ),
@@ -8322,6 +8325,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                   textAlign: TextAlign.start,
                                   style: const TextStyle(fontSize: 12),
                                   softWrap: true,
+                                  maxLines: null,
+                                  overflow: TextOverflow.visible,
                                 ),
                               ),
                             ),
@@ -8521,8 +8526,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
               child: Text(
                 widget.dishName,
                 style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 10,
+                softWrap: true,
               ),
             ),
           ),
