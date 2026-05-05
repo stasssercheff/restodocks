@@ -8033,6 +8033,34 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     );
   }
 
+  /// Заголовки таблицы просмотра: по центру по горизонтали и вертикали.
+  TableCell _cookHeaderCell(String text) {
+    const titleStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.bold,
+      height: 1.15,
+    );
+    return TableCell(
+      verticalAlignment: TableCellVerticalAlignment.middle,
+      child: SizedBox(
+        height: 44,
+        child: Center(
+          child: Padding(
+            padding: _TtkCookTable._cellPad,
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: titleStyle,
+              softWrap: true,
+              maxLines: 4,
+              overflow: TextOverflow.clip,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -8093,28 +8121,13 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                       .primaryContainer
                       .withValues(alpha: 0.3)),
               children: [
-                TableCell(
-                  verticalAlignment: TableCellVerticalAlignment.middle,
-                  child: SizedBox(
-                    height: 44,
-                    child: Center(
-                      child: Text(
-                        widget.loc.t('ttk_name'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-                _cell(widget.loc.t('ttk_product'), bold: true),
-                _cell(grossHeader, bold: true, align: TextAlign.center),
-                _cell(netHeader, bold: true, align: TextAlign.center),
-                _cell(widget.loc.t('ttk_cooking_method'),
-                    bold: true, align: TextAlign.center),
-                _cell(outputHeader, bold: true, align: TextAlign.center),
-                _cell(widget.loc.t('ttk_portions_pcs'),
-                    bold: true, align: TextAlign.center),
+                _cookHeaderCell(widget.loc.t('ttk_name')),
+                _cookHeaderCell(widget.loc.t('ttk_product')),
+                _cookHeaderCell(grossHeader),
+                _cookHeaderCell(netHeader),
+                _cookHeaderCell(widget.loc.t('ttk_cooking_method')),
+                _cookHeaderCell(outputHeader),
+                _cookHeaderCell(widget.loc.t('ttk_portions_pcs')),
               ],
             ),
             if (_ingredients.isEmpty)
