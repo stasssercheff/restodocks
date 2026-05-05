@@ -2787,6 +2787,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       });
     }
     try {
+      // Оверлей названий с диска до первого build списка (ru UI + англ. dishName в БД).
+      await TechCardTranslationCache.loadForEstablishment(
+          est.dataEstablishmentId.trim());
+
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
 

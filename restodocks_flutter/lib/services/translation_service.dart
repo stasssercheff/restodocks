@@ -533,7 +533,7 @@ class TranslationService {
     required String targetLanguage,
     required Map<String, String> existingFromDatabase,
   }) {
-    if (techCards.isEmpty || targetLanguage == 'ru') return 0;
+    if (techCards.isEmpty) return 0;
     final out = existingFromDatabase;
     var n = 0;
     for (final tc in techCards) {
@@ -605,6 +605,9 @@ class TranslationService {
   /// переводим через [translate] (тот же Google/MyMemory/ИИ), результат попадает в БД и в возвращаемую карту.
   ///
   /// Без этого в UI с языком en остаётся русский `dish_name`, а префикс ПФ («Prep») уже на английском — смешение языков.
+  ///
+  /// Для **ru UI** нельзя выходить раньше: иначе карточки с англ. `dishName` в БД
+  /// никогда не получают подпись в overlay (остаётся «caesar sauce» и т.д.).
   Future<Map<String, String>> ensureMissingTechCardDishNameTranslations({
     required List<TechCard> techCards,
     required String targetLanguage,
@@ -613,7 +616,6 @@ class TranslationService {
   }) async {
     final out = Map<String, String>.from(existingFromDatabase);
     if (techCards.isEmpty) return out;
-    if (targetLanguage == 'ru') return out;
 
     bool needsFill(TechCard tc) => _needsDishNameFill(tc, targetLanguage, out);
 
