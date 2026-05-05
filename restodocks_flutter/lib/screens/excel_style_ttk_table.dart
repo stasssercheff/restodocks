@@ -1640,6 +1640,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   child: TextField(
                     controller: controller,
                     focusNode: focusNode,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
@@ -1658,7 +1661,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       errorBorder: InputBorder.none,
                       focusedErrorBorder: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
-                      isDense: true,
+                      isDense: false,
                       filled: false,
                     ),
                     onChanged: (v) {
