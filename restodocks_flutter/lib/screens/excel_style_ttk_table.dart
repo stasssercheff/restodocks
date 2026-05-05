@@ -38,20 +38,26 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int) onRemove;
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
+
   /// После привязки продукта к строке — подтянуть глобальные % отхода / ужарки из БД.
   final void Function(int)? onAfterProductLinked;
   final bool isCook; // true для поваров - скрываем стоимость
   /// Если true, блок технологии не отображается (рендерится отдельно в родителе)
   final bool hideTechnologyBlock;
+
   /// Вес порции (г) — вносится в итого, столбец «вес прц». При изменении вызывается callback.
   final double weightPerPortion;
   final void Function(double)? onWeightPerPortionChanged;
+
   /// При изменении выхода итого — масштабирование всех ингредиентов в реальном времени (без подтверждения).
   final void Function(double)? onTotalOutputChanged;
+
   /// При клике на ПФ-ингредиент — переход к просмотру ТТК ПФ.
   final void Function(String techCardId)? onTapPfIngredient;
+
   /// Родитель скроллит страницу по вертикали — без вложенного вертикального скролла таблицы.
   final bool shrinkWrap;
+
   /// Шапка таблицы вынесена в [compositionPinnedHeader] (закреп над скроллом страницы).
   final bool omitTableHeader;
 
@@ -189,8 +195,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   String _grossDisplayText(TTIngredient ing) {
     if (ing.grossWeight == 0) return '';
     if (_usesPieces(ing)) {
-      final v = CulinaryUnits.fromGrams(ing.grossWeight, ing.unit, gramsPerPiece: ing.gramsPerPiece ?? 50);
-      return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+      final v = CulinaryUnits.fromGrams(ing.grossWeight, ing.unit,
+          gramsPerPiece: ing.gramsPerPiece ?? 50);
+      return v == v.truncateToDouble()
+          ? v.toInt().toString()
+          : v.toStringAsFixed(1);
     }
     return ing.grossWeight.toStringAsFixed(0);
   }
@@ -239,13 +248,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final estId = widget.establishmentId;
     if (estId == null) return;
     final products = store.getNomenclatureProducts(estId);
-    final missing = products.where(
-      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
-    ).toList();
+    final missing = products
+        .where(
+          (p) => !(p.names?.containsKey(lang) == true &&
+              (p.names![lang]?.trim().isNotEmpty ?? false)),
+        )
+        .toList();
     for (final p in missing) {
       if (!mounted) break;
       try {
-        await store.translateProductAwait(p.id)
+        await store
+            .translateProductAwait(p.id)
             .timeout(const Duration(seconds: 5), onTimeout: () => null);
       } catch (_) {}
     }
@@ -331,13 +344,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем обязательные поля widget
       if (widget.loc == null) {
-        return const Text('LocalizationService is null', style: TextStyle(color: Colors.red));
+        return const Text('LocalizationService is null',
+            style: TextStyle(color: Colors.red));
       }
       if (widget.productStore == null) {
-        return const Text('ProductStore is null', style: TextStyle(color: Colors.red));
+        return const Text('ProductStore is null',
+            style: TextStyle(color: Colors.red));
       }
       if (widget.onUpdate == null) {
-        return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
+        return const Text('onUpdate callback is null',
+            style: TextStyle(color: Colors.red));
       }
 
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
@@ -378,8 +394,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Error in ExcelStyleTtkTable build', style: TextStyle(color: Colors.red)),
-            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+            const Text('Error in ExcelStyleTtkTable build',
+                style: TextStyle(color: Colors.red)),
+            Text('Error: $e',
+                style: const TextStyle(color: Colors.red, fontSize: 10)),
           ],
         ),
       );
@@ -390,7 +408,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем данные
       if (widget.ingredients == null) {
-        return const Text('Ingredients is null', style: TextStyle(color: Colors.red));
+        return const Text('Ingredients is null',
+            style: TextStyle(color: Colors.red));
       }
 
       // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
@@ -398,10 +417,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       for (var i = 0; i < widget.ingredients.length; i++) {
         var ing = widget.ingredients[i];
         if (ing == null) {
-          return Text('Ingredient at index $i is null', style: const TextStyle(color: Colors.red));
+          return Text('Ingredient at index $i is null',
+              style: const TextStyle(color: Colors.red));
         }
         if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
-          ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
+          ing = ing.copyWith(
+              outputWeight: ing.netWeight *
+                  (1 - (ing.cookingLossPctOverride ?? 0) / 100));
         }
         indexedRows.add(MapEntry(i, ing));
       }
@@ -409,422 +431,509 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         indexedRows.add(MapEntry(0, TTIngredient.emptyPlaceholder()));
       }
 
-    // Добавляем строку "Итого"
-    final totalOutput = indexedRows
-        .map((e) => e.value)
-        .where((ing) => ing.productName.isNotEmpty)
-        .fold<double>(0, (s, ing) => s + ing.outputWeight);
-    // Иногда из источника может прилететь отрицательная стоимость (ошибка парсинга/валюты).
-    // В UI это выглядит как «-100» в итого. Для отображения не допускаем отрицательные суммы.
-    final totalCost = indexedRows
-        .map((e) => e.value)
-        .where((ing) => ing.productName.isNotEmpty)
-        .fold<double>(0, (s, ing) => s + _lineCostForTotals(ing));
+      // Добавляем строку "Итого"
+      final totalOutput = indexedRows
+          .map((e) => e.value)
+          .where((ing) => ing.productName.isNotEmpty)
+          .fold<double>(0, (s, ing) => s + ing.outputWeight);
+      // Иногда из источника может прилететь отрицательная стоимость (ошибка парсинга/валюты).
+      // В UI это выглядит как «-100» в итого. Для отображения не допускаем отрицательные суммы.
+      final totalCost = indexedRows
+          .map((e) => e.value)
+          .where((ing) => ing.productName.isNotEmpty)
+          .fold<double>(0, (s, ing) => s + _lineCostForTotals(ing));
 
-    // Расчет итоговой стоимости
-    // ПФ: стоимость за кг готового продукта.
-    // Блюдо: стоимость за порцию = общая стоимость * (вес порции / общий выход).
-    final costPerKgFinishedProduct = widget.isSemiFinished
-        ? (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
-        : (totalOutput > 0
-            ? (totalCost * (widget.weightPerPortion / totalOutput))
-            : 0);
+      // Расчет итоговой стоимости
+      // ПФ: стоимость за кг готового продукта.
+      // Блюдо: стоимость за порцию = общая стоимость * (вес порции / общий выход).
+      final costPerKgFinishedProduct = widget.isSemiFinished
+          ? (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
+          : (totalOutput > 0
+              ? (totalCost * (widget.weightPerPortion / totalOutput))
+              : 0);
 
-    // Подгрузка остальных строк в следующих кадрах — убирает задержку до первой реакции
-    final totalRows = indexedRows.length;
-    final displayRows = widget.shrinkWrap
-        ? totalRows
-        : math.min(_rowsToShow, totalRows);
-    if (!widget.shrinkWrap && _rowsToShow < totalRows) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _rowsToShow = (_rowsToShow + _chunkRows).clamp(0, totalRows);
+      // Подгрузка остальных строк в следующих кадрах — убирает задержку до первой реакции
+      final totalRows = indexedRows.length;
+      final displayRows =
+          widget.shrinkWrap ? totalRows : math.min(_rowsToShow, totalRows);
+      if (!widget.shrinkWrap && _rowsToShow < totalRows) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _rowsToShow = (_rowsToShow + _chunkRows).clamp(0, totalRows);
+          });
         });
-      });
-    }
+      }
 
-    final mergedOverlayTop =
-        widget.omitTableHeader ? 0.0 : _kTtkHeaderRowHeight;
+      final mergedOverlayTop =
+          widget.omitTableHeader ? 0.0 : _kTtkHeaderRowHeight;
 
-    final Widget tableCore = ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: 1295,
-              maxWidth: 1295,
-            ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Таблица: Stack для объединённой ячейки «Название»
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-              Table(
-            border: TableBorder.all(color: Colors.black, width: 1),
-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-            columnWidths: const {
-              0: FixedColumnWidth(50),   // Тип ТТК
-              1: FixedColumnWidth(120),  // Название
-              2: FixedColumnWidth(175),  // Продукт
-              3: FixedColumnWidth(85),   // Брутто г./шт
-              4: FixedColumnWidth(95),   // % отхода
-              5: FixedColumnWidth(75),   // Нетто г.
-              6: FixedColumnWidth(115),  // Способ приготовления
-              7: FixedColumnWidth(100),  // % ужарки
-              8: FixedColumnWidth(75),   // Выход г.
-              9: FixedColumnWidth(75),   // вес прц
-              10: FixedColumnWidth(90),  // порций(шт)
-              11: FixedColumnWidth(95),  // Стоимость
-              12: FixedColumnWidth(105), // Цена за кг
-              13: FixedColumnWidth(40), // Удаление
-            },
-            children: [
-              if (!widget.omitTableHeader)
-              TableRow(
-                decoration: BoxDecoration(color: Colors.grey.shade200),
-                children: [
-                  _buildHeaderCell(widget.loc.t('ttk_type')),
-                  _buildHeaderCell(widget.loc.t('ttk_name')),
-                  _buildHeaderCell(widget.loc.t('ttk_product')),
-                  _buildHeaderCell(
-                      widget.loc.t('ttk_gross_gr').replaceFirst(' ', '\n')),
-                  _buildHeaderCell(widget.loc.t('ttk_waste_pct')),
-                  _buildHeaderCell(widget.loc.t('ttk_net_gr')),
-                  _buildHeaderCell(
-                      widget.loc.t('ttk_cooking_method').replaceFirst(' ', '\n')),
-                  _buildHeaderCell(widget.loc.t('ttk_cooking_loss_pct')),
-                  _buildHeaderCell(widget.loc.t('ttk_output_gr')),
-                  _buildHeaderCell(widget.loc.t('ttk_weight_prc')),
-                  _buildHeaderCell(widget.loc.t('ttk_portions_pcs')),
-                  _buildHeaderCell(widget.loc.t('ttk_price')),
-                  _buildHeaderCell(
-                      widget.loc.t('ttk_cost').replaceFirst(' ', '\n')),
-                  _buildHeaderCell(''), // Столбец удаления
-                ],
-              ),
-              // Строки с данными — сначала первые N, остальные подгружаются в следующих кадрах
-              ...indexedRows.take(displayRows).map((entry) {
-                final rowIndex = entry.key;
-                final ingredient = entry.value;
-                return TableRow(
+      final Widget tableCore = ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: 1295,
+          maxWidth: 1295,
+        ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Таблица: Stack для объединённой ячейки «Название»
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Table(
+                  border: TableBorder.all(color: Colors.black, width: 1),
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  columnWidths: const {
+                    0: FixedColumnWidth(50), // Тип ТТК
+                    1: FixedColumnWidth(120), // Название
+                    2: FixedColumnWidth(175), // Продукт
+                    3: FixedColumnWidth(85), // Брутто г./шт
+                    4: FixedColumnWidth(95), // % отхода
+                    5: FixedColumnWidth(75), // Нетто г.
+                    6: FixedColumnWidth(115), // Способ приготовления
+                    7: FixedColumnWidth(100), // % ужарки
+                    8: FixedColumnWidth(75), // Выход г.
+                    9: FixedColumnWidth(75), // вес прц
+                    10: FixedColumnWidth(90), // порций(шт)
+                    11: FixedColumnWidth(95), // Стоимость
+                    12: FixedColumnWidth(105), // Цена за кг
+                    13: FixedColumnWidth(40), // Удаление
+                  },
                   children: [
-                    // Тип ТТК — placeholder (объединённая ячейка рисуется поверх в Stack)
-                    Container(
-                      height: _kTtkIngredientRowHeight,
-                      color: Colors.white,
+                    if (!widget.omitTableHeader)
+                      TableRow(
+                        decoration: BoxDecoration(color: Colors.grey.shade200),
+                        children: [
+                          _buildHeaderCell(widget.loc.t('ttk_type')),
+                          _buildHeaderCell(widget.loc.t('ttk_name')),
+                          _buildHeaderCell(widget.loc.t('ttk_product')),
+                          _buildHeaderCell(widget.loc
+                              .t('ttk_gross_gr')
+                              .replaceFirst(' ', '\n')),
+                          _buildHeaderCell(widget.loc.t('ttk_waste_pct')),
+                          _buildHeaderCell(widget.loc.t('ttk_net_gr')),
+                          _buildHeaderCell(widget.loc
+                              .t('ttk_cooking_method')
+                              .replaceFirst(' ', '\n')),
+                          _buildHeaderCell(
+                              widget.loc.t('ttk_cooking_loss_pct')),
+                          _buildHeaderCell(widget.loc.t('ttk_output_gr')),
+                          _buildHeaderCell(widget.loc.t('ttk_weight_prc')),
+                          _buildHeaderCell(widget.loc.t('ttk_portions_pcs')),
+                          _buildHeaderCell(widget.loc.t('ttk_price')),
+                          _buildHeaderCell(
+                              widget.loc.t('ttk_cost').replaceFirst(' ', '\n')),
+                          _buildHeaderCell(''), // Столбец удаления
+                        ],
+                      ),
+                    // Строки с данными — сначала первые N, остальные подгружаются в следующих кадрах
+                    ...indexedRows.take(displayRows).map((entry) {
+                      final rowIndex = entry.key;
+                      final ingredient = entry.value;
+                      return TableRow(
+                        children: [
+                          // Тип ТТК — placeholder (объединённая ячейка рисуется поверх в Stack)
+                          Container(
+                            height: _kTtkIngredientRowHeight,
+                            color: Colors.white,
+                          ),
+
+                          // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
+                          Container(
+                            height: _kTtkIngredientRowHeight,
+                            color: Colors.white,
+                          ),
+
+                          // Продукт
+                          _buildProductCell(ingredient, rowIndex),
+
+                          // Брутто: для unit=шт — в штуках, иначе в граммах
+                          _buildNumericCell(_grossDisplayText(ingredient),
+                              (value) {
+                            final parsed = double.tryParse(
+                                    value?.replaceFirst(',', '.') ?? '') ??
+                                0;
+                            final gross = _usesPieces(ingredient)
+                                ? CulinaryUnits.toGrams(parsed, ingredient.unit,
+                                    gramsPerPiece:
+                                        ingredient.gramsPerPiece ?? 50)
+                                : parsed;
+                            final net =
+                                gross * (1 - ingredient.primaryWastePct / 100);
+                            final output = net *
+                                (1 -
+                                    (ingredient.cookingLossPctOverride ?? 0) /
+                                        100);
+                            final qty = _usesPieces(ingredient)
+                                ? (gross / (ingredient.gramsPerPiece ?? 50))
+                                : (gross / 1000.0);
+                            final newCost = (ingredient.pricePerKg ?? 0) * qty;
+                            _updateIngredient(
+                                rowIndex,
+                                ingredient.copyWith(
+                                  grossWeight: gross,
+                                  netWeight: net,
+                                  outputWeight: output,
+                                  cost: newCost,
+                                ));
+                          }, 'gross_$rowIndex'),
+
+                          // % отхода — редактируемо; при вводе пересчёт нетто и выхода. Пусто при 0 — не удалять перед вводом.
+                          _buildNumericCell(
+                            ingredient.primaryWastePct == 0
+                                ? ''
+                                : ingredient.primaryWastePct.toStringAsFixed(0),
+                            (value) {
+                              final wastePct = (double.tryParse(
+                                          value?.replaceFirst(',', '.') ??
+                                              '') ??
+                                      0)
+                                  .clamp(0.0, 99.9);
+                              final gross = ingredient.grossWeight;
+                              final net = gross > 0
+                                  ? gross * (1.0 - wastePct / 100.0)
+                                  : 0.0;
+                              final output = net *
+                                  (1.0 -
+                                      (ingredient.cookingLossPctOverride ?? 0) /
+                                          100.0);
+                              final qty = _usesPieces(ingredient)
+                                  ? (gross / (ingredient.gramsPerPiece ?? 50))
+                                  : (gross / 1000.0);
+                              final newCost =
+                                  (ingredient.pricePerKg ?? 0) * qty;
+                              _updateIngredient(
+                                  rowIndex,
+                                  ingredient.copyWith(
+                                    primaryWastePct: wastePct,
+                                    netWeight: net,
+                                    outputWeight: output,
+                                    cost: newCost,
+                                  ));
+                            },
+                            'waste_$rowIndex',
+                          ),
+
+                          // Нетто
+                          _buildNumericCell(
+                              ingredient.netWeight == 0
+                                  ? ''
+                                  : ingredient.netWeight.toStringAsFixed(0),
+                              (value) {
+                            final net = double.tryParse(
+                                    value?.replaceFirst(',', '.') ?? '') ??
+                                0;
+                            double gross = ingredient.grossWeight;
+                            double wastePct = ingredient.primaryWastePct;
+                            if (net > 0) {
+                              if (_usesPieces(ingredient)) {
+                                // Для шт: брутто пересчитываем с округлением вверх
+                                final waste = (ingredient.primaryWastePct)
+                                        .clamp(0.0, 99.9) /
+                                    100.0;
+                                final grossNeeded = net / (1.0 - waste);
+                                final gpp = ingredient.gramsPerPiece ?? 50;
+                                final pieces = (gpp > 0)
+                                    ? (grossNeeded / gpp).ceil().toDouble()
+                                    : grossNeeded;
+                                gross = pieces * gpp;
+                                wastePct = gross > 0
+                                    ? ((1 - net / gross) * 100).clamp(0, 100)
+                                    : ingredient.primaryWastePct;
+                              } else {
+                                wastePct = gross > 0
+                                    ? ((1 - net / gross) * 100).clamp(0, 100)
+                                    : ingredient.primaryWastePct;
+                              }
+                            }
+                            final output = net *
+                                (1 -
+                                    (ingredient.cookingLossPctOverride ?? 0) /
+                                        100);
+                            final qty = _usesPieces(ingredient)
+                                ? (gross / (ingredient.gramsPerPiece ?? 50))
+                                : (gross / 1000.0);
+                            final newCost = (ingredient.pricePerKg ?? 0) * qty;
+                            _updateIngredient(
+                                rowIndex,
+                                ingredient.copyWith(
+                                  grossWeight: gross,
+                                  netWeight: net,
+                                  primaryWastePct: wastePct,
+                                  outputWeight: output,
+                                  cost: newCost,
+                                ));
+                          }, 'net_$rowIndex'),
+
+                          // Способ приготовления
+                          _buildCookingMethodCell(ingredient, rowIndex),
+
+                          // % ужарки. Пусто при 0 — не удалять перед вводом.
+                          _buildNumericCell(
+                              (ingredient.cookingLossPctOverride ?? 0) == 0
+                                  ? ''
+                                  : (ingredient.cookingLossPctOverride ?? 0)
+                                      .toStringAsFixed(0), (value) {
+                            final loss =
+                                double.tryParse(value.replaceFirst(',', '.')) ??
+                                    0;
+                            final clampedLoss = loss.clamp(0.0, 99.9);
+                            // При изменении % ужарки пересчитываем выход по той же логике, что нетто от отхода: выход = нетто × (1 − ужарка/100)
+                            final net = ingredient.netWeight;
+                            final output = net > 0
+                                ? net * (1.0 - clampedLoss / 100.0)
+                                : 0.0;
+                            _updateIngredient(
+                                rowIndex,
+                                ingredient.copyWith(
+                                  cookingLossPctOverride: clampedLoss,
+                                  outputWeight: output,
+                                ));
+                          }, 'cooking_loss_$rowIndex'),
+
+                          // Выход — редактируемо; при вводе пересчёт % ужарки (как нетто → % отхода)
+                          _buildNumericCell(
+                            ingredient.outputWeight == 0
+                                ? ''
+                                : ingredient.outputWeight.toStringAsFixed(0),
+                            (value) {
+                              final out = double.tryParse(
+                                      value?.replaceFirst(',', '.') ?? '') ??
+                                  0;
+                              if (out < 0) return;
+                              final net = ingredient.netWeight;
+                              double lossPct =
+                                  ingredient.cookingLossPctOverride ?? 0;
+                              if (net > 0 && out <= net) {
+                                lossPct =
+                                    ((1.0 - out / net) * 100).clamp(0.0, 99.9);
+                              }
+                              _updateIngredient(
+                                  rowIndex,
+                                  ingredient.copyWith(
+                                    outputWeight: out,
+                                    cookingLossPctOverride: lossPct,
+                                  ));
+                            },
+                            'output_$rowIndex',
+                          ),
+
+                          // вес прц — пусто в строках продукта
+                          _buildReadOnlyCell(''),
+
+                          // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
+                          _buildReadOnlyCell(
+                              _portionsPerOne(totalOutput, ingredient)),
+
+                          // Стоимость
+                          _buildCostCell(ingredient),
+
+                          // Цена за кг
+                          _buildPricePerKgCell(ingredient),
+
+                          // Кнопка удаления
+                          _buildDeleteButton(rowIndex),
+                        ],
+                      );
+                    }),
+                    // Строка "Итого"
+                    TableRow(
+                      decoration: BoxDecoration(color: Colors.red.shade50),
+                      children: [
+                        _buildTotalCell(widget.loc.t('ttk_total')),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        _buildTotalRowSpacer(),
+                        // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
+                        widget.canEdit &&
+                                widget.onTotalOutputChanged != null &&
+                                totalOutput > 0
+                            ? _buildNumericCell(
+                                totalOutput.toStringAsFixed(0),
+                                (value) {
+                                  final v = double.tryParse(
+                                          value?.replaceFirst(',', '.') ??
+                                              '') ??
+                                      0;
+                                  if (v > 0)
+                                    widget.onTotalOutputChanged?.call(v);
+                                },
+                                'total_output',
+                                rowHeight: _kTtkTotalRowHeight,
+                              )
+                            : _buildTotalCell(
+                                '${totalOutput.toStringAsFixed(0)}г'),
+                        // вес порции — редактируемый и для ПФ (по умолчанию 100), и для блюда (по умолчанию = вес выхода итого)
+                        widget.canEdit &&
+                                widget.onWeightPerPortionChanged != null
+                            ? _buildNumericCell(
+                                widget.weightPerPortion == 0
+                                    ? ''
+                                    : widget.weightPerPortion
+                                        .toStringAsFixed(0),
+                                (value) {
+                                  final v = double.tryParse(
+                                          value.replaceFirst(',', '.')) ??
+                                      0;
+                                  widget.onWeightPerPortionChanged?.call(v);
+                                },
+                                'weight_per_portion',
+                                rowHeight: _kTtkTotalRowHeight,
+                              )
+                            : _buildTotalCell(widget.weightPerPortion == 0
+                                ? ''
+                                : widget.weightPerPortion.toStringAsFixed(0)),
+                        _buildTotalCell('1'), // порций(шт) в итого всегда 1
+                        _buildTotalRowSpacer(),
+                        widget.isCook
+                            ? _buildTotalRowSpacer() // Скрываем стоимость для поваров
+                            : _buildTotalCell(
+                                '${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
+                        _buildTotalRowSpacer(),
+                      ],
                     ),
-
-                    // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
-                    Container(
-                      height: _kTtkIngredientRowHeight,
-                      color: Colors.white,
-                    ),
-
-                    // Продукт
-                    _buildProductCell(ingredient, rowIndex),
-
-                    // Брутто: для unit=шт — в штуках, иначе в граммах
-                    _buildNumericCell(_grossDisplayText(ingredient), (value) {
-                      final parsed = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
-                      final gross = _usesPieces(ingredient)
-                          ? CulinaryUnits.toGrams(parsed, ingredient.unit, gramsPerPiece: ingredient.gramsPerPiece ?? 50)
-                          : parsed;
-                      final net = gross * (1 - ingredient.primaryWastePct / 100);
-                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                      final qty = _usesPieces(ingredient)
-                          ? (gross / (ingredient.gramsPerPiece ?? 50))
-                          : (gross / 1000.0);
-                      final newCost = (ingredient.pricePerKg ?? 0) * qty;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        grossWeight: gross,
-                        netWeight: net,
-                        outputWeight: output,
-                        cost: newCost,
-                      ));
-                    }, 'gross_$rowIndex'),
-
-                    // % отхода — редактируемо; при вводе пересчёт нетто и выхода. Пусто при 0 — не удалять перед вводом.
-                    _buildNumericCell(
-                      ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(0),
-                      (value) {
-                        final wastePct = (double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0).clamp(0.0, 99.9);
-                        final gross = ingredient.grossWeight;
-                        final net = gross > 0 ? gross * (1.0 - wastePct / 100.0) : 0.0;
-                        final output = net * (1.0 - (ingredient.cookingLossPctOverride ?? 0) / 100.0);
-                        final qty = _usesPieces(ingredient)
-                            ? (gross / (ingredient.gramsPerPiece ?? 50))
-                            : (gross / 1000.0);
-                        final newCost = (ingredient.pricePerKg ?? 0) * qty;
-                        _updateIngredient(rowIndex, ingredient.copyWith(
-                          primaryWastePct: wastePct,
-                          netWeight: net,
-                          outputWeight: output,
-                          cost: newCost,
-                        ));
-                      },
-                      'waste_$rowIndex',
-                    ),
-
-                    // Нетто
-                    _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
-                      final net = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
-                      double gross = ingredient.grossWeight;
-                      double wastePct = ingredient.primaryWastePct;
-                      if (net > 0) {
-                        if (_usesPieces(ingredient)) {
-                          // Для шт: брутто пересчитываем с округлением вверх
-                          final waste = (ingredient.primaryWastePct).clamp(0.0, 99.9) / 100.0;
-                          final grossNeeded = net / (1.0 - waste);
-                          final gpp = ingredient.gramsPerPiece ?? 50;
-                          final pieces = (gpp > 0) ? (grossNeeded / gpp).ceil().toDouble() : grossNeeded;
-                          gross = pieces * gpp;
-                          wastePct = gross > 0 ? ((1 - net / gross) * 100).clamp(0, 100) : ingredient.primaryWastePct;
-                        } else {
-                          wastePct = gross > 0 ? ((1 - net / gross) * 100).clamp(0, 100) : ingredient.primaryWastePct;
-                        }
-                      }
-                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                      final qty = _usesPieces(ingredient)
-                          ? (gross / (ingredient.gramsPerPiece ?? 50))
-                          : (gross / 1000.0);
-                      final newCost = (ingredient.pricePerKg ?? 0) * qty;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        grossWeight: gross,
-                        netWeight: net,
-                        primaryWastePct: wastePct,
-                        outputWeight: output,
-                        cost: newCost,
-                      ));
-                    }, 'net_$rowIndex'),
-
-                    // Способ приготовления
-                    _buildCookingMethodCell(ingredient, rowIndex),
-
-                    // % ужарки. Пусто при 0 — не удалять перед вводом.
-                    _buildNumericCell(
-                      (ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(0),
-                      (value) {
-                      final loss = double.tryParse(value.replaceFirst(',', '.')) ?? 0;
-                      final clampedLoss = loss.clamp(0.0, 99.9);
-                      // При изменении % ужарки пересчитываем выход по той же логике, что нетто от отхода: выход = нетто × (1 − ужарка/100)
-                      final net = ingredient.netWeight;
-                      final output = net > 0 ? net * (1.0 - clampedLoss / 100.0) : 0.0;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        cookingLossPctOverride: clampedLoss,
-                        outputWeight: output,
-                      ));
-                    }, 'cooking_loss_$rowIndex'),
-
-                    // Выход — редактируемо; при вводе пересчёт % ужарки (как нетто → % отхода)
-                    _buildNumericCell(
-                      ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0),
-                      (value) {
-                        final out = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
-                        if (out < 0) return;
-                        final net = ingredient.netWeight;
-                        double lossPct = ingredient.cookingLossPctOverride ?? 0;
-                        if (net > 0 && out <= net) {
-                          lossPct = ((1.0 - out / net) * 100).clamp(0.0, 99.9);
-                        }
-                        _updateIngredient(rowIndex, ingredient.copyWith(
-                          outputWeight: out,
-                          cookingLossPctOverride: lossPct,
-                        ));
-                      },
-                      'output_$rowIndex',
-                    ),
-
-                    // вес прц — пусто в строках продукта
-                    _buildReadOnlyCell(''),
-
-                    // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
-                    _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
-
-                    // Стоимость
-                    _buildCostCell(ingredient),
-
-                    // Цена за кг
-                    _buildPricePerKgCell(ingredient),
-
-                    // Кнопка удаления
-                    _buildDeleteButton(rowIndex),
-
                   ],
-                );
-              }),
-              // Строка "Итого"
-              TableRow(
-                decoration: BoxDecoration(color: Colors.red.shade50),
-                children: [
-                  _buildTotalCell(widget.loc.t('ttk_total')),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  _buildTotalRowSpacer(),
-                  // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
-                  widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
-                      ? _buildNumericCell(
-                          totalOutput.toStringAsFixed(0),
-                          (value) {
-                            final v = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
-                            if (v > 0) widget.onTotalOutputChanged?.call(v);
-                          },
-                          'total_output',
-                          rowHeight: _kTtkTotalRowHeight,
-                        )
-                      : _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'),
-                  // вес порции — редактируемый и для ПФ (по умолчанию 100), и для блюда (по умолчанию = вес выхода итого)
-                  widget.canEdit && widget.onWeightPerPortionChanged != null
-                      ? _buildNumericCell(
-                          widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0),
-                          (value) {
-                            final v = double.tryParse(value.replaceFirst(',', '.')) ?? 0;
-                            widget.onWeightPerPortionChanged?.call(v);
-                          },
-                          'weight_per_portion',
-                          rowHeight: _kTtkTotalRowHeight,
-                        )
-                      : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
-                  _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  _buildTotalRowSpacer(),
-                  widget.isCook
-                      ? _buildTotalRowSpacer() // Скрываем стоимость для поваров
-                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
-                  _buildTotalRowSpacer(),
-                ],
-              ),
-                ],
-              ),
-                  // Объединённая ячейка «Тип ТТК» — позиция и размеры по границам столбца 0
-                  Positioned(
-                    left: 0,
-                    top: mergedOverlayTop,
-                    width: 50,
-                    height: (displayRows.clamp(0, indexedRows.length) *
-                                _kTtkIngredientRowHeight +
-                            2)
-                        .toDouble(),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.black, width: 1),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        widget.isSemiFinished ? widget.loc.t('tt_type_pf') : widget.loc.t('tt_type_dish'),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
+                ),
+                // Объединённая ячейка «Тип ТТК» — позиция и размеры по границам столбца 0
+                Positioned(
+                  left: 0,
+                  top: mergedOverlayTop,
+                  width: 50,
+                  height: (displayRows.clamp(0, indexedRows.length) *
+                              _kTtkIngredientRowHeight +
+                          2)
+                      .toDouble(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black, width: 1),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      widget.isSemiFinished
+                          ? widget.loc.t('tt_type_pf')
+                          : widget.loc.t('tt_type_dish'),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  // Объединённая ячейка «Название» — позиция и размеры по границам столбца 1
-                  Positioned(
-                    left: 50,  // граница между колонками 0 и 1
-                    top: mergedOverlayTop,
-                    width: 120,
-                    height: (displayRows.clamp(0, indexedRows.length) *
-                                _kTtkIngredientRowHeight +
-                            2)
-                        .toDouble(),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.black, width: 1),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                      alignment: Alignment.topLeft,
-                      child: widget.dishNameController != null
-                          ? ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: widget.dishNameController!,
-                              builder: (_, value, __) => Text(
-                                value.text,
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 10,
-                              ),
-                            )
-                          : Text(
-                              widget.dishName,
+                ),
+                // Объединённая ячейка «Название» — позиция и размеры по границам столбца 1
+                Positioned(
+                  left: 50, // граница между колонками 0 и 1
+                  top: mergedOverlayTop,
+                  width: 120,
+                  height: (displayRows.clamp(0, indexedRows.length) *
+                              _kTtkIngredientRowHeight +
+                          2)
+                      .toDouble(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black, width: 1),
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    alignment: Alignment.topLeft,
+                    child: widget.dishNameController != null
+                        ? ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: widget.dishNameController!,
+                            builder: (_, value, __) => Text(
+                              value.text,
                               style: const TextStyle(fontSize: 12),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 10,
                             ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Поле технологии под таблицей на всю ширину (если не скрыто)
-              if (widget.ingredients.isNotEmpty && !widget.hideTechnologyBlock)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black, width: 1),
-                    color: Colors.white,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Заголовок технологии
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          border: const Border(bottom: BorderSide(color: Colors.black, width: 1)),
-                        ),
-                        child: Text(
-                          'Технология',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      // Поле для ввода технологии
-                      Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(minHeight: 120),
-                        padding: const EdgeInsets.all(12),
-                        child: widget.canEdit && widget.technologyController != null
-                            ? TextField(
-                                controller: widget.technologyController,
-                                maxLines: null,
-                                minLines: 5,
-                                style: const TextStyle(fontSize: 12),
-                                textAlign: TextAlign.left,
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: Colors.transparent,
-                                  hintText: widget.loc.t('ttk_technology_placeholder'),
-                                ),
-                              )
-                            : Text(
-                                widget.technologyController?.text ?? '',
-                                style: const TextStyle(fontSize: 12),
-                                textAlign: TextAlign.left,
-                              ),
-                      ),
-                    ],
+                          )
+                        : Text(
+                            widget.dishName,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 10,
+                          ),
                   ),
                 ),
-            ],
-          ),
-        );
+              ],
+            ),
 
-    if (widget.shrinkWrap) {
-      return tableCore;
-    }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: tableCore,
-      ),
-    );
+            // Поле технологии под таблицей на всю ширину (если не скрыто)
+            if (widget.ingredients.isNotEmpty && !widget.hideTechnologyBlock)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 1),
+                  color: Colors.white,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Заголовок технологии
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        border: const Border(
+                            bottom: BorderSide(color: Colors.black, width: 1)),
+                      ),
+                      child: Text(
+                        'Технология',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    // Поле для ввода технологии
+                    Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(minHeight: 120),
+                      padding: const EdgeInsets.all(12),
+                      child: widget.canEdit &&
+                              widget.technologyController != null
+                          ? TextField(
+                              controller: widget.technologyController,
+                              maxLines: null,
+                              minLines: 5,
+                              style: const TextStyle(fontSize: 12),
+                              textAlign: TextAlign.left,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.transparent,
+                                hintText:
+                                    widget.loc.t('ttk_technology_placeholder'),
+                              ),
+                            )
+                          : Text(
+                              widget.technologyController?.text ?? '',
+                              style: const TextStyle(fontSize: 12),
+                              textAlign: TextAlign.left,
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+
+      if (widget.shrinkWrap) {
+        return tableCore;
+      }
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: tableCore,
+        ),
+      );
     } catch (e, stackTrace) {
       // В случае ошибки показываем fallback
       return Container(
@@ -833,8 +942,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Error in TTK table', style: TextStyle(color: Colors.red)),
-            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+            const Text('Error in TTK table',
+                style: TextStyle(color: Colors.red)),
+            Text('Error: $e',
+                style: const TextStyle(color: Colors.red, fontSize: 10)),
           ],
         ),
       );
@@ -868,7 +979,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedCell(String text, int rowSpan) {
     return Container(
-      height: rowSpan * _kTtkIngredientRowHeight, // Высота всех объединенных строк
+      height:
+          rowSpan * _kTtkIngredientRowHeight, // Высота всех объединенных строк
       alignment: Alignment.topCenter, // Выравнивание текста по верху
       padding: const EdgeInsets.only(top: 12), // Отступ от верха
       child: Text(
@@ -881,14 +993,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedTechnologyCell(int rowSpan) {
     return Container(
-      height: rowSpan * _kTtkIngredientRowHeight, // Высота всех объединенных строк
-      alignment: Alignment.topLeft, // Выравнивание текста по левому верхнему углу
+      height:
+          rowSpan * _kTtkIngredientRowHeight, // Высота всех объединенных строк
+      alignment:
+          Alignment.topLeft, // Выравнивание текста по левому верхнему углу
       padding: const EdgeInsets.only(top: 12, left: 4), // Отступы
       child: widget.canEdit && widget.technologyController != null
           ? TextField(
               controller: widget.technologyController,
               maxLines: null, // Позволяет неограниченное количество строк
-              minLines: 1,    // Минимум 1 строка
+              minLines: 1, // Минимум 1 строка
               style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.left,
               decoration: const InputDecoration(
@@ -915,16 +1029,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   /// Returns localized display name for an ingredient (product or PF tech card).
   String _getIngredientDisplayName(TTIngredient ingredient, String lang) {
-    if (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty) {
+    if (ingredient.sourceTechCardId != null &&
+        ingredient.sourceTechCardId!.isNotEmpty) {
       final pf = widget.semiFinishedProducts
           ?.where((tc) => tc.id == ingredient.sourceTechCardId)
           .firstOrNull;
       if (pf != null) return pf.getDisplayNameInLists(lang);
       return TechCard.pfLinkedIngredientDisplayName(ingredient, lang);
     }
-    final translated = widget.ingredientNameTranslationsById[ingredient.id]?.trim();
+    final translated =
+        widget.ingredientNameTranslationsById[ingredient.id]?.trim();
     if (translated != null && translated.isNotEmpty) return translated;
-    final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+    final product = widget.productStore
+        .findProductForIngredient(ingredient.productId, ingredient.productName);
     if (product != null) return product.getLocalizedName(lang);
     return ingredient.productName;
   }
@@ -951,10 +1068,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         );
       }
 
-      if (ingredient.productId != null || ingredient.productName.isNotEmpty ||
-          (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty)) {
+      if (ingredient.productId != null ||
+          ingredient.productName.isNotEmpty ||
+          (ingredient.sourceTechCardId != null &&
+              ingredient.sourceTechCardId!.isNotEmpty)) {
         final name = _getIngredientDisplayName(ingredient, lang);
-        final isPf = ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty;
+        final isPf = ingredient.sourceTechCardId != null &&
+            ingredient.sourceTechCardId!.isNotEmpty;
         return Container(
           height: _kTtkIngredientRowHeight,
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -967,14 +1087,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () {
+                  onTap: () async {
                     if (isPf && widget.onTapPfIngredient != null) {
                       widget.onTapPfIngredient!(ingredient.sourceTechCardId!);
-                    } else {
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        productId: null,
-                        productName: '',
-                      ));
+                      return;
+                    }
+                    final selected = await _showProductPickerDialog(
+                      initialQuery: name,
+                    );
+                    if (selected != null) {
+                      _handleProductSelection(ingredient, rowIndex, selected);
                     }
                   },
                   child: Tooltip(
@@ -985,7 +1107,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         name,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isPf ? Theme.of(context).colorScheme.primary : null,
+                          color: isPf
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
                           decoration: isPf ? TextDecoration.underline : null,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1000,8 +1124,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   icon: const Icon(Icons.open_in_new, size: 16),
                   tooltip: widget.loc.t('ttk_view'),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                  onPressed: () => widget.onTapPfIngredient!(ingredient.sourceTechCardId!),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () =>
+                      widget.onTapPfIngredient!(ingredient.sourceTechCardId!),
                 ),
               const Icon(Icons.edit, size: 16, color: Colors.grey),
             ],
@@ -1009,8 +1135,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         );
       }
 
-    // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
-    return _buildSearchableProductDropdown(ingredient, rowIndex);
+      // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
+      return _buildSearchableProductDropdown(ingredient, rowIndex);
     } catch (e, stackTrace) {
       // В случае ошибки показываем fallback
       return SizedBox(
@@ -1026,7 +1152,277 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
   }
 
-  Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
+  Future<SelectableItem?> _showProductPickerDialog({
+    String initialQuery = '',
+  }) async {
+    final allItems = _getProductItemsForDropdown();
+    final searchCtrl = TextEditingController(text: initialQuery.trim());
+    List<SelectableItem> filtered =
+        _filterSelectableItems(allItems, searchCtrl.text);
+
+    final selected = await showDialog<SelectableItem>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            contentPadding: EdgeInsets.zero,
+            content: Material(
+              color: Colors.white,
+              child: SizedBox(
+                width: 360,
+                height: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: TextField(
+                        controller: searchCtrl,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: widget.loc.t('search'),
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        onChanged: (_) {
+                          setState(() => filtered = _filterSelectableItems(
+                              allItems, searchCtrl.text));
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          if (searchCtrl.text.trim().isNotEmpty)
+                            ListTile(
+                              leading: const Icon(Icons.add_circle_outline,
+                                  size: 20),
+                              title: Text(
+                                '${widget.loc.t('add')} "${searchCtrl.text.trim()}"',
+                                style: const TextStyle(
+                                    fontSize: 14, fontStyle: FontStyle.italic),
+                              ),
+                              onTap: () => Navigator.of(ctx).pop(SelectableItem(
+                                type: 'add_by_name',
+                                item: searchCtrl.text.trim(),
+                                displayName: searchCtrl.text.trim(),
+                                searchName:
+                                    searchCtrl.text.trim().toLowerCase(),
+                              )),
+                            ),
+                          ...List.generate(filtered.length, (i) {
+                            final item = filtered[i];
+                            return ListTile(
+                              title: Text(item.displayName,
+                                  style: const TextStyle(fontSize: 14)),
+                              onTap: () => Navigator.of(ctx).pop(item),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text(widget.loc.t('cancel')),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    searchCtrl.dispose();
+    return selected;
+  }
+
+  List<SelectableItem> _filterSelectableItems(
+      List<SelectableItem> items, String query) {
+    if (query.isEmpty) return List<SelectableItem>.from(items);
+    final q = query.trim().toLowerCase();
+    final qStripped = stripIikoPrefix(query).trim().toLowerCase();
+    return items.where((item) {
+      final dn = item.displayName.toLowerCase();
+      final sn = item.searchName;
+      final dnStripped = stripIikoPrefix(item.displayName).toLowerCase();
+      return dn.contains(q) ||
+          sn.contains(q) ||
+          (qStripped.isNotEmpty &&
+              (dn.contains(qStripped) ||
+                  dnStripped.contains(qStripped) ||
+                  sn.contains(qStripped)));
+    }).toList();
+  }
+
+  void _handleProductSelection(
+      TTIngredient ingredient, int rowIndex, SelectableItem selectedItem) {
+    try {
+      TTIngredient? updated;
+      final idx = rowIndex;
+      if (selectedItem.type == 'product') {
+        final product = selectedItem.item as Product;
+        final origKey = normalizeProductAliasKey(ingredient.productName);
+        if (origKey.isNotEmpty &&
+            ingredient.productId != null &&
+            ingredient.productId != product.id) {
+          widget.productStore.saveProductAliasRejection(
+              origKey, ingredient.productId!,
+              establishmentId: widget.establishmentId);
+        }
+        final prodKey = normalizeProductAliasKey(product.name);
+        if (origKey.isNotEmpty && origKey != prodKey) {
+          widget.productStore.saveProductAlias(origKey, product.id,
+              establishmentId: widget.establishmentId);
+        }
+        final establishmentPrice = widget.productStore
+            .getEstablishmentPrice(product.id, widget.establishmentId);
+        final pricePerKg = establishmentPrice?.$1 ?? 0.0;
+        var gross = ingredient.grossWeight;
+        var wastePct = ingredient.primaryWastePct;
+        final newGpp = product.gramsPerPiece;
+        final productIsPcs = (product.unit == 'шт' || product.unit == 'pcs') &&
+            (newGpp ?? 0) > 0;
+        if (productIsPcs && _usesPieces(ingredient)) {
+          final oldGpp = ingredient.gramsPerPiece ?? 50;
+          if (oldGpp > 0 &&
+              (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+            final gpp = newGpp ?? 50;
+            final pieces = ingredient.grossWeight / oldGpp;
+            gross = pieces * gpp;
+            final net = ingredient.netWeight;
+            wastePct =
+                gross > 0 ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9) : 0.0;
+          }
+        }
+        final qty = productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
+        final cost = pricePerKg * qty;
+        var ing = ingredient.copyWith(
+          productId: product.id,
+          productName: product.name,
+          unit: product.unit ?? 'g',
+          gramsPerPiece: product.gramsPerPiece,
+          grossWeight: gross,
+          primaryWastePct: wastePct,
+          pricePerKg: pricePerKg,
+          cost: cost,
+        );
+        final outputWeight =
+            ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+        updated = ing.copyWith(outputWeight: outputWeight);
+      } else if (selectedItem.type == 'add_by_name') {
+        final name = (selectedItem.item as String).trim();
+        if (name.isEmpty) return;
+        final p = widget.productStore.findProductForIngredient(null, name);
+        if (p != null) {
+          final origKey = normalizeProductAliasKey(ingredient.productName);
+          if (origKey.isNotEmpty &&
+              ingredient.productId != null &&
+              ingredient.productId != p.id) {
+            widget.productStore.saveProductAliasRejection(
+                origKey, ingredient.productId!,
+                establishmentId: widget.establishmentId);
+          }
+          final prodKey = normalizeProductAliasKey(p.name);
+          if (origKey.isNotEmpty && origKey != prodKey) {
+            widget.productStore.saveProductAlias(origKey, p.id,
+                establishmentId: widget.establishmentId);
+          }
+          final establishmentPrice = widget.productStore
+              .getEstablishmentPrice(p.id, widget.establishmentId);
+          final pricePerKg = establishmentPrice?.$1 ?? 0.0;
+          var gross = ingredient.grossWeight;
+          var wastePct = ingredient.primaryWastePct;
+          final newGpp = p.gramsPerPiece;
+          final productIsPcs =
+              (p.unit == 'шт' || p.unit == 'pcs') && (newGpp ?? 0) > 0;
+          if (productIsPcs && _usesPieces(ingredient)) {
+            final oldGpp = ingredient.gramsPerPiece ?? 50;
+            if (oldGpp > 0 &&
+                (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+              final gpp = newGpp ?? 50;
+              final pieces = ingredient.grossWeight / oldGpp;
+              gross = pieces * gpp;
+              final net = ingredient.netWeight;
+              wastePct = gross > 0
+                  ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9)
+                  : 0.0;
+            }
+          }
+          final qty = productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
+          final cost = pricePerKg * qty;
+          var ing = ingredient.copyWith(
+            productId: p.id,
+            productName: p.name,
+            unit: p.unit ?? 'g',
+            gramsPerPiece: p.gramsPerPiece,
+            grossWeight: gross,
+            primaryWastePct: wastePct,
+            pricePerKg: pricePerKg,
+            cost: cost,
+          );
+          final outputWeight =
+              ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+          updated = ing.copyWith(outputWeight: outputWeight);
+        } else {
+          updated = ingredient.copyWith(productName: name);
+        }
+      } else if (selectedItem.type == 'pf') {
+        final pf = selectedItem.item as TechCard;
+        double? pfPricePerKg;
+        if (pf.ingredients.isNotEmpty) {
+          final r = _resolvePfRecipeCostOutput(pf.id, <String>{});
+          if (r != null && r.output > 0 && r.cost > 0) {
+            pfPricePerKg = (r.cost / r.output) * 1000;
+          }
+        }
+        final gross = ingredient.grossWeight;
+        updated = ingredient.copyWith(
+          sourceTechCardId: pf.id,
+          sourceTechCardName: pf.dishName,
+          productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+          unit: 'г',
+          pricePerKg: pfPricePerKg,
+          cost: (pfPricePerKg ?? 0) * (gross / 1000),
+        );
+      }
+      if (updated != null) {
+        _updateIngredient(idx, updated);
+        final pid = updated.productId?.trim();
+        if (pid != null &&
+            pid.isNotEmpty &&
+            (updated.sourceTechCardId == null ||
+                updated.sourceTechCardId!.trim().isEmpty)) {
+          widget.onAfterProductLinked?.call(idx);
+        }
+      }
+    } catch (e, st) {
+      devLog('TTK onProductSelected error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                widget.loc.t('error_generic', args: {'error': e.toString()})),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildSearchableProductDropdown(
+      TTIngredient ingredient, int rowIndex) {
     try {
       final allItems = _getProductItemsForDropdown();
       return _ProductSearchDropdown(
@@ -1040,33 +1436,43 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               final product = selectedItem.item as Product;
               // Отказ: был другой продукт — не предлагать его снова
               final origKey = normalizeProductAliasKey(ingredient.productName);
-              if (origKey.isNotEmpty && ingredient.productId != null && ingredient.productId != product.id) {
-                widget.productStore.saveProductAliasRejection(origKey, ingredient.productId!, establishmentId: widget.establishmentId);
+              if (origKey.isNotEmpty &&
+                  ingredient.productId != null &&
+                  ingredient.productId != product.id) {
+                widget.productStore.saveProductAliasRejection(
+                    origKey, ingredient.productId!,
+                    establishmentId: widget.establishmentId);
               }
               // Обучение: сохраняем алиас «яйцо куричное» → «яйцо»
               final prodKey = normalizeProductAliasKey(product.name);
               if (origKey.isNotEmpty && origKey != prodKey) {
-                widget.productStore.saveProductAlias(origKey, product.id, establishmentId: widget.establishmentId);
+                widget.productStore.saveProductAlias(origKey, product.id,
+                    establishmentId: widget.establishmentId);
               }
-              final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+              final establishmentPrice = widget.productStore
+                  .getEstablishmentPrice(product.id, widget.establishmentId);
               final pricePerKg = establishmentPrice?.$1 ?? 0.0;
               var gross = ingredient.grossWeight;
               var wastePct = ingredient.primaryWastePct;
               final newGpp = product.gramsPerPiece;
-              final productIsPcs = (product.unit == 'шт' || product.unit == 'pcs') && (newGpp ?? 0) > 0;
+              final productIsPcs =
+                  (product.unit == 'шт' || product.unit == 'pcs') &&
+                      (newGpp ?? 0) > 0;
               if (productIsPcs && _usesPieces(ingredient)) {
                 final oldGpp = ingredient.gramsPerPiece ?? 50;
-                if (oldGpp > 0 && (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+                if (oldGpp > 0 &&
+                    (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
                   final gpp = newGpp ?? 50;
                   final pieces = ingredient.grossWeight / oldGpp;
                   gross = pieces * gpp;
                   final net = ingredient.netWeight;
-                  wastePct = gross > 0 ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9) : 0.0;
+                  wastePct = gross > 0
+                      ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9)
+                      : 0.0;
                 }
               }
-              final qty = productIsPcs
-                  ? (gross / (newGpp ?? 50))
-                  : (gross / 1000);
+              final qty =
+                  productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
               final cost = pricePerKg * qty;
               var ing = ingredient.copyWith(
                 productId: product.id,
@@ -1078,38 +1484,52 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 pricePerKg: pricePerKg,
                 cost: cost,
               );
-              final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+              final outputWeight =
+                  ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
               updated = ing.copyWith(outputWeight: outputWeight);
             } else if (selectedItem.type == 'add_by_name') {
               final name = (selectedItem.item as String).trim();
               if (name.isEmpty) return;
-              final p = widget.productStore.findProductForIngredient(null, name);
+              final p =
+                  widget.productStore.findProductForIngredient(null, name);
               if (p != null) {
-                final origKey = normalizeProductAliasKey(ingredient.productName);
-                if (origKey.isNotEmpty && ingredient.productId != null && ingredient.productId != p.id) {
-                  widget.productStore.saveProductAliasRejection(origKey, ingredient.productId!, establishmentId: widget.establishmentId);
+                final origKey =
+                    normalizeProductAliasKey(ingredient.productName);
+                if (origKey.isNotEmpty &&
+                    ingredient.productId != null &&
+                    ingredient.productId != p.id) {
+                  widget.productStore.saveProductAliasRejection(
+                      origKey, ingredient.productId!,
+                      establishmentId: widget.establishmentId);
                 }
                 final prodKey = normalizeProductAliasKey(p.name);
                 if (origKey.isNotEmpty && origKey != prodKey) {
-                  widget.productStore.saveProductAlias(origKey, p.id, establishmentId: widget.establishmentId);
+                  widget.productStore.saveProductAlias(origKey, p.id,
+                      establishmentId: widget.establishmentId);
                 }
-                final establishmentPrice = widget.productStore.getEstablishmentPrice(p.id, widget.establishmentId);
+                final establishmentPrice = widget.productStore
+                    .getEstablishmentPrice(p.id, widget.establishmentId);
                 final pricePerKg = establishmentPrice?.$1 ?? 0.0;
                 var gross = ingredient.grossWeight;
                 var wastePct = ingredient.primaryWastePct;
                 final newGpp = p.gramsPerPiece;
-                final productIsPcs = (p.unit == 'шт' || p.unit == 'pcs') && (newGpp ?? 0) > 0;
+                final productIsPcs =
+                    (p.unit == 'шт' || p.unit == 'pcs') && (newGpp ?? 0) > 0;
                 if (productIsPcs && _usesPieces(ingredient)) {
                   final oldGpp = ingredient.gramsPerPiece ?? 50;
-                  if (oldGpp > 0 && (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+                  if (oldGpp > 0 &&
+                      (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
                     final gpp = newGpp ?? 50;
                     final pieces = ingredient.grossWeight / oldGpp;
                     gross = pieces * gpp;
                     final net = ingredient.netWeight;
-                    wastePct = gross > 0 ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9) : 0.0;
+                    wastePct = gross > 0
+                        ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9)
+                        : 0.0;
                   }
                 }
-                final qty = productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
+                final qty =
+                    productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
                 final cost = pricePerKg * qty;
                 var ing = ingredient.copyWith(
                   productId: p.id,
@@ -1121,7 +1541,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   pricePerKg: pricePerKg,
                   cost: cost,
                 );
-                final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+                final outputWeight = ing.netWeight *
+                    (1 - (ing.cookingLossPctOverride ?? 0) / 100);
                 updated = ing.copyWith(outputWeight: outputWeight);
               } else {
                 updated = ingredient.copyWith(productName: name);
@@ -1139,7 +1560,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               updated = ingredient.copyWith(
                 sourceTechCardId: pf.id,
                 sourceTechCardName: pf.dishName,
-                productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+                productName:
+                    pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
                 unit: 'г',
                 pricePerKg: pfPricePerKg,
                 cost: (pfPricePerKg ?? 0) * (gross / 1000),
@@ -1160,8 +1582,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(widget.loc.t('error_generic',
-                      args: {'error': e.toString()})),
+                  content: Text(widget.loc
+                      .t('error_generic', args: {'error': e.toString()})),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -1206,7 +1628,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           ? TextField(
               controller: controller,
               focusNode: focusNode,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
               ],
@@ -1226,7 +1649,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
               onChanged: (v) {
                 _debounceTimers[key]?.cancel();
-                _debounceTimers[key] = Timer(const Duration(milliseconds: 150), () {
+                _debounceTimers[key] =
+                    Timer(const Duration(milliseconds: 150), () {
                   if (!mounted) return;
                   onChanged(v);
                 });
@@ -1271,49 +1695,49 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: Center(
         child: widget.canEdit
             ? DropdownButton<String?>(
-              isExpanded: true,
-              hint: Text(widget.loc.t('ttk_cooking_method'),
-                  style: const TextStyle(fontSize: 12)),
-              value: cookingMethodDropdownValue(ingredient),
-              items: [
-                DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text(widget.loc.t('dash'),
-                      style: const TextStyle(fontSize: 12)),
-                ),
-                ...CookingProcess.defaultProcesses.map((process) {
-                  return DropdownMenuItem<String?>(
-                    value: process.id,
-                    child: Text(widget.loc.cookingProcessLabel(process),
+                isExpanded: true,
+                hint: Text(widget.loc.t('ttk_cooking_method'),
+                    style: const TextStyle(fontSize: 12)),
+                value: cookingMethodDropdownValue(ingredient),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(widget.loc.t('dash'),
                         style: const TextStyle(fontSize: 12)),
-                  );
-                }),
-              ],
-              onChanged: (processId) {
-                if (processId == null) {
+                  ),
+                  ...CookingProcess.defaultProcesses.map((process) {
+                    return DropdownMenuItem<String?>(
+                      value: process.id,
+                      child: Text(widget.loc.cookingProcessLabel(process),
+                          style: const TextStyle(fontSize: 12)),
+                    );
+                  }),
+                ],
+                onChanged: (processId) {
+                  if (processId == null) {
+                    _updateIngredient(
+                        rowIndex,
+                        ingredient.copyWith(
+                          cookingProcessId: null,
+                          cookingProcessName: null,
+                        ));
+                    return;
+                  }
+                  final process = CookingProcess.defaultProcesses
+                      .firstWhere((p) => p.id == processId);
                   _updateIngredient(
                       rowIndex,
                       ingredient.copyWith(
-                        cookingProcessId: null,
-                        cookingProcessName: null,
+                        cookingProcessId: processId,
+                        cookingProcessName:
+                            widget.loc.cookingProcessLabel(process),
                       ));
-                  return;
-                }
-                final process = CookingProcess.defaultProcesses
-                    .firstWhere((p) => p.id == processId);
-                _updateIngredient(
-                    rowIndex,
-                    ingredient.copyWith(
-                      cookingProcessId: processId,
-                      cookingProcessName:
-                          widget.loc.cookingProcessLabel(process),
-                    ));
-                widget.onSuggestCookingLoss?.call(rowIndex);
-              },
-              underline: const SizedBox(),
-              icon: const Icon(Icons.arrow_drop_down, size: 16),
-              style: const TextStyle(fontSize: 12, color: Colors.black),
-            )
+                  widget.onSuggestCookingLoss?.call(rowIndex);
+                },
+                underline: const SizedBox(),
+                icon: const Icon(Icons.arrow_drop_down, size: 16),
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+              )
             : Text(
                 () {
                   final id = ingredient.cookingProcessId;
@@ -1370,7 +1794,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (product == null) return 0;
     final ep = widget.productStore.getEstablishmentPrice(product.id, estId);
     double pricePerKg = ep?.$1 ?? 0.0;
-    if (pricePerKg <= 0 && product.basePrice != null && product.basePrice! > 0) {
+    if (pricePerKg <= 0 &&
+        product.basePrice != null &&
+        product.basePrice! > 0) {
       pricePerKg = product.basePrice!;
     }
     if (pricePerKg <= 0) return 0;
@@ -1380,7 +1806,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   /// Рекурсивно: себестоимость и суммарный «выход» по рецепту ПФ (для цены/кг и строки в родителе).
   ({double cost, double output})? _resolvePfRecipeCostOutput(
-      String pfId, Set<String> stack, {String? fallbackName}) {
+      String pfId, Set<String> stack,
+      {String? fallbackName}) {
     if (!stack.add(pfId)) return null;
     TechCard? pf;
     try {
@@ -1393,7 +1820,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         }
       }
       // Fallback: поиск по имени (sourceTechCardName / productName) при расхождении ID.
-      if (pf == null && fallbackName != null && fallbackName.trim().isNotEmpty) {
+      if (pf == null &&
+          fallbackName != null &&
+          fallbackName.trim().isNotEmpty) {
         final norm = normalizeForPfMatching(fallbackName);
         if (norm.isNotEmpty) {
           for (final t in list) {
@@ -1403,7 +1832,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               pf = t;
               break;
             }
-            final display = t.getDisplayNameInLists(widget.loc.currentLanguageCode);
+            final display =
+                t.getDisplayNameInLists(widget.loc.currentLanguageCode);
             if (normalizeForPfMatching(display) == norm) {
               if (!stack.add(t.id)) return null;
               pf = t;
@@ -1475,13 +1905,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
 
     if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
-      final product = widget.productStore
-          .findProductForIngredient(ingredient.productId, ingredient.productName);
+      final product = widget.productStore.findProductForIngredient(
+          ingredient.productId, ingredient.productName);
       if (product != null) {
         final ep = widget.productStore
             .getEstablishmentPrice(product.id, widget.establishmentId);
         pricePerKg = ep?.$1 ?? 0.0;
-        if (pricePerKg <= 0 && product.basePrice != null && product.basePrice! > 0) {
+        if (pricePerKg <= 0 &&
+            product.basePrice != null &&
+            product.basePrice! > 0) {
           pricePerKg = product.basePrice!;
         }
       }
@@ -1492,7 +1924,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   String get _currencySymbol {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
-    return est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+    return est?.currencySymbol ??
+        Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
@@ -1555,8 +1988,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   /// Количество продукта на 1 порцию (г) = outputWeight * (weightPerPortion / totalOutput).
   String _portionsPerOne(double totalOutput, TTIngredient ingredient) {
     if (ingredient.productName.isEmpty || totalOutput <= 0) return '';
-    final val = ingredient.outputWeight * (widget.weightPerPortion / totalOutput);
-    return val == val.truncateToDouble() ? val.toInt().toString() : val.toStringAsFixed(1);
+    final val =
+        ingredient.outputWeight * (widget.weightPerPortion / totalOutput);
+    return val == val.truncateToDouble()
+        ? val.toInt().toString()
+        : val.toStringAsFixed(1);
   }
 
   void _updateIngredient(int index, TTIngredient updated) {
@@ -1582,7 +2018,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   void _removeIngredient(int index) {
     widget.onRemove(index);
   }
-
 }
 
 class SelectableItem {
@@ -1631,15 +2066,17 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     }
     final q = query.trim().toLowerCase();
     final qStripped = stripIikoPrefix(query).trim().toLowerCase();
-    return widget.items
-        .where((item) {
-          final dn = item.displayName.toLowerCase();
-          final sn = item.searchName;
-          final dnStripped = stripIikoPrefix(item.displayName).toLowerCase();
-          return dn.contains(q) || sn.contains(q) ||
-              (qStripped.isNotEmpty && (dn.contains(qStripped) || dnStripped.contains(qStripped) || sn.contains(qStripped)));
-        })
-        .toList();
+    return widget.items.where((item) {
+      final dn = item.displayName.toLowerCase();
+      final sn = item.searchName;
+      final dnStripped = stripIikoPrefix(item.displayName).toLowerCase();
+      return dn.contains(q) ||
+          sn.contains(q) ||
+          (qStripped.isNotEmpty &&
+              (dn.contains(qStripped) ||
+                  dnStripped.contains(qStripped) ||
+                  sn.contains(qStripped)));
+    }).toList();
   }
 
   Future<void> _openPicker() async {
@@ -1673,10 +2110,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           prefixIcon: const Icon(Icons.search, size: 20),
                           isDense: true,
                           border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                         ),
                         onChanged: (_) {
-                          setState(() => filtered = _filterItems(searchCtrl.text));
+                          setState(
+                              () => filtered = _filterItems(searchCtrl.text));
                         },
                       ),
                     ),
@@ -1685,22 +2124,26 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                         children: [
                           if (searchCtrl.text.trim().isNotEmpty)
                             ListTile(
-                              leading: const Icon(Icons.add_circle_outline, size: 20),
+                              leading: const Icon(Icons.add_circle_outline,
+                                  size: 20),
                               title: Text(
                                 '${widget.loc.t('add')} "${searchCtrl.text.trim()}"',
-                                style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                                style: const TextStyle(
+                                    fontSize: 14, fontStyle: FontStyle.italic),
                               ),
                               onTap: () => Navigator.of(ctx).pop(SelectableItem(
                                 type: 'add_by_name',
                                 item: searchCtrl.text.trim(),
                                 displayName: searchCtrl.text.trim(),
-                                searchName: searchCtrl.text.trim().toLowerCase(),
+                                searchName:
+                                    searchCtrl.text.trim().toLowerCase(),
                               )),
                             ),
                           ...List.generate(filtered.length, (i) {
                             final item = filtered[i];
                             return ListTile(
-                              title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
+                              title: Text(item.displayName,
+                                  style: const TextStyle(fontSize: 14)),
                               onTap: () => Navigator.of(ctx).pop(item),
                             );
                           }),
@@ -1748,10 +2191,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              _searchController.text.isEmpty ? widget.loc.t('ttk_choose_product') : _searchController.text,
+              _searchController.text.isEmpty
+                  ? widget.loc.t('ttk_choose_product')
+                  : _searchController.text,
               style: TextStyle(
                 fontSize: 12,
-                color: _searchController.text.isEmpty ? Colors.grey : Colors.black,
+                color:
+                    _searchController.text.isEmpty ? Colors.grey : Colors.black,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1761,4 +2207,3 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     );
   }
 }
-
