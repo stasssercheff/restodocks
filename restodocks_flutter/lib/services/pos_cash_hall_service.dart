@@ -56,6 +56,8 @@ class PosCashHallService {
     required double closingBalance,
     required String closedByEmployeeId,
     String? notes,
+    String? closeReportScope,
+    List<String>? closeReportZones,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     final row = await _supabase.client
@@ -65,6 +67,8 @@ class PosCashHallService {
           'closing_balance': closingBalance,
           'closed_by_employee_id': closedByEmployeeId,
           'notes': notes,
+          if (closeReportScope != null) 'close_report_scope': closeReportScope,
+          if (closeReportZones != null) 'close_report_zones': closeReportZones,
           'updated_at': now,
         })
         .eq('id', shiftId)

@@ -82,6 +82,7 @@ export 'fiscal_tax_presets_service.dart';
 export 'establishment_fiscal_settings_service.dart';
 export 'fiscal_outbox_service.dart';
 export 'pos_orders_display_settings_service.dart';
+export 'pos_shift_report_audience_service.dart';
 export 'sales_financial_visibility_service.dart';
 export 'kitchen_bar_sales_service.dart';
 export 'sales_plan_storage_service.dart';
