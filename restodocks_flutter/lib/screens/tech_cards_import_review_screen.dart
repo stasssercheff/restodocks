@@ -865,15 +865,38 @@ class _TechCardsImportReviewScreenState
         try {
           final savedProduct = await productStore.addProduct(product);
           final docPrice = priceFromDoc[norm];
+          final tm = TranslationManager(
+            aiService: context.read<AiServiceSupabase>(),
+            translationService: context.read<TranslationService>(),
+            getSupportedLanguages: () =>
+                LocalizationService.productLanguageCodes,
+          );
+          var forMapping = savedProduct;
+          try {
+            await tm.handleEntitySave(
+              entityType: TranslationEntityType.product,
+              entityId: savedProduct.id,
+              textFields: {'name': normalizedName},
+              sourceLanguage: lang,
+              userId: acc.currentEmployee?.id,
+            );
+            final namesMap = await tm.materializeProductNames(
+              productId: savedProduct.id,
+              sourceLanguage: lang,
+              sourceText: normalizedName,
+            );
+            forMapping = savedProduct.copyWith(names: namesMap);
+            await productStore.updateProduct(forMapping);
+          } catch (_) {}
           await productStore.addToNomenclature(
             est.dataEstablishmentId,
-            savedProduct.id,
+            forMapping.id,
             price: docPrice,
             currency: defCur,
           );
           productsForMapping = [
             ...productsForMapping,
-            (id: savedProduct.id, name: savedProduct.name)
+            (id: forMapping.id, name: forMapping.name)
           ];
         } catch (e) {
           if (e.toString().contains('duplicate') ||

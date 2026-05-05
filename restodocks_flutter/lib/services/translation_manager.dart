@@ -68,6 +68,59 @@ class TranslationManager {
     devLog('TranslationManager: Translation processing completed');
   }
 
+  /// Собирает [Product.names]-совместимую карту для всех [productLanguageCodes]
+  /// (после [handleEntitySave] повторный вызов [TranslationService.translate] в основном бьёт в кеш).
+  ///
+  /// Если задан [mergeExisting], непустые значения из него сохраняются; переводятся только пустые коды.
+  Future<Map<String, String>> materializeProductNames({
+    required String productId,
+    required String sourceLanguage,
+    required String sourceText,
+    Map<String, String>? mergeExisting,
+  }) async {
+    final text = sourceText.trim();
+    final codes = _getSupportedLanguages();
+    if (codes.isEmpty) {
+      return {sourceLanguage: text};
+    }
+    final from = codes.contains(sourceLanguage) ? sourceLanguage : codes.first;
+
+    final names = <String, String>{};
+    for (final c in codes) {
+      final merged = mergeExisting?[c]?.trim();
+      if (merged != null && merged.isNotEmpty) {
+        names[c] = merged;
+      } else {
+        names[c] = text;
+      }
+    }
+    names[from] = text;
+
+    for (final lang in codes) {
+      if (lang == from) continue;
+      final keep = mergeExisting?[lang]?.trim();
+      if (keep != null && keep.isNotEmpty) continue;
+      try {
+        final t = await _translationService.translate(
+          entityType: TranslationEntityType.product,
+          entityId: productId,
+          fieldName: 'name',
+          text: text,
+          from: from,
+          to: lang,
+          allowOverride: false,
+        );
+        if (t != null && t.trim().isNotEmpty) {
+          names[lang] = t.trim();
+        }
+      } catch (e) {
+        devLog('TranslationManager: materializeProductNames $lang: $e');
+      }
+    }
+
+    return names;
+  }
+
   /// Получить локализованный текст для сущности
   Future<String> getLocalizedText({
     required TranslationEntityType entityType,
@@ -125,37 +178,6 @@ class TranslationManager {
     // Сохраняем в кеш и БД
     await _translationService.saveToDatabase(translation);
     _translationService.cache[translation.cacheKey] = translation;
-  }
-
-  /// Сгенерировать переводы для названия продукта
-  Future<Map<String, String>> generateTranslationsForProduct(
-      String productName, String sourceLanguage) async {
-    final translations = <String, String>{};
-    translations[sourceLanguage] = productName;
-
-    for (final targetLang in _getSupportedLanguages()) {
-      if (targetLang == sourceLanguage) continue;
-
-      try {
-        final translatedText = await _translationService.translate(
-          entityType: TranslationEntityType.product,
-          entityId: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-          fieldName: 'name',
-          text: productName,
-          from: sourceLanguage,
-          to: targetLang,
-          allowOverride: true,
-        );
-
-        if (translatedText != null && translatedText != productName) {
-          translations[targetLang] = translatedText;
-        }
-      } catch (e) {
-        devLog('Translation error for $targetLang: $e');
-      }
-    }
-
-    return translations;
   }
 
   /// Определить язык текста через AI

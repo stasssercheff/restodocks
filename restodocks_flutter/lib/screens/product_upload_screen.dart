@@ -3045,16 +3045,17 @@ ${text}
             await translationManager.handleEntitySave(
               entityType: TranslationEntityType.product,
               entityId: savedProduct.id,
-              textFields: {
-                'name': storedName,
-                if (savedProduct.names != null)
-                  for (final entry in savedProduct.names!.entries)
-                    'name_${entry.key}': entry.value,
-              },
+              textFields: {'name': storedName},
               sourceLanguage: sourceLang,
               userId:
                   context.read<AccountManagerSupabase>().currentEmployee?.id,
             );
+            final namesMap = await translationManager.materializeProductNames(
+              productId: savedProduct.id,
+              sourceLanguage: sourceLang,
+              sourceText: storedName,
+            );
+            await store.updateProduct(savedProduct.copyWith(names: namesMap));
           } catch (e) {
             devLog('DEBUG: Failed to add product "${product.name}": $e');
             if (e.toString().contains('duplicate key') ||

@@ -160,26 +160,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         // Название не меняем — только как вставил пользователь. ИИ — КБЖУ и пр.
         final storedName = item.name.trim();
-        var names = <String, String>{
+        final names = <String, String>{
           for (final c in allLangs) c: storedName
         };
-
-        if (widget.items.length > 5) {
-          for (final lang in allLangs) {
-            if (lang == sourceLang) continue;
-            final translated = await translationService.translate(
-              entityType: TranslationEntityType.product,
-              entityId: item.name,
-              fieldName: 'name',
-              text: storedName,
-              from: sourceLang,
-              to: lang,
-            );
-            if (translated != null && translated.trim().isNotEmpty) {
-              names[lang] = translated.trim();
-            }
-          }
-        }
 
         final normalizedLower = storedName.toLowerCase();
 
@@ -291,6 +274,30 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           devLog('Failed to add to nomenclature "${product.name}": $e');
           setState(() => _failed++);
           continue;
+        }
+
+        try {
+          final tm = TranslationManager(
+            aiService: context.read<AiServiceSupabase>(),
+            translationService: translationService,
+            getSupportedLanguages: () =>
+                LocalizationService.productLanguageCodes,
+          );
+          await tm.handleEntitySave(
+            entityType: TranslationEntityType.product,
+            entityId: savedProduct.id,
+            textFields: {'name': storedName},
+            sourceLanguage: sourceLang,
+            userId: account.currentEmployee?.id,
+          );
+          final namesMap = await tm.materializeProductNames(
+            productId: savedProduct.id,
+            sourceLanguage: sourceLang,
+            sourceText: storedName,
+          );
+          await store.updateProduct(savedProduct.copyWith(names: namesMap));
+        } catch (e, st) {
+          devLog('Upload dialog: translation for ${savedProduct.id}: $e\n$st');
         }
 
         setState(() => _added++);
@@ -2646,6 +2653,50 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             final saved = await store.addProduct(model);
             await store.addToNomenclature(estId, saved.id);
             added++;
+            final codes = LocalizationService.productLanguageCodes;
+            String? srcLng;
+            for (final c in codes) {
+              if ((names[c] ?? '').trim().isNotEmpty) {
+                srcLng = c;
+                break;
+              }
+            }
+            srcLng ??= loc.currentLanguageCode;
+            final safeSrc =
+                codes.contains(srcLng) ? srcLng! : codes.first;
+            final srcText =
+                (names[safeSrc] ?? names[srcLng] ?? productName).trim();
+            final missing = codes
+                .where((c) => (names[c] ?? '').trim().isEmpty)
+                .toList();
+            try {
+              final tm = TranslationManager(
+                aiService: context.read<AiServiceSupabase>(),
+                translationService: TranslationService(
+                  aiService: context.read<AiServiceSupabase>(),
+                  supabase: context.read<SupabaseService>(),
+                ),
+                getSupportedLanguages: () =>
+                    LocalizationService.productLanguageCodes,
+              );
+              if (missing.isNotEmpty) {
+                await tm.handleEntitySave(
+                  entityType: TranslationEntityType.product,
+                  entityId: saved.id,
+                  textFields: {'name': srcText},
+                  sourceLanguage: safeSrc,
+                  userId: account.currentEmployee?.id,
+                  targetLanguages: missing,
+                );
+              }
+              final mergedNames = await tm.materializeProductNames(
+                productId: saved.id,
+                sourceLanguage: safeSrc,
+                sourceText: srcText,
+                mergeExisting: names,
+              );
+              await store.updateProduct(saved.copyWith(names: mergedNames));
+            } catch (_) {}
           }
         } catch (_) {
           failed++;
@@ -2765,20 +2816,21 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     try {
       final savedProduct = await store.addProduct(product);
       await store.addToNomenclature(estId, savedProduct.id);
-      // Запускаем перевод фоново — не блокируем UI
-      translationManager
-          .generateTranslationsForProduct(sourceName, sourceLang)
-          .then((translations) async {
-        if (translations.length > 1) {
-          final updatedNames =
-              Map<String, String>.from(savedProduct.names ?? {})
-                ..addAll(translations);
-          final updatedProduct = savedProduct.copyWith(names: updatedNames);
-          try {
-            await store.updateProduct(updatedProduct);
-          } catch (_) {}
-        }
-      });
+      try {
+        await translationManager.handleEntitySave(
+          entityType: TranslationEntityType.product,
+          entityId: savedProduct.id,
+          textFields: {'name': sourceName},
+          sourceLanguage: sourceLang,
+          userId: account.currentEmployee?.id,
+        );
+        final namesMap = await translationManager.materializeProductNames(
+          productId: savedProduct.id,
+          sourceLanguage: sourceLang,
+          sourceText: sourceName,
+        );
+        await store.updateProduct(savedProduct.copyWith(names: namesMap));
+      } catch (_) {}
       await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});
@@ -5117,6 +5169,22 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             currency: currencyCode,
           );
         }
+        try {
+          final tm = context.read<TranslationManager>();
+          await tm.handleEntitySave(
+            entityType: TranslationEntityType.product,
+            entityId: savedUpdated.id,
+            textFields: {'name': name},
+            sourceLanguage: curLang,
+            userId: acc.currentEmployee?.id,
+          );
+          final namesMap = await tm.materializeProductNames(
+            productId: savedUpdated.id,
+            sourceLanguage: curLang,
+            sourceText: name,
+          );
+          await widget.store.updateProduct(savedUpdated.copyWith(names: namesMap));
+        } catch (_) {}
       } else {
         await widget.store.updateProduct(updated);
         if (widget.establishmentId != null &&

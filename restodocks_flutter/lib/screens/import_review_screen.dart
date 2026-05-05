@@ -257,11 +257,20 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 getSupportedLanguages: () =>
                     LocalizationService.productLanguageCodes,
               );
+              final srcLang = widget.importSourceLanguage ?? 'en';
               await tm.handleEntitySave(
                 entityType: TranslationEntityType.product,
                 entityId: savedProduct.id,
                 textFields: {'name': item.displayName},
-                sourceLanguage: widget.importSourceLanguage ?? 'en',
+                sourceLanguage: srcLang,
+              );
+              final namesMap = await tm.materializeProductNames(
+                productId: savedProduct.id,
+                sourceLanguage: srcLang,
+                sourceText: item.displayName,
+              );
+              await store.updateProduct(
+                savedProduct.copyWith(names: namesMap),
               );
             }
             devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
