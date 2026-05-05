@@ -47,11 +47,50 @@ Widget _ttkNumericEditableField({
   required VoidCallback onSubmit,
   FocusNode? focusNode,
   bool requestFocusOnOuterTap = true,
+
+  /// Если false — одна строка по центру (для высоких ячеек, напр. «Итого»).
+  bool expandToCell = true,
 }) {
   final fillColor = _ttkEditableFill(context);
   final cs = Theme.of(context).colorScheme;
 
   Widget coreLayout() {
+    if (!expandToCell) {
+      return SizedBox(
+        width: double.infinity,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: TextField(
+            focusNode: focusNode,
+            controller: controller,
+            keyboardType: keyboardType,
+            textAlign: TextAlign.center,
+            textAlignVertical: TextAlignVertical.center,
+            expands: false,
+            maxLines: 1,
+            cursorColor: cs.onSurface,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              filled: false,
+            ),
+            style: const TextStyle(fontSize: 12),
+            onChanged: (_) => onInputChanged(),
+            onSubmitted: (_) => onSubmit(),
+            onTapOutside: (_) => onSubmit(),
+          ),
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxH = constraints.maxHeight;
@@ -7918,6 +7957,12 @@ class _TtkCookTable extends StatefulWidget {
   static const _colOutput = 70.0;
   static const _colPortions = 56.0;
 
+  /// Совпадает с логикой [ExcelStyleTtkTable]: продукты −20%, «Итого» +20% от базы 44.
+  static const double _kCookBaseRowDp = 44.0;
+  static const double _kCookIngredientRowHeight = _kCookBaseRowDp * 0.8;
+  static const double _kCookTotalRowHeight = _kCookBaseRowDp * 1.2;
+  static const double _kCookHeaderHeight = _kCookBaseRowDp;
+
   /// Веб на ПК: чуть шире колонки, чтобы в гапке переносы шли по словам, а не посередине.
   static double _webColumnScale(BuildContext context) {
     if (!kIsWeb) return 1.0;
@@ -8043,7 +8088,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     return TableCell(
       verticalAlignment: TableCellVerticalAlignment.middle,
       child: SizedBox(
-        height: 44,
+        height: _TtkCookTable._kCookHeaderHeight,
         child: Center(
           child: Padding(
             padding: _TtkCookTable._cellPad,
@@ -8054,6 +8099,36 @@ class _TtkCookTableState extends State<_TtkCookTable> {
               softWrap: true,
               maxLines: 4,
               overflow: TextOverflow.clip,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  TableCell _totalRowEmptyCell() {
+    return TableCell(
+      verticalAlignment: TableCellVerticalAlignment.middle,
+      child: SizedBox(
+        height: _TtkCookTable._kCookTotalRowHeight,
+        width: double.infinity,
+      ),
+    );
+  }
+
+  TableCell _totalRowLabelCell(String label) {
+    return TableCell(
+      verticalAlignment: TableCellVerticalAlignment.middle,
+      child: SizedBox(
+        height: _TtkCookTable._kCookTotalRowHeight,
+        width: double.infinity,
+        child: Padding(
+          padding: _TtkCookTable._cellPad,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -8165,7 +8240,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                     TableCell(
                       verticalAlignment: TableCellVerticalAlignment.middle,
                       child: Container(
-                        height: 44,
+                        height: _TtkCookTable._kCookIngredientRowHeight,
                         color: Colors.white,
                       ),
                     ),
@@ -8291,61 +8366,81 @@ class _TtkCookTableState extends State<_TtkCookTable> {
               decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest),
               children: [
-                _cell(widget.loc.t('ttk_total'), bold: true),
-                _cell(''),
-                _cell(''),
+                _totalRowLabelCell(widget.loc.t('ttk_total')),
+                _totalRowEmptyCell(),
+                _totalRowEmptyCell(),
                 TableCell(
-                  verticalAlignment: TableCellVerticalAlignment.fill,
-                  child: Center(
-                    child: Text(
-                      UnitConverter.roundUi(
-                        totalOutputDisplay.value,
-                        fractionDigits: unitPrefs.isImperial ? 2 : 0,
-                      ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                _cell(''),
-                TableCell(
-                  verticalAlignment: TableCellVerticalAlignment.fill,
-                  child: SizedBox.expand(
-                    child: _EditableNetCell(
-                      value: _totalOutput,
-                      decimalPlaces: unitPrefs.isImperial ? 2 : 0,
-                      canonicalToDisplay: (v) => UnitConverter.toDisplay(
-                        canonicalValue: v,
-                        canonicalUnit: 'g',
-                        system: unitPrefs.unitSystem,
-                      ).value,
-                      displayToCanonical: (v) => UnitConverter.fromDisplay(
-                        displayValue: v,
-                        canonicalUnit: 'g',
-                        system: unitPrefs.unitSystem,
+                  verticalAlignment: TableCellVerticalAlignment.middle,
+                  child: SizedBox(
+                    height: _TtkCookTable._kCookTotalRowHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: Text(
+                        UnitConverter.roundUi(
+                          totalOutputDisplay.value,
+                          fractionDigits: unitPrefs.isImperial ? 2 : 0,
+                        ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      onChanged: (v) {
-                        if (v != null && v > 0) _scaleByOutput(v);
-                      },
+                    ),
+                  ),
+                ),
+                _totalRowEmptyCell(),
+                TableCell(
+                  verticalAlignment: TableCellVerticalAlignment.middle,
+                  child: SizedBox(
+                    height: _TtkCookTable._kCookTotalRowHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: _EditableNetCell(
+                          expandToCell: false,
+                          value: _totalOutput,
+                          decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                          canonicalToDisplay: (v) => UnitConverter.toDisplay(
+                            canonicalValue: v,
+                            canonicalUnit: 'g',
+                            system: unitPrefs.unitSystem,
+                          ).value,
+                          displayToCanonical: (v) => UnitConverter.fromDisplay(
+                            displayValue: v,
+                            canonicalUnit: 'g',
+                            system: unitPrefs.unitSystem,
+                          ),
+                          onChanged: (v) {
+                            if (v != null && v > 0) _scaleByOutput(v);
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 TableCell(
-                  verticalAlignment: TableCellVerticalAlignment.fill,
-                  child: SizedBox.expand(
-                    child: _EditableNetCell(
-                      value: _portionsCount,
-                      decimalPlaces: 1,
-                      onChanged: (v) {
-                        if (v == null || v <= 0) return;
-                        setState(() {
-                          _portionsCount = v.clamp(0.1, 9999.0);
-                          // Пересчёт всей таблицы под N порций: брутто, нетто, выход по всем продуктам и в Итого
-                          final targetOutput =
-                              _portionsCount * widget.weightPerPortion;
-                          _scaleByOutput(targetOutput);
-                        });
-                      },
+                  verticalAlignment: TableCellVerticalAlignment.middle,
+                  child: SizedBox(
+                    height: _TtkCookTable._kCookTotalRowHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: _EditableNetCell(
+                          expandToCell: false,
+                          value: _portionsCount,
+                          decimalPlaces: 1,
+                          onChanged: (v) {
+                            if (v == null || v <= 0) return;
+                            setState(() {
+                              _portionsCount = v.clamp(0.1, 9999.0);
+                              // Пересчёт всей таблицы под N порций: брутто, нетто, выход по всем продуктам и в Итого
+                              final targetOutput =
+                                  _portionsCount * widget.weightPerPortion;
+                              _scaleByOutput(targetOutput);
+                            });
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -8397,9 +8492,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         if (_ingredients.isNotEmpty)
           Positioned(
             left: 0,
-            top: 44,
-            width: _TtkCookTable._colDish,
-            height: _ingredients.length * 44 + 1,
+            top: _TtkCookTable._kCookHeaderHeight,
+            width: _TtkCookTable._colDish * colScale,
+            height:
+                _ingredients.length * _TtkCookTable._kCookIngredientRowHeight +
+                    1,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -8427,10 +8524,14 @@ class _EditableNetCell extends StatefulWidget {
     this.decimalPlaces = 0,
     this.canonicalToDisplay,
     this.displayToCanonical,
+    this.expandToCell = true,
   });
 
   final double value;
   final void Function(double? v) onChanged;
+
+  /// true — как раньше, растягивается на высоту ячейки; false — одна строка по центру.
+  final bool expandToCell;
 
   /// Количество знаков после запятой (0 = целые, 1 = 0.3 и т.д.)
   final int decimalPlaces;
@@ -8504,6 +8605,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
       keyboardType: TextInputType.numberWithOptions(decimal: true),
       onInputChanged: _scheduleSubmit,
       onSubmit: _submit,
+      expandToCell: widget.expandToCell,
     );
   }
 }
