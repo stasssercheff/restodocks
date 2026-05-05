@@ -508,6 +508,8 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
+    if (employee == null) return const Scaffold(body: SizedBox());
+
     final ent = SubscriptionEntitlements.from(accountManager.establishment);
     final posOn = FeatureFlags.posEnabledForSubscription(ent);
     final canOpenShifts = posOn &&
@@ -516,8 +518,6 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
             employee.department == 'hall' ||
             employee.department == 'dining_room');
     final loc = context.watch<LocalizationService>();
-
-    if (employee == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
       appBar: AppBar(
