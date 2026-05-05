@@ -24,6 +24,7 @@ const Color _kTtkEditableCellFill = Color(0xFFFDF3F6);
 const TextStyle _kTtkNumericTextStyle = TextStyle(fontSize: 12, height: 1);
 const StrutStyle _kTtkNumericStrut =
     StrutStyle(forceStrutHeight: true, height: 1);
+const double _kTtkNumericCenterNudgeY = -1.2;
 
 class ExcelStyleTtkTable extends StatefulWidget {
   final LocalizationService loc;
@@ -580,7 +581,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   outputWeight: output,
                                   cost: newCost,
                                 ));
-                          }, 'gross_$rowIndex'),
+                          }, 'gross_$rowIndex',
+                              textNudgeY: _kTtkNumericCenterNudgeY),
 
                           // % отхода — редактируемо; при вводе пересчёт нетто и выхода. Пусто при 0 — не удалять перед вводом.
                           _buildNumericCell(
@@ -616,6 +618,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   ));
                             },
                             'waste_$rowIndex',
+                            textNudgeY: _kTtkNumericCenterNudgeY,
                           ),
 
                           // Нетто
@@ -667,7 +670,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   outputWeight: output,
                                   cost: newCost,
                                 ));
-                          }, 'net_$rowIndex'),
+                          }, 'net_$rowIndex',
+                              textNudgeY: _kTtkNumericCenterNudgeY),
 
                           // Способ приготовления
                           _buildCookingMethodCell(ingredient, rowIndex),
@@ -693,7 +697,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   cookingLossPctOverride: clampedLoss,
                                   outputWeight: output,
                                 ));
-                          }, 'cooking_loss_$rowIndex'),
+                          }, 'cooking_loss_$rowIndex',
+                              textNudgeY: _kTtkNumericCenterNudgeY),
 
                           // Выход — редактируемо; при вводе пересчёт % ужарки (как нетто → % отхода)
                           _buildNumericCell(
@@ -720,6 +725,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   ));
                             },
                             'output_$rowIndex',
+                            textNudgeY: _kTtkNumericCenterNudgeY,
                           ),
 
                           // вес прц — пусто в строках продукта
@@ -727,7 +733,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                           // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                           _buildReadOnlyCell(
-                              _portionsPerOne(totalOutput, ingredient)),
+                              _portionsPerOne(totalOutput, ingredient),
+                              textNudgeY: _kTtkNumericCenterNudgeY),
 
                           // Стоимость
                           _buildCostCell(ingredient),
@@ -768,6 +775,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                 },
                                 'total_output',
                                 rowHeight: _kTtkTotalRowHeight,
+                                textNudgeY: _kTtkNumericCenterNudgeY,
                               )
                             : _buildTotalCell(
                                 '${totalOutput.toStringAsFixed(0)}г'),
@@ -787,6 +795,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                 },
                                 'weight_per_portion',
                                 rowHeight: _kTtkTotalRowHeight,
+                                textNudgeY: _kTtkNumericCenterNudgeY,
                               )
                             : _buildTotalCell(widget.weightPerPortion == 0
                                 ? ''
@@ -794,6 +803,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         _buildReadOnlyCell(
                           '1',
                           rowHeight: _kTtkTotalRowHeight,
+                          textNudgeY: _kTtkNumericCenterNudgeY,
                         ), // порций(шт) в итого всегда 1
                         _buildTotalRowSpacer(),
                         widget.isCook
@@ -1616,6 +1626,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     Function(String) onChanged,
     String key, {
     double rowHeight = _kTtkIngredientRowHeight,
+    double textNudgeY = 0,
   }) {
     // Обновляем контроллер если значение изменилось
     final controller = _getController(key, value);
@@ -1647,40 +1658,43 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     onTap: () => focusNode.requestFocus(),
                     child: SizedBox.expand(
                       child: Center(
-                        child: TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'[0-9\.,]')),
-                          ],
-                          style: _kTtkNumericTextStyle,
-                          strutStyle: _kTtkNumericStrut,
-                          textAlign: TextAlign.center,
-                          textAlignVertical: TextAlignVertical.center,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            focusedErrorBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
-                            isCollapsed: true,
-                            filled: false,
+                        child: Transform.translate(
+                          offset: Offset(0, textNudgeY),
+                          child: TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9\.,]')),
+                            ],
+                            style: _kTtkNumericTextStyle,
+                            strutStyle: _kTtkNumericStrut,
+                            textAlign: TextAlign.center,
+                            textAlignVertical: TextAlignVertical.center,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                              isCollapsed: true,
+                              filled: false,
+                            ),
+                            onChanged: (v) {
+                              _debounceTimers[key]?.cancel();
+                              _debounceTimers[key] =
+                                  Timer(const Duration(milliseconds: 150), () {
+                                if (!mounted) return;
+                                onChanged(v);
+                              });
+                            },
                           ),
-                          onChanged: (v) {
-                            _debounceTimers[key]?.cancel();
-                            _debounceTimers[key] =
-                                Timer(const Duration(milliseconds: 150), () {
-                              if (!mounted) return;
-                              onChanged(v);
-                            });
-                          },
                         ),
                       ),
                     ),
@@ -1690,23 +1704,29 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             )
           : Align(
               alignment: Alignment.center,
-              child: Text(value,
-                  style: _kTtkNumericTextStyle,
-                  strutStyle: _kTtkNumericStrut,
-                  textAlign: TextAlign.center),
+              child: Transform.translate(
+                offset: Offset(0, textNudgeY),
+                child: Text(value,
+                    style: _kTtkNumericTextStyle,
+                    strutStyle: _kTtkNumericStrut,
+                    textAlign: TextAlign.center),
+              ),
             ),
     );
   }
 
   Widget _buildReadOnlyCell(String value,
-      {double rowHeight = _kTtkIngredientRowHeight}) {
+      {double rowHeight = _kTtkIngredientRowHeight, double textNudgeY = 0}) {
     return SizedBox(
       height: rowHeight,
       child: Center(
-        child: Text(value,
-            style: _kTtkNumericTextStyle,
-            strutStyle: _kTtkNumericStrut,
-            textAlign: TextAlign.center),
+        child: Transform.translate(
+          offset: Offset(0, textNudgeY),
+          child: Text(value,
+              style: _kTtkNumericTextStyle,
+              strutStyle: _kTtkNumericStrut,
+              textAlign: TextAlign.center),
+        ),
       ),
     );
   }
