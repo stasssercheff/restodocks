@@ -2827,8 +2827,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }) async {
     final cardId = techCardId.trim();
     final lang = languageCode.trim().toLowerCase();
-    if (cardId.isEmpty || lang.isEmpty || lang == 'ru') return;
-    final key = '$cardId:$lang';
+    if (cardId.isEmpty || lang.isEmpty) return;
+    final key = '$cardId:ingredient_i18n_all';
     if (_ingredientTranslationBackfillInFlight.contains(key)) return;
 
     final sourceFields = _ingredientFieldsForTranslation(_ingredients);
@@ -2864,7 +2864,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               textFields: <String, String>{entry.key: entry.value},
               sourceLanguage: inferredSourceLanguage,
               userId: userId,
-              targetLanguages: <String>[lang],
+              // null → все [LocalizationService.productLanguageCodes], кроме sourceLanguage
             );
           }),
         );
@@ -3084,16 +3084,35 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return 'en';
   }
 
+  /// Канонический текст названия для запроса перевода — без приоритета «только ru».
+  String _canonicalDishNameSource(TechCard tc) {
+    final dn = tc.dishName.trim();
+    if (dn.isNotEmpty) return dn;
+    final loc = tc.dishNameLocalized;
+    if (loc != null) {
+      for (final code in TechCard.kDishNameFallbackLanguageOrder) {
+        final v = loc[code]?.trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+      for (final code in LocalizationService.productLanguageCodes) {
+        final v = loc[code]?.trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+      for (final v in loc.values) {
+        final t = v.trim();
+        if (t.isNotEmpty) return t;
+      }
+    }
+    return '';
+  }
+
   Future<void> _refreshDishNameTranslationForCurrentLanguage(TechCard tc) async {
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode.trim().toLowerCase();
-    if (targetLang == 'ru') return;
 
     final localized = Map<String, String>.from(tc.dishNameLocalized ?? const {});
-    final sourceText = (localized['ru']?.trim().isNotEmpty ?? false)
-        ? localized['ru']!.trim()
-        : tc.dishName.trim();
+    final sourceText = _canonicalDishNameSource(tc);
     if (sourceText.isEmpty) return;
     final sourceLang = _inferLanguageFromText(sourceText);
     if (sourceLang == targetLang) return;
