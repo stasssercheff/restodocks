@@ -96,7 +96,11 @@ Widget _ttkNumericEditableField({
               contentPadding: EdgeInsets.symmetric(vertical: 8),
               filled: false,
             ),
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 12, height: 1),
+            strutStyle: const StrutStyle(
+              forceStrutHeight: true,
+              height: 1,
+            ),
             onChanged: (_) => onInputChanged(),
             onSubmitted: (_) => onSubmit(),
             onTapOutside: (_) => onSubmit(),
@@ -138,7 +142,11 @@ Widget _ttkNumericEditableField({
                   contentPadding: EdgeInsets.zero,
                   filled: false,
                 ),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12, height: 1),
+                strutStyle: const StrutStyle(
+                  forceStrutHeight: true,
+                  height: 1,
+                ),
                 onChanged: (_) => onInputChanged(),
                 onSubmitted: (_) => onSubmit(),
                 onTapOutside: (_) => onSubmit(),
@@ -5471,6 +5479,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     // Определяем, является ли устройство мобильным
     final isMobile = isHandheldNarrowLayout(context);
     final compositionHScrollThumbVisible = !kIsWeb || isMobile;
+    final centerReadOnlyWebBlock = kIsWeb && tableOnlyView && !isMobile;
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -6134,183 +6143,198 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: RawScrollbar(
-                              controller: _compositionTableHScrollController,
-                              scrollbarOrientation: ScrollbarOrientation.bottom,
-                              thumbVisibility: compositionHScrollThumbVisible,
-                              child: SingleChildScrollView(
+                            child: Align(
+                              alignment: centerReadOnlyWebBlock
+                                  ? Alignment.topCenter
+                                  : Alignment.topLeft,
+                              child: RawScrollbar(
                                 controller: _compositionTableHScrollController,
-                                scrollDirection: Axis.horizontal,
-                                clipBehavior: Clip.hardEdge,
-                                child: Builder(builder: (ctx) {
-                                  // On iOS handhelds InteractiveViewer may render
-                                  // the table off-screen after recent layout changes.
-                                  // Keep stable table rendering across platforms.
-                                  const enableZoomViewer = false;
-                                  final table = effectiveCanEdit
-                                      ? RepaintBoundary(
-                                          child: ExcelStyleTtkTable(
-                                            loc: loc,
-                                            dishName: _nameController.text,
-                                            isSemiFinished: _isSemiFinished,
-                                            ingredients: _ingredients,
-                                            canEdit: effectiveCanEdit,
-                                            dishNameController: _nameController,
-                                            technologyController:
-                                                _technologyController,
-                                            productStore: context
-                                                .read<ProductStoreSupabase>(),
-                                            ingredientNameTranslationsById:
-                                                _ingredientNameTranslationsById,
-                                            establishmentId: (() {
-                                              final est = context
-                                                  .read<
-                                                      AccountManagerSupabase>()
-                                                  .establishment;
-                                              return est != null && est.isBranch
-                                                  ? est.id
-                                                  : (est?.dataEstablishmentId ??
-                                                      '');
-                                            })(),
-                                            semiFinishedProducts:
-                                                _semiFinishedProducts,
-                                            isCook: isCook,
-                                            weightPerPortion: _portionWeight,
-                                            onWeightPerPortionChanged: (v) {
-                                              _portionWeightUpdateDebounce
-                                                  ?.cancel();
-                                              _portionWeight = v;
-                                              _portionWeightUpdateDebounce =
-                                                  Timer(
-                                                const Duration(
-                                                    milliseconds: 200),
-                                                () {
-                                                  if (!mounted) return;
-                                                  setState(() {});
-                                                  _scheduleDraftSave();
-                                                },
-                                              );
-                                            },
-                                            onTotalOutputChanged: (newOutput) {
-                                              _scaleIngredientsToTotalOutput(
-                                                  newOutput);
-                                            },
-                                            onAdd: _showAddIngredient,
-                                            onUpdate: (i, ing) {
-                                              _lastUserInteractionAt =
-                                                  DateTime.now();
-                                              if (_ingredients.isEmpty &&
-                                                  i == 0) {
-                                                _ingredients.add(ing);
-                                                if (ing.hasData) {
-                                                  _ingredients[0] =
-                                                      ing.isPlaceholder
+                                scrollbarOrientation:
+                                    ScrollbarOrientation.bottom,
+                                thumbVisibility: compositionHScrollThumbVisible,
+                                child: SingleChildScrollView(
+                                  controller:
+                                      _compositionTableHScrollController,
+                                  scrollDirection: Axis.horizontal,
+                                  clipBehavior: Clip.hardEdge,
+                                  child: Builder(builder: (ctx) {
+                                    // On iOS handhelds InteractiveViewer may render
+                                    // the table off-screen after recent layout changes.
+                                    // Keep stable table rendering across platforms.
+                                    const enableZoomViewer = false;
+                                    final table = effectiveCanEdit
+                                        ? RepaintBoundary(
+                                            child: ExcelStyleTtkTable(
+                                              loc: loc,
+                                              dishName: _nameController.text,
+                                              isSemiFinished: _isSemiFinished,
+                                              ingredients: _ingredients,
+                                              canEdit: effectiveCanEdit,
+                                              dishNameController:
+                                                  _nameController,
+                                              technologyController:
+                                                  _technologyController,
+                                              productStore: context
+                                                  .read<ProductStoreSupabase>(),
+                                              ingredientNameTranslationsById:
+                                                  _ingredientNameTranslationsById,
+                                              establishmentId: (() {
+                                                final est = context
+                                                    .read<
+                                                        AccountManagerSupabase>()
+                                                    .establishment;
+                                                return est != null &&
+                                                        est.isBranch
+                                                    ? est.id
+                                                    : (est?.dataEstablishmentId ??
+                                                        '');
+                                              })(),
+                                              semiFinishedProducts:
+                                                  _semiFinishedProducts,
+                                              isCook: isCook,
+                                              weightPerPortion: _portionWeight,
+                                              onWeightPerPortionChanged: (v) {
+                                                _portionWeightUpdateDebounce
+                                                    ?.cancel();
+                                                _portionWeight = v;
+                                                _portionWeightUpdateDebounce =
+                                                    Timer(
+                                                  const Duration(
+                                                      milliseconds: 200),
+                                                  () {
+                                                    if (!mounted) return;
+                                                    setState(() {});
+                                                    _scheduleDraftSave();
+                                                  },
+                                                );
+                                              },
+                                              onTotalOutputChanged:
+                                                  (newOutput) {
+                                                _scaleIngredientsToTotalOutput(
+                                                    newOutput);
+                                              },
+                                              onAdd: _showAddIngredient,
+                                              onUpdate: (i, ing) {
+                                                _lastUserInteractionAt =
+                                                    DateTime.now();
+                                                if (_ingredients.isEmpty &&
+                                                    i == 0) {
+                                                  _ingredients.add(ing);
+                                                  if (ing.hasData) {
+                                                    _ingredients[0] =
+                                                        ing.isPlaceholder
+                                                            ? ing.withRealId()
+                                                            : ing;
+                                                  }
+                                                  _ensurePlaceholderRowAtEnd();
+                                                } else if (i <
+                                                    _ingredients.length) {
+                                                  _ingredients[i] =
+                                                      ing.isPlaceholder &&
+                                                              ing.hasData
                                                           ? ing.withRealId()
                                                           : ing;
+                                                  _ensurePlaceholderRowAtEnd();
                                                 }
-                                                _ensurePlaceholderRowAtEnd();
-                                              } else if (i <
-                                                  _ingredients.length) {
-                                                _ingredients[i] =
-                                                    ing.isPlaceholder &&
-                                                            ing.hasData
-                                                        ? ing.withRealId()
-                                                        : ing;
-                                                _ensurePlaceholderRowAtEnd();
-                                              }
-                                              _ingredientUpdateDebounce
-                                                  ?.cancel();
-                                              _ingredientUpdateDebounce = Timer(
-                                                const Duration(
-                                                    milliseconds: 250),
-                                                () {
-                                                  if (!mounted) return;
-                                                  setState(() {});
-                                                  _scheduleDraftSave();
-                                                },
+                                                _ingredientUpdateDebounce
+                                                    ?.cancel();
+                                                _ingredientUpdateDebounce =
+                                                    Timer(
+                                                  const Duration(
+                                                      milliseconds: 250),
+                                                  () {
+                                                    if (!mounted) return;
+                                                    setState(() {});
+                                                    _scheduleDraftSave();
+                                                  },
+                                                );
+                                              },
+                                              onRemove: _removeIngredient,
+                                              onSuggestWaste:
+                                                  _suggestWasteForRow,
+                                              onSuggestCookingLoss:
+                                                  _suggestCookingLossForRow,
+                                              onAfterProductLinked:
+                                                  _refreshGlobalProcessingHintsForRow,
+                                              hideTechnologyBlock: true,
+                                              omitTableHeader: false,
+                                              shrinkWrap: true,
+                                              onTapPfIngredient: (id) => context
+                                                  .push('/tech-cards/$id'),
+                                            ),
+                                          )
+                                        : ListenableBuilder(
+                                            listenable: context
+                                                .read<ProductStoreSupabase>()
+                                                .catalogRevision,
+                                            builder: (context, _) {
+                                              return SizedBox(
+                                                width: _TtkCookTable
+                                                    .intrinsicTableWidth(
+                                                        context),
+                                                child: _TtkCookTable(
+                                                  loc: loc,
+                                                  dishName:
+                                                      _nameController.text,
+                                                  ingredients: _ingredients
+                                                      .where((i) =>
+                                                          !i.isPlaceholder ||
+                                                          i.hasData)
+                                                      .toList(),
+                                                  technology:
+                                                      _technologyController
+                                                          .text,
+                                                  weightPerPortion:
+                                                      _portionWeight,
+                                                  hideTechnologyInTable: true,
+                                                  productStore: context.read<
+                                                      ProductStoreSupabase>(),
+                                                  ingredientNameTranslationsById:
+                                                      _ingredientNameTranslationsById,
+                                                  onTapPfIngredient: (id) =>
+                                                      context.push(
+                                                          '/tech-cards/$id?view=1'),
+                                                  onIngredientsChanged: (list) {
+                                                    _cookTableSyncDebounce
+                                                        ?.cancel();
+                                                    final snapshot =
+                                                        List<TTIngredient>.from(
+                                                            list);
+                                                    _cookTableSyncDebounce =
+                                                        Timer(
+                                                      const Duration(
+                                                          milliseconds: 150),
+                                                      () {
+                                                        if (!mounted) return;
+                                                        setState(() {
+                                                          _ingredients
+                                                            ..clear()
+                                                            ..addAll(snapshot);
+                                                          _ensurePlaceholderRowAtEnd();
+                                                        });
+                                                        _scheduleDraftSave();
+                                                      },
+                                                    );
+                                                  },
+                                                ),
                                               );
                                             },
-                                            onRemove: _removeIngredient,
-                                            onSuggestWaste: _suggestWasteForRow,
-                                            onSuggestCookingLoss:
-                                                _suggestCookingLossForRow,
-                                            onAfterProductLinked:
-                                                _refreshGlobalProcessingHintsForRow,
-                                            hideTechnologyBlock: true,
-                                            omitTableHeader: false,
-                                            shrinkWrap: true,
-                                            onTapPfIngredient: (id) =>
-                                                context.push('/tech-cards/$id'),
-                                          ),
-                                        )
-                                      : ListenableBuilder(
-                                          listenable: context
-                                              .read<ProductStoreSupabase>()
-                                              .catalogRevision,
-                                          builder: (context, _) {
-                                            return SizedBox(
-                                              width: _TtkCookTable
-                                                  .intrinsicTableWidth(context),
-                                              child: _TtkCookTable(
-                                                loc: loc,
-                                                dishName: _nameController.text,
-                                                ingredients: _ingredients
-                                                    .where((i) =>
-                                                        !i.isPlaceholder ||
-                                                        i.hasData)
-                                                    .toList(),
-                                                technology:
-                                                    _technologyController.text,
-                                                weightPerPortion:
-                                                    _portionWeight,
-                                                hideTechnologyInTable: true,
-                                                productStore: context.read<
-                                                    ProductStoreSupabase>(),
-                                                ingredientNameTranslationsById:
-                                                    _ingredientNameTranslationsById,
-                                                onTapPfIngredient: (id) =>
-                                                    context.push(
-                                                        '/tech-cards/$id?view=1'),
-                                                onIngredientsChanged: (list) {
-                                                  _cookTableSyncDebounce
-                                                      ?.cancel();
-                                                  final snapshot =
-                                                      List<TTIngredient>.from(
-                                                          list);
-                                                  _cookTableSyncDebounce =
-                                                      Timer(
-                                                    const Duration(
-                                                        milliseconds: 150),
-                                                    () {
-                                                      if (!mounted) return;
-                                                      setState(() {
-                                                        _ingredients
-                                                          ..clear()
-                                                          ..addAll(snapshot);
-                                                        _ensurePlaceholderRowAtEnd();
-                                                      });
-                                                      _scheduleDraftSave();
-                                                    },
-                                                  );
-                                                },
-                                              ),
-                                            );
-                                          },
-                                        );
-                                  if (!enableZoomViewer) {
-                                    return table;
-                                  }
-                                  return InteractiveViewer(
-                                    panEnabled: true,
-                                    scaleEnabled: true,
-                                    constrained: false,
-                                    alignment: Alignment.topLeft,
-                                    minScale: 0.5,
-                                    maxScale: 2.2,
-                                    boundaryMargin: const EdgeInsets.all(64),
-                                    child: table,
-                                  );
-                                }),
+                                          );
+                                    if (!enableZoomViewer) {
+                                      return table;
+                                    }
+                                    return InteractiveViewer(
+                                      panEnabled: true,
+                                      scaleEnabled: true,
+                                      constrained: false,
+                                      alignment: Alignment.topLeft,
+                                      minScale: 0.5,
+                                      maxScale: 2.2,
+                                      boundaryMargin: const EdgeInsets.all(64),
+                                      child: table,
+                                    );
+                                  }),
+                                ),
                               ),
                             ),
                           ),
@@ -6413,7 +6437,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ),
                                 // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
                                 Align(
-                                  alignment: Alignment.centerLeft,
+                                  alignment: centerReadOnlyWebBlock
+                                      ? Alignment.topCenter
+                                      : Alignment.centerLeft,
                                   child: SizedBox(
                                     width: _ttkTechnologyStripWidth(
                                         context, tableOnlyView),
