@@ -231,7 +231,9 @@ class _CategoryPickerField extends StatelessWidget {
         decoration: InputDecoration(
             labelText: loc.t('category'),
             isDense: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
         child: Text(categoryLabel(selectedCategory),
             overflow: TextOverflow.ellipsis),
       );
@@ -250,7 +252,9 @@ class _CategoryPickerField extends StatelessWidget {
       decoration: InputDecoration(
           labelText: loc.t('category'),
           isDense: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
       items: [
         DropdownMenuItem(
           value: _addValue,
@@ -5909,6 +5913,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               const SizedBox(width: 8),
                                               SizedBox(
                                                 width: 180,
+                                                height: 56,
                                                 child: _CategoryPickerField(
                                                   selectedCategory:
                                                       _categoryOptions.contains(
@@ -5943,6 +5948,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               const SizedBox(width: 8),
                                               SizedBox(
                                                 width: 180,
+                                                height: 56,
                                                 child: _SectionPicker(
                                                   selected: _selectedSections,
                                                   availableSections:
@@ -9594,6 +9600,8 @@ class _SectionPicker extends StatelessWidget {
           labelText: loc.t('ttk_col_section'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         ),
         child: Row(
           children: [
@@ -9628,6 +9636,8 @@ class _SectionPicker extends StatelessWidget {
           labelText: loc.t('ttk_col_section'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           suffixIcon: const Icon(Icons.arrow_drop_down),
         ),
         child: Row(

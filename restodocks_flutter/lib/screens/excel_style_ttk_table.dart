@@ -1626,7 +1626,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       controller.text = value;
     }
 
-    final verticalPadding = ((rowHeight - 14) / 2).clamp(0.0, 24.0);
     return SizedBox(
       height: rowHeight,
       child: widget.canEdit
@@ -1643,39 +1642,48 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       width: 2,
                     ),
                   ),
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
-                    ],
-                    style: _kTtkNumericTextStyle,
-                    strutStyle: _kTtkNumericStrut,
-                    textAlign: TextAlign.center,
-                    textAlignVertical: TextAlignVertical.center,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: verticalPadding),
-                      isDense: true,
-                      filled: false,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => focusNode.requestFocus(),
+                    child: SizedBox.expand(
+                      child: Center(
+                        child: TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9\.,]')),
+                          ],
+                          style: _kTtkNumericTextStyle,
+                          strutStyle: _kTtkNumericStrut,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                            isCollapsed: true,
+                            filled: false,
+                          ),
+                          onChanged: (v) {
+                            _debounceTimers[key]?.cancel();
+                            _debounceTimers[key] =
+                                Timer(const Duration(milliseconds: 150), () {
+                              if (!mounted) return;
+                              onChanged(v);
+                            });
+                          },
+                        ),
+                      ),
                     ),
-                    onChanged: (v) {
-                      _debounceTimers[key]?.cancel();
-                      _debounceTimers[key] =
-                          Timer(const Duration(milliseconds: 150), () {
-                        if (!mounted) return;
-                        onChanged(v);
-                      });
-                    },
                   ),
                 );
               },
