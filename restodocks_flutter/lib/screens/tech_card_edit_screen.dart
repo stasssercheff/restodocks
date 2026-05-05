@@ -33,6 +33,106 @@ enum _DuplicateNameAction { createDuplicate, edit, delete }
 /// Отображение для сотрудников (режим просмотра, !effectiveCanEdit) должно соответствовать референсу:
 /// https://github.com/stasssercheff/shbb326 — kitchen/kitchen/ttk/Preps (ТТК ПФ), dish (карточки блюд), sv (су-вид).
 
+Color _ttkEditableFill(BuildContext context) =>
+    Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7);
+
+/// Розовый фон числового поля на всю ячейку таблицы, цифры по центру.
+/// Фокус подсвечивает всю ячейку (рамка темы), не отдельное поле ввода.
+Widget _ttkNumericEditableField({
+  required BuildContext context,
+  required TextEditingController controller,
+  required TextInputType keyboardType,
+  required VoidCallback onInputChanged,
+  required VoidCallback onSubmit,
+  FocusNode? focusNode,
+  bool requestFocusOnOuterTap = true,
+}) {
+  final fillColor = _ttkEditableFill(context);
+  final cs = Theme.of(context).colorScheme;
+
+  Widget coreLayout() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxH = constraints.maxHeight;
+        final stretch = maxH.isFinite && maxH > 0;
+        final h = stretch ? maxH : 44.0;
+        return SizedBox(
+          width: double.infinity,
+          height: h,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+            ),
+            child: TextField(
+              focusNode: focusNode,
+              controller: controller,
+              keyboardType: keyboardType,
+              textAlign: TextAlign.center,
+              textAlignVertical: TextAlignVertical.center,
+              expands: stretch,
+              maxLines: stretch ? null : 1,
+              cursorColor: cs.onSurface,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                filled: false,
+              ),
+              style: const TextStyle(fontSize: 12),
+              onChanged: (_) => onInputChanged(),
+              onSubmitted: (_) => onSubmit(),
+              onTapOutside: (_) => onSubmit(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget shell() {
+    final fn = focusNode;
+    if (fn != null) {
+      return ListenableBuilder(
+        listenable: fn,
+        builder: (context, _) {
+          final focused = fn.hasFocus;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: fillColor,
+              border: Border.all(
+                width: 2,
+                color: focused ? cs.primary : Colors.transparent,
+              ),
+            ),
+            child: coreLayout(),
+          );
+        },
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(color: fillColor),
+      child: coreLayout(),
+    );
+  }
+
+  final field = shell();
+  final fn = focusNode;
+  if (fn != null && requestFocusOnOuterTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => fn.requestFocus(),
+      child: field,
+    );
+  }
+  return field;
+}
+
 /// Поле выбора категории: выпадающий список с «Свой вариант» сверху. Удаление своих — через «Управление».
 class _CategoryPickerField extends StatelessWidget {
   const _CategoryPickerField({
@@ -196,30 +296,13 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context)
-        .colorScheme
-        .surfaceContainerLow
-        .withValues(alpha: 0.7);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _focusNode.requestFocus(),
-      child: TextField(
-        focusNode: _focusNode,
-        controller: _ctrl,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          filled: true,
-          fillColor: fill,
-        ),
-        style: const TextStyle(fontSize: 12),
-        onChanged: (_) => _scheduleSubmit(),
-        onSubmitted: (_) => _submit(),
-        onTapOutside: (_) => _submit(),
-      ),
+    return _ttkNumericEditableField(
+      context: context,
+      controller: _ctrl,
+      focusNode: _focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      onInputChanged: _scheduleSubmit,
+      onSubmit: _submit,
     );
   }
 }
@@ -276,30 +359,13 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context)
-        .colorScheme
-        .surfaceContainerLow
-        .withValues(alpha: 0.7);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _focusNode.requestFocus(),
-      child: TextField(
-        focusNode: _focusNode,
-        controller: _ctrl,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          filled: true,
-          fillColor: fill,
-        ),
-        style: const TextStyle(fontSize: 12),
-        onChanged: (_) => _scheduleSubmit(),
-        onSubmitted: (_) => _submit(),
-        onTapOutside: (_) => _submit(),
-      ),
+    return _ttkNumericEditableField(
+      context: context,
+      controller: _ctrl,
+      focusNode: _focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      onInputChanged: _scheduleSubmit,
+      onSubmit: _submit,
     );
   }
 }
@@ -456,30 +522,13 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context)
-        .colorScheme
-        .surfaceContainerLow
-        .withValues(alpha: 0.7);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _focusNode.requestFocus(),
-      child: TextField(
-        focusNode: _focusNode,
-        controller: _ctrl,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          filled: true,
-          fillColor: fill,
-        ),
-        style: const TextStyle(fontSize: 12),
-        onChanged: (_) => _scheduleSubmit(),
-        onSubmitted: (_) => _submit(),
-        onTapOutside: (_) => _submit(),
-      ),
+    return _ttkNumericEditableField(
+      context: context,
+      controller: _ctrl,
+      focusNode: _focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      onInputChanged: _scheduleSubmit,
+      onSubmit: _submit,
     );
   }
 }
@@ -505,6 +554,7 @@ class _EditablePricePerKgCell extends StatefulWidget {
 
 class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -523,6 +573,7 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -536,23 +587,13 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context)
-        .colorScheme
-        .surfaceContainerLow
-        .withValues(alpha: 0.7);
-    return TextField(
+    return _ttkNumericEditableField(
+      context: context,
       controller: _ctrl,
+      focusNode: _focusNode,
       keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        isDense: true,
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: fill,
-      ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
+      onInputChanged: () {},
+      onSubmit: _submit,
     );
   }
 }
@@ -611,29 +652,13 @@ class _EditableCostCellState extends State<_EditableCostCell> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _focusNode.requestFocus(),
-      child: TextField(
-        focusNode: _focusNode,
-        controller: _ctrl,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          filled: true,
-          fillColor: Theme.of(context)
-              .colorScheme
-              .surfaceContainerLow
-              .withValues(alpha: 0.7),
-        ),
-        style: const TextStyle(fontSize: 12),
-        onChanged: (_) => _scheduleSubmit(),
-        onSubmitted: (_) => _submit(),
-        onTapOutside: (_) => _submit(),
-      ),
+    return _ttkNumericEditableField(
+      context: context,
+      controller: _ctrl,
+      focusNode: _focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      onInputChanged: _scheduleSubmit,
+      onSubmit: _submit,
     );
   }
 }
@@ -7134,10 +7159,9 @@ class _TtkTableState extends State<_TtkTable> {
                                     dataCell: true)),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              SizedBox.expand(
                                 child: _EditableGrossCell(
                                   grams: ing.grossWeight,
                                   decimalPlaces:
@@ -7164,7 +7188,7 @@ class _TtkTableState extends State<_TtkTable> {
                                   },
                                 ),
                               ),
-                            )),
+                            ),
                           )
                         : _cell(UnitConverter.roundUi(
                                 _displayWeight(ing.grossWeight, ing).value,
@@ -7172,60 +7196,47 @@ class _TtkTableState extends State<_TtkTable> {
                             .toStringAsFixed(unitPrefs.isImperial ? 2 : 0)),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Expanded(
-                                          child: _EditableWasteCell(
-                                            value: ing.primaryWastePct,
-                                            onChanged: (v) {
-                                              if (v != null)
-                                                widget.onUpdate(
-                                                    i,
-                                                    ing.copyWith(
-                                                        primaryWastePct: v
-                                                            .clamp(0.0, 99.9)));
-                                            },
-                                          ),
-                                        ),
-                                        if (product == null &&
-                                            ing.productName.trim().isNotEmpty &&
-                                            widget.onSuggestWaste != null)
-                                          IconButton(
-                                            icon: const Icon(Icons.auto_awesome,
-                                                size: 18),
-                                            tooltip: loc.t('ttk_suggest_waste'),
-                                            onPressed: () =>
-                                                widget.onSuggestWaste!(i),
-                                            style: IconButton.styleFrom(
-                                                padding: EdgeInsets.zero,
-                                                minimumSize:
-                                                    const Size(28, 28)),
-                                          ),
-                                      ],
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: _EditableWasteCell(
+                                      value: ing.primaryWastePct,
+                                      onChanged: (v) {
+                                        if (v != null)
+                                          widget.onUpdate(
+                                              i,
+                                              ing.copyWith(
+                                                  primaryWastePct: v
+                                                      .clamp(0.0, 99.9)));
+                                      },
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  if (product == null &&
+                                      ing.productName.trim().isNotEmpty &&
+                                      widget.onSuggestWaste != null)
+                                    IconButton(
+                                      icon: const Icon(Icons.auto_awesome,
+                                          size: 18),
+                                      tooltip: loc.t('ttk_suggest_waste'),
+                                      onPressed: () =>
+                                          widget.onSuggestWaste!(i),
+                                      style: IconButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: const Size(28, 28)),
+                                    ),
+                                ],
                               ),
-                            )),
+                            ),
                           )
                         : _cell(ing.primaryWastePct.toStringAsFixed(0)),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              SizedBox.expand(
                                 child: _EditableNetCell(
                                   value: ing.effectiveGrossWeight,
                                   decimalPlaces:
@@ -7254,7 +7265,7 @@ class _TtkTableState extends State<_TtkTable> {
                                   },
                                 ),
                               ),
-                            )),
+                            ),
                           )
                         : _cell(
                             UnitConverter.roundUi(
@@ -7351,48 +7362,40 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _EditableShrinkageCell(
-                                      value: product != null
-                                          ? ing.weightLossPercentage
-                                          : (ing.cookingLossPctOverride ?? 0),
-                                      onChanged: (pct) {
-                                        if (pct != null) {
-                                          final eff = ing.effectiveGrossWeight;
-                                          final output = eff > 0
-                                              ? eff *
-                                                  (1.0 -
-                                                      pct.clamp(0.0, 99.9) /
-                                                          100.0)
-                                              : 0.0;
-                                          widget.onUpdate(
-                                              i,
-                                              ing.copyWith(
-                                                  cookingLossPctOverride:
-                                                      pct.clamp(0.0, 99.9),
-                                                  outputWeight: output));
-                                        }
-                                      },
-                                    ),
-                                  ],
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              SizedBox.expand(
+                                child: _EditableShrinkageCell(
+                                  value: product != null
+                                      ? ing.weightLossPercentage
+                                      : (ing.cookingLossPctOverride ?? 0),
+                                  onChanged: (pct) {
+                                    if (pct != null) {
+                                      final eff = ing.effectiveGrossWeight;
+                                      final output = eff > 0
+                                          ? eff *
+                                              (1.0 -
+                                                  pct.clamp(0.0, 99.9) /
+                                                      100.0)
+                                          : 0.0;
+                                      widget.onUpdate(
+                                          i,
+                                          ing.copyWith(
+                                              cookingLossPctOverride:
+                                                  pct.clamp(0.0, 99.9),
+                                              outputWeight: output));
+                                    }
+                                  },
                                 ),
                               ),
-                            )),
+                            ),
                           )
                         : _cell(ing.weightLossPercentage.toStringAsFixed(0)),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              SizedBox.expand(
                                 child: _EditableNetCell(
                                   value: ing.outputWeight > 0
                                       ? ing.outputWeight
@@ -7420,16 +7423,15 @@ class _TtkTableState extends State<_TtkTable> {
                                   },
                                 ),
                               ),
-                            )),
+                            ),
                           )
                         : _cell(
                             '${(ing.outputWeight > 0 ? ing.outputWeight : ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0)).toStringAsFixed(0)}'),
                     widget.effectiveCanEdit
                         ? TableCell(
-                            child: wrapCell(ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Padding(
-                                padding: _cellPad,
+                            verticalAlignment: TableCellVerticalAlignment.fill,
+                            child: wrapCell(
+                              SizedBox.expand(
                                 child: _EditableCostCell(
                                   cost: ing.effectiveCost,
                                   symbol: sym,
@@ -7439,7 +7441,7 @@ class _TtkTableState extends State<_TtkTable> {
                                   },
                                 ),
                               ),
-                            )),
+                            ),
                           )
                         : _cell(
                             NumberFormatUtils.formatDecimal(ing.effectiveCost)),
@@ -7728,6 +7730,16 @@ class _TtkCookTable extends StatefulWidget {
   static const _colOutput = 70.0;
   static const _colPortions = 56.0;
 
+  /// Веб на ПК: чуть шире колонки, чтобы в гапке переносы шли по словам, а не посередине.
+  static double _webColumnScale(BuildContext context) {
+    if (!kIsWeb) return 1.0;
+    final w = MediaQuery.sizeOf(context).width;
+    if (w >= 1200) return 1.35;
+    if (w >= 900) return 1.22;
+    if (w >= 600) return 1.12;
+    return 1.0;
+  }
+
   @override
   State<_TtkCookTable> createState() => _TtkCookTableState();
 }
@@ -7809,15 +7821,26 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         : val.toStringAsFixed(1);
   }
 
-  Widget _cell(String text, {bool bold = false}) {
+  Widget _cell(
+    String text, {
+    bool bold = false,
+    TextAlign align = TextAlign.start,
+    int maxLines = 4,
+  }) {
     return TableCell(
+      verticalAlignment: TableCellVerticalAlignment.middle,
       child: Padding(
         padding: _TtkCookTable._cellPad,
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 12, fontWeight: bold ? FontWeight.bold : null),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2),
+        child: Text(
+          text,
+          textAlign: align,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: bold ? FontWeight.bold : null,
+          ),
+          softWrap: true,
+          maxLines: maxLines,
+        ),
       ),
     );
   }
@@ -7858,19 +7881,20 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           .toStringAsFixed(digits);
     }
     final borderColor = Colors.grey;
+    final colScale = _TtkCookTable._webColumnScale(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Table(
           border: TableBorder.all(width: 0.5, color: borderColor),
           columnWidths: {
-            0: const FixedColumnWidth(_TtkCookTable._colDish),
-            1: const FixedColumnWidth(_TtkCookTable._colProduct),
-            2: const FixedColumnWidth(_TtkCookTable._colGross),
-            3: const FixedColumnWidth(_TtkCookTable._colNet),
-            4: const FixedColumnWidth(_TtkCookTable._colMethod),
-            5: const FixedColumnWidth(_TtkCookTable._colOutput),
-            6: const FixedColumnWidth(_TtkCookTable._colPortions),
+            0: FixedColumnWidth(_TtkCookTable._colDish * colScale),
+            1: FixedColumnWidth(_TtkCookTable._colProduct * colScale),
+            2: FixedColumnWidth(_TtkCookTable._colGross * colScale),
+            3: FixedColumnWidth(_TtkCookTable._colNet * colScale),
+            4: FixedColumnWidth(_TtkCookTable._colMethod * colScale),
+            5: FixedColumnWidth(_TtkCookTable._colOutput * colScale),
+            6: FixedColumnWidth(_TtkCookTable._colPortions * colScale),
           },
           children: [
             TableRow(
@@ -7881,30 +7905,44 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                       .withValues(alpha: 0.3)),
               children: [
                 TableCell(
+                  verticalAlignment: TableCellVerticalAlignment.middle,
                   child: SizedBox(
-                      height: 44,
-                      child: Center(
-                          child: Text(widget.loc.t('ttk_name'),
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.bold)))),
+                    height: 44,
+                    child: Center(
+                      child: Text(
+                        widget.loc.t('ttk_name'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                 ),
                 _cell(widget.loc.t('ttk_product'), bold: true),
-                _cell(grossHeader, bold: true),
-                _cell(netHeader, bold: true),
-                _cell(widget.loc.t('ttk_cooking_method'), bold: true),
-                _cell(outputHeader, bold: true),
-                _cell(widget.loc.t('ttk_portions_pcs'), bold: true),
+                _cell(grossHeader, bold: true, align: TextAlign.center),
+                _cell(netHeader, bold: true, align: TextAlign.center),
+                _cell(widget.loc.t('ttk_cooking_method'),
+                    bold: true, align: TextAlign.center),
+                _cell(outputHeader, bold: true, align: TextAlign.center),
+                _cell(widget.loc.t('ttk_portions_pcs'),
+                    bold: true, align: TextAlign.center),
               ],
             ),
             if (_ingredients.isEmpty)
               TableRow(
                 children: List.filled(
-                    7,
-                    TableCell(
-                        child: Padding(
-                            padding: _TtkCookTable._cellPad,
-                            child: Text(widget.loc.t('dash'),
-                                style: const TextStyle(fontSize: 12))))),
+                  7,
+                  TableCell(
+                    verticalAlignment: TableCellVerticalAlignment.middle,
+                    child: Padding(
+                      padding: _TtkCookTable._cellPad,
+                      child: Text(
+                        widget.loc.t('dash'),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ),
               )
             else
               ..._ingredients.asMap().entries.map((e) {
@@ -7923,6 +7961,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 return TableRow(
                   children: [
                     TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.middle,
                       child: Container(
                         height: 44,
                         color: Colors.white,
@@ -7932,48 +7971,60 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                             ing.sourceTechCardId!.isNotEmpty &&
                             widget.onTapPfIngredient != null
                         ? TableCell(
+                            verticalAlignment: TableCellVerticalAlignment.middle,
                             child: InkWell(
                               onTap: () => widget
                                   .onTapPfIngredient!(ing.sourceTechCardId!),
                               child: Padding(
                                 padding: _TtkCookTable._cellPad,
-                                child: Text.rich(
-                                  TextSpan(
-                                    style: const TextStyle(fontSize: 12),
-                                    children: [
-                                      TextSpan(
-                                        text: cookDisplayName,
-                                        style: TextStyle(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(fontSize: 12),
+                                      children: [
+                                        TextSpan(
+                                          text: cookDisplayName,
+                                          style: TextStyle(
                                             fontSize: 12,
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .primary,
                                             decoration:
-                                                TextDecoration.underline),
-                                      ),
-                                      TextSpan(
+                                                TextDecoration.underline,
+                                          ),
+                                        ),
+                                        TextSpan(
                                           text:
-                                              ' (${weightText(ing, ing.outputWeight)} ${widget.loc.unitLabel(displayWeight(ing, ing.outputWeight).unitId)})'),
-                                    ],
+                                              ' (${weightText(ing, ing.outputWeight)} ${widget.loc.unitLabel(displayWeight(ing, ing.outputWeight).unitId)})',
+                                        ),
+                                      ],
+                                    ),
+                                    textAlign: TextAlign.start,
+                                    softWrap: true,
                                   ),
-                                  softWrap: true,
                                 ),
                               ),
                             ),
                           )
                         : TableCell(
+                            verticalAlignment: TableCellVerticalAlignment.middle,
                             child: Padding(
                               padding: _TtkCookTable._cellPad,
-                              child: Text(
-                                cookDisplayName,
-                                style: const TextStyle(fontSize: 12),
-                                softWrap: true,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  cookDisplayName,
+                                  textAlign: TextAlign.start,
+                                  style: const TextStyle(fontSize: 12),
+                                  softWrap: true,
+                                ),
                               ),
                             ),
                           ),
                     TableCell(
-                      child: Padding(
-                        padding: _TtkCookTable._cellPad,
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: SizedBox.expand(
                         child: _EditableNetCell(
                           value: ing.grossWeight,
                           decimalPlaces: unitPrefs.isImperial ? 2 : 0,
@@ -7991,8 +8042,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                       ),
                     ),
                     TableCell(
-                      child: Padding(
-                        padding: _TtkCookTable._cellPad,
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: SizedBox.expand(
                         child: _EditableNetCell(
                           value: ing.netWeight,
                           decimalPlaces: unitPrefs.isImperial ? 2 : 0,
@@ -8028,8 +8079,9 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                   widget.loc.t('dash'))
                               : widget.loc.t('dash'),
                     ),
-                    _cell(weightText(ing, ing.outputWeight)),
-                    _cell(_portionsAmount(ing)),
+                    _cell(weightText(ing, ing.outputWeight),
+                        align: TextAlign.center),
+                    _cell(_portionsAmount(ing), align: TextAlign.center),
                   ],
                 );
               }),
@@ -8041,20 +8093,22 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 _cell(''),
                 _cell(''),
                 TableCell(
-                  child: Padding(
-                    padding: _TtkCookTable._cellPad,
+                  verticalAlignment: TableCellVerticalAlignment.fill,
+                  child: Center(
                     child: Text(
-                        UnitConverter.roundUi(
-                          totalOutputDisplay.value,
-                          fractionDigits: unitPrefs.isImperial ? 2 : 0,
-                        ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                      UnitConverter.roundUi(
+                        totalOutputDisplay.value,
+                        fractionDigits: unitPrefs.isImperial ? 2 : 0,
+                      ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 _cell(''),
                 TableCell(
-                  child: Padding(
-                    padding: _TtkCookTable._cellPad,
+                  verticalAlignment: TableCellVerticalAlignment.fill,
+                  child: SizedBox.expand(
                     child: _EditableNetCell(
                       value: _totalOutput,
                       decimalPlaces: unitPrefs.isImperial ? 2 : 0,
@@ -8075,8 +8129,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   ),
                 ),
                 TableCell(
-                  child: Padding(
-                    padding: _TtkCookTable._cellPad,
+                  verticalAlignment: TableCellVerticalAlignment.fill,
+                  child: SizedBox.expand(
                     child: _EditableNetCell(
                       value: _portionsCount,
                       decimalPlaces: 1,
@@ -8241,29 +8295,13 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _focusNode.requestFocus(),
-      child: TextField(
-        focusNode: _focusNode,
-        controller: _ctrl,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          filled: true,
-          fillColor: Theme.of(context)
-              .colorScheme
-              .surfaceContainerLow
-              .withValues(alpha: 0.7),
-        ),
-        style: const TextStyle(fontSize: 12),
-        onChanged: (_) => _scheduleSubmit(),
-        onSubmitted: (_) => _submit(),
-        onTapOutside: (_) => _submit(),
-      ),
+    return _ttkNumericEditableField(
+      context: context,
+      controller: _ctrl,
+      focusNode: _focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      onInputChanged: _scheduleSubmit,
+      onSubmit: _submit,
     );
   }
 }
