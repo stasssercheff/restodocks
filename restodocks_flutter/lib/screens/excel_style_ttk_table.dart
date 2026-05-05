@@ -24,7 +24,7 @@ const Color _kTtkEditableCellFill = Color(0xFFFDF3F6);
 const TextStyle _kTtkNumericTextStyle = TextStyle(fontSize: 12, height: 1);
 const StrutStyle _kTtkNumericStrut =
     StrutStyle(forceStrutHeight: true, height: 1);
-const double _kTtkNumericCenterNudgeY = -1.2;
+const double _kTtkNumericCenterNudgeY = 0.0;
 
 class ExcelStyleTtkTable extends StatefulWidget {
   final LocalizationService loc;
