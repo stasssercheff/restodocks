@@ -243,7 +243,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
             }
           },
         ),
-        title: Text(loc.t('register_company')),
+        title: Text(loc.t('inventory_establishment')),
         actions: [
           // Кнопка очистки тестовых данных (только для разработки)
           IconButton(
@@ -309,19 +309,19 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  loc.t('company_info'),
+                  loc.t('inventory_establishment'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: loc.t('company_name'),
-                    hintText: loc.t('enter_company_name'),
+                    labelText: loc.t('inventory_establishment'),
+                    hintText: loc.t('inventory_establishment_hint'),
                     prefixIcon: const Icon(Icons.business),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return loc.t('company_name_required');
+                    if (v == null || v.trim().isEmpty) return loc.t('name_required');
                     return null;
                   },
                 ),

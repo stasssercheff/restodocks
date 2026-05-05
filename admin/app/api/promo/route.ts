@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
@@ -7,6 +7,122 @@ import { isAllowedPromoGrantType, isSelectablePromoGrantTier } from '@/lib/promo
 
 const EMPLOYEE_PACK_OPTIONS = new Set([0, 5, 8, 12, 15])
 const BRANCH_PACK_OPTIONS = new Set([0, 1, 3, 5, 10])
+
+type RedemptionDetail = {
+  establishment_id: string
+  establishment_name: string | null
+  owner_email: string | null
+  owner_name: string | null
+  redeemed_at: string | null
+}
+
+/** Погашения по promo_code_id с именем заведения и владельцем (email поднимается по цепочке филиал → головное). */
+async function redemptionDetailsByPromoId(
+  supabase: SupabaseClient,
+  promoIds: number[],
+): Promise<Map<number, RedemptionDetail[]>> {
+  const out = new Map<number, RedemptionDetail[]>()
+  if (promoIds.length === 0) return out
+
+  const { data: rawRed, error: redErr } = await supabase
+    .from('promo_code_redemptions')
+    .select('promo_code_id, establishment_id, redeemed_at')
+    .in('promo_code_id', promoIds)
+
+  if (redErr) throw new Error(redErr.message)
+  const rrows = rawRed ?? []
+  if (rrows.length === 0) return out
+
+  const seedEst = new Set<string>()
+  for (const r of rrows) {
+    const eid = (r as { establishment_id: string }).establishment_id
+    if (eid) seedEst.add(eid)
+  }
+
+  const estMeta = new Map<string, { name: string | null; parent: string | null }>()
+  const seen = new Set<string>()
+  let frontier = [...seedEst]
+  for (let depth = 0; depth < 24 && frontier.length > 0; depth++) {
+    const batch = frontier.filter(id => !seen.has(id))
+    if (batch.length === 0) break
+    for (const id of batch) seen.add(id)
+    const { data: chunk, error: estErr } = await supabase
+      .from('establishments')
+      .select('id, name, parent_establishment_id')
+      .in('id', batch)
+    if (estErr) throw new Error(estErr.message)
+    const next = new Set<string>()
+    for (const row of chunk ?? []) {
+      const id = (row as { id: string }).id
+      const name = (row as { name: string | null }).name ?? null
+      const parent = (row as { parent_establishment_id: string | null }).parent_establishment_id ?? null
+      estMeta.set(id, { name, parent })
+      if (parent && !seen.has(parent)) next.add(parent)
+    }
+    frontier = [...next]
+  }
+
+  const allEstIds = [...estMeta.keys()]
+  const { data: emRows, error: emErr } =
+    allEstIds.length === 0
+      ? { data: [] as Record<string, unknown>[], error: null }
+      : await supabase
+          .from('employees')
+          .select('establishment_id, email, full_name, roles')
+          .in('establishment_id', allEstIds)
+
+  if (emErr) throw new Error(emErr.message)
+
+  type Emp = { establishment_id: string; email: string | null; full_name: string | null; roles: string[] | null }
+  const byEst = new Map<string, Emp[]>()
+  for (const e of emRows ?? []) {
+    const x = e as Emp
+    const arr = byEst.get(x.establishment_id) ?? []
+    arr.push(x)
+    byEst.set(x.establishment_id, arr)
+  }
+
+  function resolveOwner(estId: string): { email: string | null; name: string | null } {
+    let cur: string | null = estId
+    for (let i = 0; i < 14 && cur; i++) {
+      const emps = byEst.get(cur) ?? []
+      const owner = emps.find(emp => Array.isArray(emp.roles) && emp.roles.includes('owner'))
+      if (owner && (owner.email || owner.full_name)) {
+        return { email: owner.email ?? null, name: owner.full_name ?? null }
+      }
+      cur = estMeta.get(cur)?.parent ?? null
+    }
+    return { email: null, name: null }
+  }
+
+  for (const r of rrows) {
+    const eid = (r as { establishment_id: string }).establishment_id
+    if (!eid) continue
+    const pid = (r as { promo_code_id: number }).promo_code_id
+    const redeemedAt = (r as { redeemed_at: string | null }).redeemed_at ?? null
+    const name = estMeta.get(eid)?.name ?? null
+    const own = resolveOwner(eid)
+    const list = out.get(pid) ?? []
+    list.push({
+      establishment_id: eid,
+      establishment_name: name,
+      owner_email: own.email,
+      owner_name: own.name,
+      redeemed_at: redeemedAt,
+    })
+    out.set(pid, list)
+  }
+
+  for (const [, list] of out) {
+    list.sort((a, b) => {
+      const ta = a.redeemed_at ? new Date(a.redeemed_at).getTime() : 0
+      const tb = b.redeemed_at ? new Date(b.redeemed_at).getTime() : 0
+      return tb - ta
+    })
+  }
+
+  return out
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -48,10 +164,22 @@ export async function GET() {
     }
   }
 
-  const data = rows.map(row => ({
-    ...(row as Record<string, unknown>),
-    redemption_count: countByPromoId.get((row as { id: number }).id) ?? 0,
-  }))
+  let detailsByPromo: Map<number, RedemptionDetail[]>
+  try {
+    detailsByPromo = await redemptionDetailsByPromoId(supabase, promoIds)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'redemption details failed'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+
+  const data = rows.map(row => {
+    const id = (row as { id: number }).id
+    return {
+      ...(row as Record<string, unknown>),
+      redemption_count: countByPromoId.get(id) ?? 0,
+      redemption_details: detailsByPromo.get(id) ?? [],
+    }
+  })
   return NextResponse.json(data)
 }
 

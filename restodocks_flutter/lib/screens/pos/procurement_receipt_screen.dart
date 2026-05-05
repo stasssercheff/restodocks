@@ -638,9 +638,32 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         unit: unitChoice,
       );
       final saved = await store.addProduct(product);
+      final src = loc.currentLanguageCode;
+      final tm = TranslationManager(
+        aiService: context.read<AiServiceSupabase>(),
+        translationService: context.read<TranslationService>(),
+        getSupportedLanguages: () => LocalizationService.productLanguageCodes,
+      );
+      var savedForUi = saved;
+      try {
+        await tm.handleEntitySave(
+          entityType: TranslationEntityType.product,
+          entityId: saved.id,
+          textFields: {'name': name},
+          sourceLanguage: src,
+          userId: acc.currentEmployee?.id,
+        );
+        final namesMap = await tm.materializeProductNames(
+          productId: saved.id,
+          sourceLanguage: src,
+          sourceText: name,
+        );
+        savedForUi = saved.copyWith(names: namesMap);
+        await store.updateProduct(savedForUi);
+      } catch (_) {}
       await store.addToNomenclature(
         nomEstId,
-        saved.id,
+        savedForUi.id,
         price: price,
         currency: est!.defaultCurrency,
       );
@@ -648,7 +671,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
       if (!mounted) return;
       _applyProductFromNomenclature(
         lineIndex,
-        saved,
+        savedForUi,
         store,
         nomEstId,
         loc.currentLanguageCode,

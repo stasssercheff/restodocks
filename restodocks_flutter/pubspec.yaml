@@ -113,7 +113,6 @@ flutter:
     - assets/config.json
     - assets/images/
     - assets/translations/
-    - assets/products/
     - assets/data/
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf

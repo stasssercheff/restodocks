@@ -34,8 +34,9 @@ async function getEstablishmentsJson() {
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   const supabase = createClient(config.url, config.serviceRoleKey)
 
-  const selectCore =
+  const selectGeo =
     'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city'
+  const selectCore = `${selectGeo}, registration_client`
 
   /** Пока на БД не все миграции — перебираем селекты от полного к минимальному. */
   const selectVariants: string[] = [
@@ -43,6 +44,10 @@ async function getEstablishmentsJson() {
     `${selectCore}, subscription_type, pro_trial_ends_at`,
     `${selectCore}, subscription_type`,
     selectCore,
+    `${selectGeo}, subscription_type, pro_paid_until, pro_trial_ends_at`,
+    `${selectGeo}, subscription_type, pro_trial_ends_at`,
+    `${selectGeo}, subscription_type`,
+    selectGeo,
   ]
 
   function isMissingColumnError(message: string) {

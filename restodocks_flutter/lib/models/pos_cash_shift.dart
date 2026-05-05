@@ -12,6 +12,8 @@ class PosCashShift extends Equatable {
     this.openedByEmployeeId,
     this.closedByEmployeeId,
     this.notes,
+    this.closeReportScope,
+    this.closeReportZones = const <String>[],
   });
 
   final String id;
@@ -23,6 +25,8 @@ class PosCashShift extends Equatable {
   final String? openedByEmployeeId;
   final String? closedByEmployeeId;
   final String? notes;
+  final String? closeReportScope;
+  final List<String> closeReportZones;
 
   bool get isOpen => endedAt == null;
 
@@ -41,6 +45,10 @@ class PosCashShift extends Equatable {
       openedByEmployeeId: json['opened_by_employee_id'] as String?,
       closedByEmployeeId: json['closed_by_employee_id'] as String?,
       notes: json['notes'] as String?,
+      closeReportScope: json['close_report_scope'] as String?,
+      closeReportZones: (json['close_report_zones'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 

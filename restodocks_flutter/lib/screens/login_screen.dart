@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'legal_document_screen.dart';
 import '../core/pending_owner_role.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/app_store_download_badge.dart';
 import '../services/services.dart';
 
 /// Экран входа в систему
@@ -83,31 +84,74 @@ class _LoginScreenState extends State<LoginScreen> {
     // В Safari landscape боковые inset'ы дают «полосы»; контент формы можно тянуть на всю ширину.
     final stripSideInsets = kIsWeb && landPhone;
     final theme = Theme.of(context);
+    final scrollPadding = EdgeInsets.fromLTRB(
+      landPhone ? 12 : 24,
+      landPhone ? 8 : 24,
+      landPhone ? 12 : 24,
+      landPhone ? 16 : 24,
+    );
+    final appBar = AppBar(
+      toolbarHeight: landPhone ? 44 : kToolbarHeight,
+      leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+      title: Text(loc.t('login')),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.language),
+          onPressed: () => loc.showLocalePickerDialog(context),
+          tooltip: loc.t('language'),
+        ),
+      ],
+    );
+
+    if (kIsWeb) {
+      return Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: appBar,
+        body: SafeArea(
+          left: !stripSideInsets,
+          right: !stripSideInsets,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: scrollPadding,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildLoginFormMain(loc, compact: landPhone),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  landPhone ? 12 : 24,
+                  12,
+                  landPhone ? 12 : 24,
+                  landPhone ? 12 : 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: _buildLoginFooterPinned(loc, compact: landPhone),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        toolbarHeight: landPhone ? 44 : kToolbarHeight,
-        leading:
-            GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
-        title: Text(loc.t('login')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.language),
-            onPressed: () => loc.showLocalePickerDialog(context),
-            tooltip: loc.t('language'),
-          ),
-        ],
-      ),
+      appBar: appBar,
       body: SafeArea(
         left: !stripSideInsets,
         right: !stripSideInsets,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            landPhone ? 12 : 24,
-            landPhone ? 8 : 24,
-            landPhone ? 12 : 24,
-            landPhone ? 16 : 24,
-          ),
+          padding: scrollPadding,
           child: Form(
             key: _formKey,
             child: Column(
@@ -120,8 +164,60 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  List<Widget> _buildFormChildren(LocalizationService loc,
+  /// Основная форма без нижнего блока «контакты» (для веба — он закреплён внизу экрана).
+  List<Widget> _buildLoginFormMain(LocalizationService loc,
       {bool compact = false}) {
+    return _buildFormChildren(
+      loc,
+      compact: compact,
+      includeContactAndStoreFooter: false,
+    );
+  }
+
+  /// Низ экрана (веб): контакты, email, бейдж App Store — по центру.
+  List<Widget> _buildLoginFooterPinned(LocalizationService loc,
+      {bool compact = false}) {
+    return [
+      Text(
+        loc.t('login_footer_contact'),
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
+      SizedBox(height: compact ? 4 : 8),
+      Center(
+        child: InkWell(
+          onTap: () async {
+            const addr = 'info@restodocks.com';
+            final uri = Uri(scheme: 'mailto', path: addr);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri);
+            }
+          },
+          child: Text(
+            'info@restodocks.com',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ),
+      SizedBox(height: compact ? 16 : 20),
+      Center(
+        child: AppStoreDownloadBadge(
+          semanticsLabel: loc.t('app_store_download_a11y'),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildFormChildren(
+    LocalizationService loc, {
+    bool compact = false,
+    bool includeContactAndStoreFooter = true,
+  }) {
     final welcomeStyle = compact
         ? Theme.of(context).textTheme.titleLarge
         : Theme.of(context).textTheme.headlineMedium;
@@ -301,33 +397,43 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: EdgeInsets.symmetric(vertical: btnVPadOutlined)),
         label: Text(loc.t('legal_offer_and_privacy_button')),
       ),
-      SizedBox(height: compact ? 16 : 32),
-      Text(
-        loc.t('login_footer_contact'),
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-      ),
-      SizedBox(height: compact ? 4 : 8),
-      Center(
-        child: InkWell(
-          onTap: () async {
-            const addr = 'info@restodocks.com';
-            final uri = Uri(scheme: 'mailto', path: addr);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri);
-            }
-          },
-          child: Text(
-            'info@restodocks.com',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              decoration: TextDecoration.underline,
+      if (includeContactAndStoreFooter) ...[
+        SizedBox(height: compact ? 16 : 32),
+        Text(
+          loc.t('login_footer_contact'),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        SizedBox(height: compact ? 4 : 8),
+        Center(
+          child: InkWell(
+            onTap: () async {
+              const addr = 'info@restodocks.com';
+              final uri = Uri(scheme: 'mailto', path: addr);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            child: Text(
+              'info@restodocks.com',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                decoration: TextDecoration.underline,
+              ),
             ),
           ),
         ),
-      ),
+        if (kIsWeb) ...[
+          SizedBox(height: compact ? 20 : 28),
+          Center(
+            child: AppStoreDownloadBadge(
+              semanticsLabel: loc.t('app_store_download_a11y'),
+            ),
+          ),
+        ],
+      ],
     ];
   }
 

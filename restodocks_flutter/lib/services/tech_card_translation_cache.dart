@@ -32,7 +32,9 @@ class TechCardTranslationCache {
         final map = inner.map(
           (k, v) => MapEntry(k.toString(), v.toString()),
         );
-        TechCard.setTranslationOverlay(map, languageCode: lang, merge: false);
+        // merge: true — иначе повторный load затирает свежий in-memory оверлей
+        // (после prefetch, пока save в prefs ещё не выполнился).
+        TechCard.setTranslationOverlay(map, languageCode: lang, merge: true);
       }
       final warmedRaw = prefs.getString(_keyWarmedLangs(id));
       if (warmedRaw != null && warmedRaw.isNotEmpty) {

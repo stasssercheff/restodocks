@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/product.dart';
 import '../models/product_import_result.dart';
+import '../utils/dev_log.dart';
 import '../models/nomenclature_item.dart';
 import '../models/tech_card.dart';
 import '../models/translation.dart';
@@ -188,16 +189,10 @@ class IntelligentProductImportService {
               currency: defaultCurrency,
             );
           } else if (resolution == 'create') {
-            // Создаем новый продукт
-            final translations = await _translationManager.generateTranslationsForProduct(
-              result.fileName,
-              result.detectedLanguage ?? 'en',
-            );
-
+            final nm = result.fileName.trim();
             final product = Product.create(
-              name: result.fileName,
+              name: nm,
               category: 'imported',
-              names: translations,
               basePrice: null,
               currency: result.filePrice != null ? defaultCurrency : null,
             );
@@ -211,6 +206,11 @@ class IntelligentProductImportService {
               savedProduct2.id,
               price: result.filePrice,
               currency: result.filePrice != null ? defaultCurrency : null,
+            );
+            await _generateAndSaveTranslations(
+              savedProduct2.id,
+              nm,
+              result.detectedLanguage ?? 'en',
             );
           }
           break;
@@ -429,20 +429,26 @@ ${sampleTexts.take(5).join('\n')}
 
   /// Сгенерировать переводы продукта (сохранение в БД)
   Future<void> _generateAndSaveTranslations(String productId, String name, String sourceLanguage) async {
-    // Создаем TranslationManager для сохранения переводов
-    final translationManager = TranslationManager(
-      aiService: _aiService,
-      translationService: _translationService,
-      getSupportedLanguages: () => LocalizationService.productLanguageCodes,
-    );
-
-    // Сохраняем переводы через TranslationManager
-    await translationManager.handleEntitySave(
+    await _translationManager.handleEntitySave(
       entityType: TranslationEntityType.product,
       entityId: productId,
       textFields: {'name': name},
       sourceLanguage: sourceLanguage,
     );
+    final namesMap = await _translationManager.materializeProductNames(
+      productId: productId,
+      sourceLanguage: sourceLanguage,
+      sourceText: name,
+    );
+    final prod =
+        _productStore.allProducts.where((p) => p.id == productId).firstOrNull;
+    if (prod != null) {
+      try {
+        await _productStore.updateProduct(prod.copyWith(names: namesMap));
+      } catch (e, st) {
+        devLog('IntelligentImport: updateProduct names failed: $e\n$st');
+      }
+    }
   }
 
   /// Разобрать цену из строки

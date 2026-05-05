@@ -77,7 +77,18 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
-    const body = (await req.json()) as { establishment_id?: string };
+    const ALLOWED_CLIENTS = new Set([
+      "ios_app",
+      "android_app",
+      "web_mobile",
+      "web_desktop",
+      "native_other",
+    ]);
+
+    const body = (await req.json()) as {
+      establishment_id?: string;
+      registration_client?: string;
+    };
     const establishmentId = body?.establishment_id;
     if (!establishmentId || typeof establishmentId !== "string") {
       return new Response(JSON.stringify({ error: "establishment_id required" }), {
@@ -150,12 +161,18 @@ export async function handleRequest(req: Request): Promise<Response> {
     const ip = getClientIp(req);
     const geo = await fetchGeo(ip);
 
+    const rawClient = typeof body?.registration_client === "string"
+      ? body.registration_client.trim().toLowerCase()
+      : "";
+    const registration_client = ALLOWED_CLIENTS.has(rawClient) ? rawClient : null;
+
     const { error } = await supabase
       .from("establishments")
       .update({
         registration_ip: ip,
         registration_country: geo.country ?? null,
         registration_city: geo.city ?? null,
+        ...(registration_client ? { registration_client } : {}),
       })
       .eq("id", establishmentId);
 

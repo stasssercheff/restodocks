@@ -2787,6 +2787,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       });
     }
     try {
+      // Оверлей названий ТТК с диска до первого кадра списка — любой язык UI:
+      // не мигать «сырым» dishName из БД, пока посткадровый prefetch не подставит перевод.
+      await TechCardTranslationCache.loadForEstablishment(
+          est.dataEstablishmentId.trim());
+
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
 
@@ -3018,8 +3023,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _ensureTechCardTranslations(
       TechCardServiceSupabase svc, List<TechCard> cards) async {
     final currentLang = context.read<LocalizationService>().currentLanguageCode;
-    // Русский интерфейс: название уже в dishName — иначе N вызовов translate-text на каждую ТТК.
-    if (currentLang == 'ru') return;
+    // Любой язык UI: добиваем dishNameLocalized[currentLang], если в БД только другой язык.
     final targetLanguages = <String>[currentLang];
     var i = 0;
     final pendingUpdates = <String, Map<String, String>>{};
@@ -5460,7 +5464,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     isExpanded: true,
                     value: _filterSection,
                     decoration: InputDecoration(
-                      labelText: loc.t('ttk_section_label'),
+                      labelText: loc.t('ttk_col_section'),
                       isDense: true,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(

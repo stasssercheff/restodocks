@@ -127,12 +127,28 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
               ),
               const SizedBox(height: 20),
               FilledButton.tonal(
+                style: ButtonStyle(
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.disabled)) {
+                      return Colors.white.withValues(alpha: 0.75);
+                    }
+                    return Colors.white;
+                  }),
+                  textStyle: WidgetStateProperty.all(
+                    Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
                 onPressed: _isSendingLink ? null : _resendConfirmationLink,
                 child: _isSendingLink
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
                       )
                     : Text(loc.t('send_confirmation_link')),
               ),

@@ -30,6 +30,8 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
   PosCashShift? _activeShift;
   double _cashInShift = 0;
   double _expectedDrawer = 0;
+  PosShiftReportAudienceSettings _shiftReportAudience =
+      PosShiftReportAudienceSettings.kDefaultAll;
 
   @override
   void initState() {
@@ -66,6 +68,8 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
       final orders =
           await PosOrderService.instance.fetchCashRegisterRows(est.id);
       final shift = await PosCashHallService.instance.fetchActiveShift(est.id);
+      final reportAudience =
+          await PosShiftReportAudienceService.instance.fetchForEstablishment(est.id);
       List<PosCashDisbursement> disb;
       double cashIn = 0;
       double expected = 0;
@@ -91,6 +95,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
         _disbursements = disb;
         _cashInShift = cashIn;
         _expectedDrawer = expected;
+        _shiftReportAudience = reportAudience;
         _loading = false;
       });
     } catch (e) {
@@ -176,20 +181,25 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
     final shift = _activeShift;
-    if (emp == null || shift == null) return;
+    final est = account.establishment;
+    if (emp == null || shift == null || est == null) return;
+    final isOwner = emp.hasRole('owner');
+    var selectedScope = _shiftReportAudience.scope;
+    final selectedZones = <String>{..._shiftReportAudience.zones};
     final ctrl = TextEditingController(
       text: _expectedDrawer.toStringAsFixed(2),
     );
     final notesCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('pos_cash_shift_close_title')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          title: Text(loc.t('pos_cash_shift_close_title')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Text(
                 '${loc.t('pos_cash_shift_expected')}: ${formatPosOrderMenuDue(context, _expectedDrawer)}',
               ),
@@ -212,29 +222,117 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
                 ),
                 maxLines: 2,
               ),
-            ],
+              const SizedBox(height: 12),
+              Text(
+                'Аудитория отчета закрытия',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+                if (isOwner)
+                  DropdownButtonFormField<PosShiftReportAudienceScope>(
+                    initialValue: selectedScope,
+                    decoration: const InputDecoration(
+                      labelText: 'Режим рассылки',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: PosShiftReportAudienceScope.all,
+                        child: Text('Весь объект'),
+                      ),
+                      DropdownMenuItem(
+                        value: PosShiftReportAudienceScope.zones,
+                        child: Text('Только выбранные зоны'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setModalState(() {
+                        selectedScope = v;
+                      });
+                    },
+                  )
+                else
+                  Text(
+                    selectedScope == PosShiftReportAudienceScope.all
+                        ? 'Весь объект'
+                        : 'Только выбранные зоны',
+                  ),
+                if (selectedScope == PosShiftReportAudienceScope.zones) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _zoneChip(
+                        loc: loc,
+                        zone: 'kitchen',
+                        selectedZones: selectedZones,
+                        editable: isOwner,
+                        onChanged: () => setModalState(() {}),
+                      ),
+                      _zoneChip(
+                        loc: loc,
+                        zone: 'bar',
+                        selectedZones: selectedZones,
+                        editable: isOwner,
+                        onChanged: () => setModalState(() {}),
+                      ),
+                      _zoneChip(
+                        loc: loc,
+                        zone: 'banquet',
+                        selectedZones: selectedZones,
+                        editable: isOwner,
+                        onChanged: () => setModalState(() {}),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
       ),
     );
     if (ok != true || !mounted) return;
     final closing = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
+    if (selectedScope == PosShiftReportAudienceScope.zones &&
+        selectedZones.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите хотя бы одну зону для отчета.')),
+      );
+      return;
+    }
+    final appliedSettings = PosShiftReportAudienceSettings(
+      scope: selectedScope,
+      zones: selectedZones.toList(),
+    );
     try {
+      if (isOwner) {
+        await PosShiftReportAudienceService.instance.upsertForOwner(
+          establishmentId: est.id,
+          updatedByEmployeeId: emp.id,
+          settings: appliedSettings,
+        );
+      }
       await PosCashHallService.instance.closeShift(
         shiftId: shift.id,
         closingBalance: closing,
         closedByEmployeeId: emp.id,
         notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+        closeReportScope: appliedSettings.isAll ? 'all' : 'zones',
+        closeReportZones: appliedSettings.zones,
       );
       if (!mounted) return;
       final diff = closing - _expectedDrawer;
@@ -251,6 +349,43 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('error')}: $e')),
       );
+    }
+  }
+
+  FilterChip _zoneChip({
+    required LocalizationService loc,
+    required String zone,
+    required Set<String> selectedZones,
+    required bool editable,
+    required VoidCallback onChanged,
+  }) {
+    final selected = selectedZones.contains(zone);
+    return FilterChip(
+      label: Text(_zoneLabel(loc, zone)),
+      selected: selected,
+      onSelected: editable
+          ? (v) {
+              if (v) {
+                selectedZones.add(zone);
+              } else {
+                selectedZones.remove(zone);
+              }
+              onChanged();
+            }
+          : null,
+    );
+  }
+
+  String _zoneLabel(LocalizationService loc, String zone) {
+    switch (zone) {
+      case 'kitchen':
+        return loc.t('dept_kitchen');
+      case 'bar':
+        return loc.t('dept_bar');
+      case 'banquet':
+        return 'Банкет';
+      default:
+        return zone;
     }
   }
 
@@ -601,6 +736,13 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               onPressed: () => _closeShiftDialog(loc),
               icon: const Icon(Icons.lock),
               label: Text(loc.t('pos_cash_shift_close_action')),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Аудитория отчета закрытия: ${_shiftReportAudience.isAll ? 'Весь объект' : 'Только выбранные зоны (${_shiftReportAudience.zones.map((z) => _zoneLabel(loc, z)).join(', ')})'}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ],

@@ -48,7 +48,7 @@ lib/models/
 ```
 lib/services/
 ├── account_manager.dart   # Аутентификация и управление аккаунтами
-├── product_store.dart     # Управление продуктами
+├── product_store_supabase.dart # Каталог продуктов и номенклатура (Supabase)
 ├── localization_service.dart # Многоязычность
 ├── image_service.dart     # Обработка изображений
 ├── tech_card_service.dart # Управление ТТК
