@@ -21,6 +21,9 @@ const double _kTtkIngredientRowHeight = 44.0 * 0.8;
 /// Строка «Итого» слегка выше базовой (компактная версия для веб).
 const double _kTtkTotalRowHeight = 44.0 * 1.02;
 const Color _kTtkEditableCellFill = Color(0xFFFDF3F6);
+const TextStyle _kTtkNumericTextStyle = TextStyle(fontSize: 12, height: 1);
+const StrutStyle _kTtkNumericStrut =
+    StrutStyle(forceStrutHeight: true, height: 1);
 
 class ExcelStyleTtkTable extends StatefulWidget {
   final LocalizationService loc;
@@ -1642,11 +1645,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
                     ],
-                    style: const TextStyle(fontSize: 12, height: 1),
-                    strutStyle: const StrutStyle(
-                      forceStrutHeight: true,
-                      height: 1,
-                    ),
+                    style: _kTtkNumericTextStyle,
+                    strutStyle: _kTtkNumericStrut,
                     textAlign: TextAlign.center,
                     textAlignVertical: TextAlignVertical.center,
                     textInputAction: TextInputAction.next,
@@ -1676,7 +1676,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           : Align(
               alignment: Alignment.center,
               child: Text(value,
-                  style: const TextStyle(fontSize: 12),
+                  style: _kTtkNumericTextStyle,
+                  strutStyle: _kTtkNumericStrut,
                   textAlign: TextAlign.center),
             ),
     );
@@ -1688,7 +1689,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       height: rowHeight,
       child: Center(
         child: Text(value,
-            style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+            style: _kTtkNumericTextStyle,
+            strutStyle: _kTtkNumericStrut,
+            textAlign: TextAlign.center),
       ),
     );
   }
@@ -1955,7 +1958,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: Center(
         child: Text(
           sym.isNotEmpty ? '$fmt $sym' : fmt,
-          style: const TextStyle(fontSize: 12),
+          style: _kTtkNumericTextStyle,
+          strutStyle: _kTtkNumericStrut,
         ),
       ),
     );
@@ -1981,7 +1985,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: Center(
         child: Text(
           sym.isNotEmpty ? '$fmt $sym' : fmt,
-          style: const TextStyle(fontSize: 12),
+          style: _kTtkNumericTextStyle,
+          strutStyle: _kTtkNumericStrut,
         ),
       ),
     );
@@ -1995,8 +2000,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
             text,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: _kTtkNumericTextStyle.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
+            strutStyle: _kTtkNumericStrut,
           ),
         ),
       ),

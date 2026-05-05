@@ -5709,6 +5709,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final narrow = constraints.maxWidth < 500;
+            final topHeaderWidth =
+                _ttkTechnologyStripWidth(context, tableOnlyView);
             return Column(
               children: [
                 Expanded(
@@ -5865,257 +5867,279 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             ),
                                           ),
                                   ] else
-                                    SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            width: 320,
-                                            height: 56,
-                                            child: TextField(
-                                              controller: _nameController,
-                                              readOnly: !effectiveCanEdit,
-                                              style: TextStyle(fontSize: 14),
-                                              decoration: InputDecoration(
-                                                labelText: loc.t('ttk_name'),
-                                                isDense: true,
-                                                filled: false,
-                                                border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8)),
-                                                contentPadding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 14),
+                                    Align(
+                                      alignment: centerDesktopWebBlock
+                                          ? Alignment.topCenter
+                                          : Alignment.topLeft,
+                                      child: SizedBox(
+                                        width: centerDesktopWebBlock
+                                            ? topHeaderWidth
+                                            : constraints.maxWidth,
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              SizedBox(
+                                                width: 320,
+                                                height: 56,
+                                                child: TextField(
+                                                  controller: _nameController,
+                                                  readOnly: !effectiveCanEdit,
+                                                  style:
+                                                      TextStyle(fontSize: 14),
+                                                  decoration: InputDecoration(
+                                                    labelText:
+                                                        loc.t('ttk_name'),
+                                                    isDense: true,
+                                                    filled: false,
+                                                    border: OutlineInputBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8)),
+                                                    contentPadding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 14),
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          SizedBox(
-                                            width: 180,
-                                            child: _CategoryPickerField(
-                                              selectedCategory:
-                                                  _categoryOptions.contains(
-                                                          _selectedCategory)
-                                                      ? _selectedCategory
-                                                      : 'misc',
-                                              categoryOptions:
-                                                  _categoryDepartment == 'bar'
-                                                      ? _barCategoryOptions
-                                                      : _kitchenCategoryOptions,
-                                              customCategories:
-                                                  _customCategories,
-                                              categoryLabel: (c) =>
-                                                  _categoryLabel(c,
-                                                      loc.currentLanguageCode),
-                                              canEdit: effectiveCanEdit,
-                                              onCategorySelected: (v) {
-                                                setState(() =>
-                                                    _selectedCategory = v);
-                                                _scheduleDraftSave();
-                                              },
-                                              onAddCustom:
-                                                  _showAddCustomCategoryDialog,
-                                              onRefreshCustom:
-                                                  _refreshCustomCategories,
-                                              onManageCustom:
-                                                  _showManageCustomCategoriesDialog,
-                                              loc: loc,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          SizedBox(
-                                            width: 180,
-                                            child: _SectionPicker(
-                                              selected: _selectedSections,
-                                              availableSections:
-                                                  _getAvailableSections(
-                                                      context
-                                                          .read<
-                                                              AccountManagerSupabase>()
-                                                          .hasProSubscription,
-                                                      loc),
-                                              canEdit: effectiveCanEdit,
-                                              onChanged: (v) {
-                                                setState(() =>
-                                                    _selectedSections = v);
-                                                _scheduleDraftSave();
-                                              },
-                                              loc: loc,
-                                              compact: true,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                                minWidth: 160, maxWidth: 220),
-                                            child: SizedBox(
-                                              height: 56,
-                                              child: Align(
-                                                alignment: Alignment.center,
-                                                child: effectiveCanEdit
-                                                    ? Tooltip(
-                                                        message: loc
-                                                            .t('tt_type_hint'),
-                                                        child: SegmentedButton<
-                                                            bool>(
-                                                          style: SegmentedButton
-                                                              .styleFrom(
-                                                            foregroundColor:
-                                                                Theme.of(
-                                                                        context)
-                                                                    .colorScheme
-                                                                    .primary,
-                                                            selectedForegroundColor:
-                                                                Theme.of(
-                                                                        context)
-                                                                    .colorScheme
-                                                                    .primary,
-                                                            visualDensity:
-                                                                VisualDensity
-                                                                    .compact,
-                                                            padding:
-                                                                const EdgeInsets
+                                              const SizedBox(width: 8),
+                                              SizedBox(
+                                                width: 180,
+                                                child: _CategoryPickerField(
+                                                  selectedCategory:
+                                                      _categoryOptions.contains(
+                                                              _selectedCategory)
+                                                          ? _selectedCategory
+                                                          : 'misc',
+                                                  categoryOptions:
+                                                      _categoryDepartment ==
+                                                              'bar'
+                                                          ? _barCategoryOptions
+                                                          : _kitchenCategoryOptions,
+                                                  customCategories:
+                                                      _customCategories,
+                                                  categoryLabel: (c) =>
+                                                      _categoryLabel(c,
+                                                          loc.currentLanguageCode),
+                                                  canEdit: effectiveCanEdit,
+                                                  onCategorySelected: (v) {
+                                                    setState(() =>
+                                                        _selectedCategory = v);
+                                                    _scheduleDraftSave();
+                                                  },
+                                                  onAddCustom:
+                                                      _showAddCustomCategoryDialog,
+                                                  onRefreshCustom:
+                                                      _refreshCustomCategories,
+                                                  onManageCustom:
+                                                      _showManageCustomCategoriesDialog,
+                                                  loc: loc,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              SizedBox(
+                                                width: 180,
+                                                child: _SectionPicker(
+                                                  selected: _selectedSections,
+                                                  availableSections:
+                                                      _getAvailableSections(
+                                                          context
+                                                              .read<
+                                                                  AccountManagerSupabase>()
+                                                              .hasProSubscription,
+                                                          loc),
+                                                  canEdit: effectiveCanEdit,
+                                                  onChanged: (v) {
+                                                    setState(() =>
+                                                        _selectedSections = v);
+                                                    _scheduleDraftSave();
+                                                  },
+                                                  loc: loc,
+                                                  compact: true,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ConstrainedBox(
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: 160,
+                                                        maxWidth: 220),
+                                                child: SizedBox(
+                                                  height: 56,
+                                                  child: Align(
+                                                    alignment: Alignment.center,
+                                                    child: effectiveCanEdit
+                                                        ? Tooltip(
+                                                            message: loc.t(
+                                                                'tt_type_hint'),
+                                                            child:
+                                                                SegmentedButton<
+                                                                    bool>(
+                                                              style:
+                                                                  SegmentedButton
+                                                                      .styleFrom(
+                                                                foregroundColor:
+                                                                    Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                selectedForegroundColor:
+                                                                    Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                visualDensity:
+                                                                    VisualDensity
+                                                                        .compact,
+                                                                padding: const EdgeInsets
                                                                     .symmetric(
                                                                     horizontal:
                                                                         12,
                                                                     vertical:
                                                                         6),
-                                                            tapTargetSize:
-                                                                MaterialTapTargetSize
-                                                                    .shrinkWrap,
-                                                            minimumSize:
-                                                                const Size(
-                                                                    80, 44),
-                                                          ).copyWith(
-                                                            shape: WidgetStateProperty
-                                                                .all(
-                                                                    const StadiumBorder()),
+                                                                tapTargetSize:
+                                                                    MaterialTapTargetSize
+                                                                        .shrinkWrap,
+                                                                minimumSize:
+                                                                    const Size(
+                                                                        80, 44),
+                                                              ).copyWith(
+                                                                shape: WidgetStateProperty
+                                                                    .all(
+                                                                        const StadiumBorder()),
+                                                              ),
+                                                              expandedInsets:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          8),
+                                                              segments: [
+                                                                ButtonSegment(
+                                                                  value: true,
+                                                                  label: Text(
+                                                                      loc.t(
+                                                                          'tt_type_pf'),
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis),
+                                                                  icon: const Icon(
+                                                                      Icons
+                                                                          .inventory_2,
+                                                                      size: 16),
+                                                                ),
+                                                                ButtonSegment(
+                                                                  value: false,
+                                                                  label: Text(
+                                                                      loc.t(
+                                                                          'tt_type_dish'),
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis),
+                                                                  icon: const Icon(
+                                                                      Icons
+                                                                          .restaurant,
+                                                                      size: 16),
+                                                                ),
+                                                              ],
+                                                              selected: {
+                                                                _isSemiFinished
+                                                              },
+                                                              onSelectionChanged:
+                                                                  (v) {
+                                                                setState(() {
+                                                                  final toPf =
+                                                                      v.first;
+                                                                  _isSemiFinished =
+                                                                      toPf;
+                                                                  _typeManuallyChanged =
+                                                                      true;
+                                                                  if (toPf) {
+                                                                    _portionWeight =
+                                                                        100; // ТТК ПФ: вес порции по умолчанию 100
+                                                                  } else {
+                                                                    final sum = _ingredients.fold<
+                                                                            double>(
+                                                                        0,
+                                                                        (s, i) =>
+                                                                            s +
+                                                                            i.outputWeight);
+                                                                    _portionWeight =
+                                                                        sum > 0
+                                                                            ? sum
+                                                                            : 100; // ТТК блюдо: вес порции = вес выхода итого
+                                                                  }
+                                                                });
+                                                                _scheduleDraftSave();
+                                                              },
+                                                              showSelectedIcon:
+                                                                  false,
+                                                            ),
+                                                          )
+                                                        : InputDecorator(
+                                                            decoration:
+                                                                InputDecoration(
+                                                              labelText: loc.t(
+                                                                  'tt_type_hint'),
+                                                              isDense: true,
+                                                              border: OutlineInputBorder(
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              8)),
+                                                              contentPadding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          12,
+                                                                      vertical:
+                                                                          14),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                Icon(
+                                                                    _isSemiFinished
+                                                                        ? Icons
+                                                                            .inventory_2
+                                                                        : Icons
+                                                                            .restaurant,
+                                                                    size: 20,
+                                                                    color: Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .onSurface),
+                                                                const SizedBox(
+                                                                    width: 8),
+                                                                Text(
+                                                                    _isSemiFinished
+                                                                        ? loc.t(
+                                                                            'tt_type_pf')
+                                                                        : loc.t(
+                                                                            'tt_type_dish'),
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                    maxLines:
+                                                                        1),
+                                                              ],
+                                                            ),
                                                           ),
-                                                          expandedInsets:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal:
-                                                                      8),
-                                                          segments: [
-                                                            ButtonSegment(
-                                                              value: true,
-                                                              label: Text(
-                                                                  loc.t(
-                                                                      'tt_type_pf'),
-                                                                  maxLines: 1,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis),
-                                                              icon: const Icon(
-                                                                  Icons
-                                                                      .inventory_2,
-                                                                  size: 16),
-                                                            ),
-                                                            ButtonSegment(
-                                                              value: false,
-                                                              label: Text(
-                                                                  loc.t(
-                                                                      'tt_type_dish'),
-                                                                  maxLines: 1,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis),
-                                                              icon: const Icon(
-                                                                  Icons
-                                                                      .restaurant,
-                                                                  size: 16),
-                                                            ),
-                                                          ],
-                                                          selected: {
-                                                            _isSemiFinished
-                                                          },
-                                                          onSelectionChanged:
-                                                              (v) {
-                                                            setState(() {
-                                                              final toPf =
-                                                                  v.first;
-                                                              _isSemiFinished =
-                                                                  toPf;
-                                                              _typeManuallyChanged =
-                                                                  true;
-                                                              if (toPf) {
-                                                                _portionWeight =
-                                                                    100; // ТТК ПФ: вес порции по умолчанию 100
-                                                              } else {
-                                                                final sum = _ingredients.fold<
-                                                                        double>(
-                                                                    0,
-                                                                    (s, i) =>
-                                                                        s +
-                                                                        i.outputWeight);
-                                                                _portionWeight =
-                                                                    sum > 0
-                                                                        ? sum
-                                                                        : 100; // ТТК блюдо: вес порции = вес выхода итого
-                                                              }
-                                                            });
-                                                            _scheduleDraftSave();
-                                                          },
-                                                          showSelectedIcon:
-                                                              false,
-                                                        ),
-                                                      )
-                                                    : InputDecorator(
-                                                        decoration:
-                                                            InputDecoration(
-                                                          labelText: loc.t(
-                                                              'tt_type_hint'),
-                                                          isDense: true,
-                                                          border: OutlineInputBorder(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8)),
-                                                          contentPadding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal:
-                                                                      12,
-                                                                  vertical: 14),
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            Icon(
-                                                                _isSemiFinished
-                                                                    ? Icons
-                                                                        .inventory_2
-                                                                    : Icons
-                                                                        .restaurant,
-                                                                size: 20,
-                                                                color: Theme.of(
-                                                                        context)
-                                                                    .colorScheme
-                                                                    .onSurface),
-                                                            const SizedBox(
-                                                                width: 8),
-                                                            Text(
-                                                                _isSemiFinished
-                                                                    ? loc.t(
-                                                                        'tt_type_pf')
-                                                                    : loc.t(
-                                                                        'tt_type_dish'),
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                maxLines: 1),
-                                                          ],
-                                                        ),
-                                                      ),
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                            ],
                                           ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                 const SizedBox(height: 16),
