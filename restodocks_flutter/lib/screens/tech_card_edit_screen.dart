@@ -6144,12 +6144,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                     ),
                                 const SizedBox(height: 16),
                                 if (!tableOnlyView) ...[
-                                  Text(loc.t('ttk_composition'),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold)),
+                                  Align(
+                                    alignment: centerDesktopWebBlock
+                                        ? Alignment.topCenter
+                                        : Alignment.topLeft,
+                                    child: SizedBox(
+                                      width: centerDesktopWebBlock
+                                          ? _ttkTechnologyStripWidth(
+                                              context, tableOnlyView)
+                                          : double.infinity,
+                                      child: Text(
+                                        loc.t('ttk_composition'),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                 ],
                               ],

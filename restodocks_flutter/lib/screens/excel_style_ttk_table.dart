@@ -1717,6 +1717,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               color: _kTtkEditableCellFill,
               child: DropdownButton<String?>(
                 isExpanded: true,
+                isDense: true,
+                alignment: Alignment.center,
                 hint: Text(widget.loc.t('ttk_cooking_method'),
                     style: const TextStyle(fontSize: 12)),
                 value: cookingMethodDropdownValue(ingredient),
