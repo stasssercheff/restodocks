@@ -117,30 +117,32 @@ Widget _ttkNumericEditableField({
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
             ),
-            child: TextField(
-              focusNode: focusNode,
-              controller: controller,
-              keyboardType: keyboardType,
-              textAlign: TextAlign.center,
-              textAlignVertical: TextAlignVertical.center,
-              expands: stretch,
-              maxLines: stretch ? null : 1,
-              cursorColor: cs.onSurface,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                filled: false,
+            child: Center(
+              child: TextField(
+                focusNode: focusNode,
+                controller: controller,
+                keyboardType: keyboardType,
+                textAlign: TextAlign.center,
+                textAlignVertical: TextAlignVertical.center,
+                expands: false,
+                maxLines: 1,
+                cursorColor: cs.onSurface,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  filled: false,
+                ),
+                style: const TextStyle(fontSize: 12),
+                onChanged: (_) => onInputChanged(),
+                onSubmitted: (_) => onSubmit(),
+                onTapOutside: (_) => onSubmit(),
               ),
-              style: const TextStyle(fontSize: 12),
-              onChanged: (_) => onInputChanged(),
-              onSubmitted: (_) => onSubmit(),
-              onTapOutside: (_) => onSubmit(),
             ),
           ),
         );
@@ -7967,10 +7969,10 @@ class _TtkCookTable extends StatefulWidget {
   static const _colOutput = 70.0;
   static const _colPortions = 56.0;
 
-  /// Совпадает с логикой [ExcelStyleTtkTable]: продукты −20%, «Итого» +10% от базы 44.
+  /// Совпадает с логикой [ExcelStyleTtkTable]: продукты −20%, «Итого» уменьшено ещё на 15% от предыдущего варианта.
   static const double _kCookBaseRowDp = 44.0;
   static const double _kCookIngredientRowHeight = _kCookBaseRowDp * 0.8;
-  static const double _kCookTotalRowHeight = _kCookBaseRowDp * 1.1;
+  static const double _kCookTotalRowHeight = _kCookBaseRowDp * 0.935;
   static const double _kCookHeaderHeight = _kCookBaseRowDp;
 
   /// Веб на ПК: чуть шире колонки, чтобы в гапке переносы шли по словам, а не посередине.
@@ -8404,7 +8406,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                           fractionDigits: unitPrefs.isImperial ? 2 : 0,
                         ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
