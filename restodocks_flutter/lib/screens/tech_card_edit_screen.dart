@@ -2205,123 +2205,121 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         tc = working;
       }
       if (!mounted) return;
-      // Откладываем тяжёлый setState на следующий кадр, чтобы не блокировать UI при большом числе ингредиентов
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        setState(() {
-          _techCard = tc;
-          _loading = false;
-          if (tc != null) {
-            if (tc.isSemiFinished) {
-              // для ПФ самой по себе достаточно своих ингредиентов, но пусть не пусто для рекурсии
-              _semiFinishedProducts = semiFinishedForCost.isNotEmpty
-                  ? semiFinishedForCost
-                  : (tc != null ? [tc] : []);
-            } else {
-              if (semiFinishedForCost.isNotEmpty) {
-                _semiFinishedProducts = semiFinishedForCost;
-              }
-            }
-            final sumOutput =
-                tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
-            if (tc.isSemiFinished) {
-              // ТТК ПФ: по умолчанию 100; из БД только если задан
-              _portionWeight = tc.portionWeight > 0 ? tc.portionWeight : 100;
-            } else {
-              // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
-              if (tc.portionWeight <= 0 && sumOutput > 0) {
-                _portionWeight = sumOutput;
-              } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
-                _portionWeight = sumOutput;
-              } else {
-                _portionWeight = tc.portionWeight;
-              }
-            }
-            _nameController.text = tc.getLocalizedDishName(
-                context.read<LocalizationService>().currentLanguageCode);
-            _selectedCategory = _categoryOptions.contains(tc.category)
-                ? tc.category
-                : 'misc'; // fallback if custom category was deleted
-            _selectedSections = List<String>.from(tc.sections);
-            _isSemiFinished = tc.isSemiFinished;
-            _photoUrls = tc.photoUrls ?? [];
-            _pendingPhotoBytes = [];
-            _technologyController.text = tc.getLocalizedTechnology(
-                context.read<LocalizationService>().currentLanguageCode);
-            _descriptionForHallController.text = tc.descriptionForHall ?? '';
-            _compositionForHallController.text = tc.compositionForHall ?? '';
-            _sellingPriceController.text =
-                tc.sellingPrice != null && tc.sellingPrice! > 0
-                    ? tc.sellingPrice!.toStringAsFixed(2)
-                    : '';
-            _ingredients
-              ..clear()
-              ..addAll(_ensureOutputWeights(tc.ingredients));
-            final targetFromChecklist = widget.initialViewTargetOutputGrams;
-            if (widget.forceViewMode &&
-                targetFromChecklist != null &&
-                targetFromChecklist > 0) {
-              final currentTotal = _ingredients
-                  .where((i) => i.productName.trim().isNotEmpty)
-                  .fold<double>(0, (s, i) => s + i.outputWeight);
-              if (currentTotal > 0) {
-                final factor = targetFromChecklist / currentTotal;
-                if ((factor - 1.0).abs() > 0.0001) {
-                  final scaled =
-                      _ingredients.map((i) => i.scaleBy(factor)).toList();
-                  _ingredients
-                    ..clear()
-                    ..addAll(scaled);
-                }
-              }
-              // Для переходов из чеклиста целевой выход — источник истины UI.
-              _portionWeight = targetFromChecklist;
-            }
-            _ensurePlaceholderRowAtEnd();
-          }
-          _contentPhase =
-              1; // показываем полную форму сразу после загрузки данных
-        });
-        // Защитный fallback: если по какой-то причине semiFinishedProducts не
-        // успели заполниться (например, view-режим без loadedTechCards),
-        // подгружаем/гидратим их, чтобы ExcelStyleTtkTable успел посчитать цены.
-        if (tc != null &&
-            _semiFinishedProducts.isEmpty &&
-            tc.ingredients.any((ing) =>
-                (ing.sourceTechCardId?.trim().isNotEmpty ?? false) ||
-                (ing.productId == null && ing.productName.trim().isNotEmpty))) {
-          unawaited(_ensureSemiFinishedProductsForCost(tc));
-        }
-        // Если перевод технологии ещё не сохранён — запросить через DeepL
-        if (tc != null) _translateTechnologyIfNeeded(tc);
+      // Применяем данные сразу: не ждём новый frame, иначе UI может обновиться
+      // только после первого пользовательского действия (скролл/тап).
+      setState(() {
+        _techCard = tc;
+        _loading = false;
         if (tc != null) {
-          unawaited(_refreshDishNameTranslationForCurrentLanguage(tc));
-        }
-        if (tc != null) {
-          unawaited(
-            _refreshIngredientNameTranslationsForCard(
-              tc,
-              context.read<LocalizationService>().currentLanguageCode,
-            ),
-          );
-        }
-        // Дополнить цены из номенклатуры (если productId есть, cost=0)
-        if (tc != null && est != null)
-          _enrichPricesFromNomenclature(
-              est.isBranch ? est.id : est.dataEstablishmentId!);
-        if (mounted) {
-          // Для существующих ТТК не восстанавливаем черновик автоматически:
-          // старый draft может перетирать серверные поля (название/категория/цех/тип/технология).
-          final shouldRestoreDraft = _isNew || widget.initialFromAi != null;
-          if (shouldRestoreDraft) {
-            if (kIsWeb) {
-              unawaited(restoreDraftNow());
-            } else {
-              await restoreDraftNow();
+          if (tc.isSemiFinished) {
+            // для ПФ самой по себе достаточно своих ингредиентов, но пусть не пусто для рекурсии
+            _semiFinishedProducts =
+                semiFinishedForCost.isNotEmpty ? semiFinishedForCost : [tc];
+          } else {
+            if (semiFinishedForCost.isNotEmpty) {
+              _semiFinishedProducts = semiFinishedForCost;
             }
           }
+          final sumOutput =
+              tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+          if (tc.isSemiFinished) {
+            // ТТК ПФ: по умолчанию 100; из БД только если задан
+            _portionWeight = tc.portionWeight > 0 ? tc.portionWeight : 100;
+          } else {
+            // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
+            if (tc.portionWeight <= 0 && sumOutput > 0) {
+              _portionWeight = sumOutput;
+            } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
+              _portionWeight = sumOutput;
+            } else {
+              _portionWeight = tc.portionWeight;
+            }
+          }
+          _nameController.text = tc.getLocalizedDishName(
+              context.read<LocalizationService>().currentLanguageCode);
+          _selectedCategory = _categoryOptions.contains(tc.category)
+              ? tc.category
+              : 'misc'; // fallback if custom category was deleted
+          _selectedSections = List<String>.from(tc.sections);
+          _isSemiFinished = tc.isSemiFinished;
+          _photoUrls = tc.photoUrls ?? [];
+          _pendingPhotoBytes = [];
+          _technologyController.text = tc.getLocalizedTechnology(
+              context.read<LocalizationService>().currentLanguageCode);
+          _descriptionForHallController.text = tc.descriptionForHall ?? '';
+          _compositionForHallController.text = tc.compositionForHall ?? '';
+          _sellingPriceController.text =
+              tc.sellingPrice != null && tc.sellingPrice! > 0
+                  ? tc.sellingPrice!.toStringAsFixed(2)
+                  : '';
+          _ingredients
+            ..clear()
+            ..addAll(_ensureOutputWeights(tc.ingredients));
+          final targetFromChecklist = widget.initialViewTargetOutputGrams;
+          if (widget.forceViewMode &&
+              targetFromChecklist != null &&
+              targetFromChecklist > 0) {
+            final currentTotal = _ingredients
+                .where((i) => i.productName.trim().isNotEmpty)
+                .fold<double>(0, (s, i) => s + i.outputWeight);
+            if (currentTotal > 0) {
+              final factor = targetFromChecklist / currentTotal;
+              if ((factor - 1.0).abs() > 0.0001) {
+                final scaled =
+                    _ingredients.map((i) => i.scaleBy(factor)).toList();
+                _ingredients
+                  ..clear()
+                  ..addAll(scaled);
+              }
+            }
+            // Для переходов из чеклиста целевой выход — источник истины UI.
+            _portionWeight = targetFromChecklist;
+          }
+          _ensurePlaceholderRowAtEnd();
         }
+        _contentPhase =
+            1; // показываем полную форму сразу после загрузки данных
       });
+      // Защитный fallback: если по какой-то причине semiFinishedProducts не
+      // успели заполниться (например, view-режим без loadedTechCards),
+      // подгружаем/гидратим их, чтобы ExcelStyleTtkTable успел посчитать цены.
+      if (tc != null &&
+          _semiFinishedProducts.isEmpty &&
+          tc.ingredients.any((ing) =>
+              (ing.sourceTechCardId?.trim().isNotEmpty ?? false) ||
+              (ing.productId == null && ing.productName.trim().isNotEmpty))) {
+        unawaited(_ensureSemiFinishedProductsForCost(tc));
+      }
+      // Если перевод технологии ещё не сохранён — запросить через DeepL
+      if (tc != null) _translateTechnologyIfNeeded(tc);
+      if (tc != null) {
+        unawaited(_refreshDishNameTranslationForCurrentLanguage(tc));
+      }
+      if (tc != null) {
+        unawaited(
+          _refreshIngredientNameTranslationsForCard(
+            tc,
+            context.read<LocalizationService>().currentLanguageCode,
+          ),
+        );
+      }
+      // Дополнить цены из номенклатуры (если productId есть, cost=0)
+      if (tc != null && est != null) {
+        _enrichPricesFromNomenclature(
+            est.isBranch ? est.id : est.dataEstablishmentId!);
+      }
+      if (mounted) {
+        // Для существующих ТТК не восстанавливаем черновик автоматически:
+        // старый draft может перетирать серверные поля (название/категория/цех/тип/технология).
+        final shouldRestoreDraft = _isNew || widget.initialFromAi != null;
+        if (shouldRestoreDraft) {
+          if (kIsWeb) {
+            unawaited(restoreDraftNow());
+          } else {
+            await restoreDraftNow();
+          }
+        }
+      }
     } catch (e) {
       if (mounted)
         setState(() {
