@@ -3051,7 +3051,7 @@ ${text}
                   for (final entry in savedProduct.names!.entries)
                     'name_${entry.key}': entry.value,
               },
-              sourceLanguage: 'ru',
+              sourceLanguage: sourceLang,
               userId:
                   context.read<AccountManagerSupabase>().currentEmployee?.id,
             );

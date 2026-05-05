@@ -82,7 +82,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _ensureTranslations(
       ProductStoreSupabase store, List<Product> products) async {
     final lang = _currentLang;
-    if (lang == 'ru') return;
     final missing = products
         .where(
           (p) => !(p.names?.containsKey(lang) == true &&
