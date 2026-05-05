@@ -4694,7 +4694,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Future<void> _ensureTechCardTranslations(List<TechCard> cards) async {
     if (!mounted) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
-    if (lang == 'ru') return;
     final svc = context.read<TechCardServiceSupabase>();
     final missing = cards
         .where(

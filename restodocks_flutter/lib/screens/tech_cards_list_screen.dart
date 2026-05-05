@@ -2787,7 +2787,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       });
     }
     try {
-      // Оверлей названий с диска до первого build списка (ru UI + англ. dishName в БД).
+      // Оверлей названий ТТК с диска до первого кадра списка — любой язык UI:
+      // не мигать «сырым» dishName из БД, пока посткадровый prefetch не подставит перевод.
       await TechCardTranslationCache.loadForEstablishment(
           est.dataEstablishmentId.trim());
 
@@ -3022,8 +3023,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _ensureTechCardTranslations(
       TechCardServiceSupabase svc, List<TechCard> cards) async {
     final currentLang = context.read<LocalizationService>().currentLanguageCode;
-    // Русский интерфейс: название уже в dishName — иначе N вызовов translate-text на каждую ТТК.
-    if (currentLang == 'ru') return;
+    // Любой язык UI: добиваем dishNameLocalized[currentLang], если в БД только другой язык.
     final targetLanguages = <String>[currentLang];
     var i = 0;
     final pendingUpdates = <String, Map<String, String>>{};

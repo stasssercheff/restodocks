@@ -220,7 +220,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Future<void> _ensureProductTranslations() async {
     final lang = widget.loc.currentLanguageCode;
-    if (lang == 'ru') return;
     final store = widget.productStore;
     final estId = widget.establishmentId;
     if (estId == null) return;

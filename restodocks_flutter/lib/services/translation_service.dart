@@ -606,8 +606,8 @@ class TranslationService {
   ///
   /// Без этого в UI с языком en остаётся русский `dish_name`, а префикс ПФ («Prep») уже на английском — смешение языков.
   ///
-  /// Для **ru UI** нельзя выходить раньше: иначе карточки с англ. `dishName` в БД
-  /// никогда не получают подпись в overlay (остаётся «caesar sauce» и т.д.).
+  /// Поддерживается любой `targetLanguage` (в т.ч. ru, es, de…): нельзя было
+  /// ранее выходить при `ru` — тогда не догонялись подписи в overlay для «чужого» `dishName`.
   Future<Map<String, String>> ensureMissingTechCardDishNameTranslations({
     required List<TechCard> techCards,
     required String targetLanguage,
