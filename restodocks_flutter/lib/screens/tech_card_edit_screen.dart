@@ -5884,25 +5884,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               SizedBox(
                                                 width: 320,
                                                 height: 56,
-                                                child: TextField(
-                                                  controller: _nameController,
-                                                  readOnly: !effectiveCanEdit,
-                                                  style:
-                                                      TextStyle(fontSize: 14),
-                                                  decoration: InputDecoration(
-                                                    labelText:
-                                                        loc.t('ttk_name'),
-                                                    isDense: true,
-                                                    filled: false,
-                                                    border: OutlineInputBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(8)),
-                                                    contentPadding:
-                                                        const EdgeInsets
-                                                            .symmetric(
-                                                            horizontal: 12,
-                                                            vertical: 14),
+                                                child: Transform.translate(
+                                                  offset: const Offset(0, 2),
+                                                  child: TextField(
+                                                    controller: _nameController,
+                                                    readOnly: !effectiveCanEdit,
+                                                    style:
+                                                        TextStyle(fontSize: 14),
+                                                    decoration: InputDecoration(
+                                                      labelText:
+                                                          loc.t('ttk_name'),
+                                                      isDense: true,
+                                                      filled: false,
+                                                      border:
+                                                          OutlineInputBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                      contentPadding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 14),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
