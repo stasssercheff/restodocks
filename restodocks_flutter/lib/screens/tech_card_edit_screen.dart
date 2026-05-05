@@ -26,6 +26,19 @@ import '../utils/unit_converter.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
+/// Совпадает с фиксированной шириной тела [ExcelStyleTtkTable].
+const double _kExcelTtkCompositionBodyWidth = 1295;
+
+/// Ширина блока «Технология»: как у таблицы состава, но не шире области контента при узком экране.
+double _ttkTechnologyStripWidth(BuildContext context, bool tableOnlyView) {
+  final intrinsic = tableOnlyView
+      ? _TtkCookTable.intrinsicTableWidth(context)
+      : _kExcelTtkCompositionBodyWidth.toDouble();
+  final vw = MediaQuery.sizeOf(context).width;
+  final maxOuter = vw > 24 ? vw - 24 : vw;
+  return intrinsic > maxOuter ? maxOuter : intrinsic;
+}
+
 enum _DuplicateNameAction { createDuplicate, edit, delete }
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
@@ -5457,6 +5470,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     // Определяем, является ли устройство мобильным
     final isMobile = isHandheldNarrowLayout(context);
+    final compositionHScrollThumbVisible = !kIsWeb || isMobile;
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -6123,7 +6137,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             child: RawScrollbar(
                               controller: _compositionTableHScrollController,
                               scrollbarOrientation: ScrollbarOrientation.bottom,
-                              thumbVisibility: true,
+                              thumbVisibility: compositionHScrollThumbVisible,
                               child: SingleChildScrollView(
                                 controller: _compositionTableHScrollController,
                                 scrollDirection: Axis.horizontal,
@@ -6402,10 +6416,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: SizedBox(
-                                    width:
-                                        MediaQuery.of(context).size.width > 1000
-                                            ? 1000
-                                            : MediaQuery.of(context).size.width,
+                                    width: _ttkTechnologyStripWidth(
+                                        context, tableOnlyView),
                                     child: Container(
                                       margin: const EdgeInsets.only(top: 12),
                                       decoration: BoxDecoration(
@@ -7957,10 +7969,10 @@ class _TtkCookTable extends StatefulWidget {
   static const _colOutput = 70.0;
   static const _colPortions = 56.0;
 
-  /// Совпадает с логикой [ExcelStyleTtkTable]: продукты −20%, «Итого» +20% от базы 44.
+  /// Совпадает с логикой [ExcelStyleTtkTable]: продукты −20%, «Итого» +10% от базы 44.
   static const double _kCookBaseRowDp = 44.0;
   static const double _kCookIngredientRowHeight = _kCookBaseRowDp * 0.8;
-  static const double _kCookTotalRowHeight = _kCookBaseRowDp * 1.2;
+  static const double _kCookTotalRowHeight = _kCookBaseRowDp * 1.1;
   static const double _kCookHeaderHeight = _kCookBaseRowDp;
 
   /// Веб на ПК: чуть шире колонки, чтобы в гапке переносы шли по словам, а не посередине.
@@ -7971,6 +7983,19 @@ class _TtkCookTable extends StatefulWidget {
     if (w >= 900) return 1.22;
     if (w >= 600) return 1.12;
     return 1.0;
+  }
+
+  /// Фактическая ширина таблицы просмотра (совпадает с суммой колонок).
+  static double intrinsicTableWidth(BuildContext context) {
+    final scale = _webColumnScale(context);
+    return (_colDish +
+            _colProduct +
+            _colGross +
+            _colNet +
+            _colMethod +
+            _colOutput +
+            _colPortions) *
+        scale;
   }
 
   @override
@@ -8392,28 +8417,22 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: SizedBox(
                     height: _TtkCookTable._kCookTotalRowHeight,
                     width: double.infinity,
-                    child: Center(
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: _EditableNetCell(
-                          expandToCell: false,
-                          value: _totalOutput,
-                          decimalPlaces: unitPrefs.isImperial ? 2 : 0,
-                          canonicalToDisplay: (v) => UnitConverter.toDisplay(
-                            canonicalValue: v,
-                            canonicalUnit: 'g',
-                            system: unitPrefs.unitSystem,
-                          ).value,
-                          displayToCanonical: (v) => UnitConverter.fromDisplay(
-                            displayValue: v,
-                            canonicalUnit: 'g',
-                            system: unitPrefs.unitSystem,
-                          ),
-                          onChanged: (v) {
-                            if (v != null && v > 0) _scaleByOutput(v);
-                          },
-                        ),
+                    child: _EditableNetCell(
+                      value: _totalOutput,
+                      decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                      canonicalToDisplay: (v) => UnitConverter.toDisplay(
+                        canonicalValue: v,
+                        canonicalUnit: 'g',
+                        system: unitPrefs.unitSystem,
+                      ).value,
+                      displayToCanonical: (v) => UnitConverter.fromDisplay(
+                        displayValue: v,
+                        canonicalUnit: 'g',
+                        system: unitPrefs.unitSystem,
                       ),
+                      onChanged: (v) {
+                        if (v != null && v > 0) _scaleByOutput(v);
+                      },
                     ),
                   ),
                 ),
@@ -8422,25 +8441,19 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: SizedBox(
                     height: _TtkCookTable._kCookTotalRowHeight,
                     width: double.infinity,
-                    child: Center(
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: _EditableNetCell(
-                          expandToCell: false,
-                          value: _portionsCount,
-                          decimalPlaces: 1,
-                          onChanged: (v) {
-                            if (v == null || v <= 0) return;
-                            setState(() {
-                              _portionsCount = v.clamp(0.1, 9999.0);
-                              // Пересчёт всей таблицы под N порций: брутто, нетто, выход по всем продуктам и в Итого
-                              final targetOutput =
-                                  _portionsCount * widget.weightPerPortion;
-                              _scaleByOutput(targetOutput);
-                            });
-                          },
-                        ),
-                      ),
+                    child: _EditableNetCell(
+                      value: _portionsCount,
+                      decimalPlaces: 1,
+                      onChanged: (v) {
+                        if (v == null || v <= 0) return;
+                        setState(() {
+                          _portionsCount = v.clamp(0.1, 9999.0);
+                          // Пересчёт всей таблицы под N порций: брутто, нетто, выход по всем продуктам и в Итого
+                          final targetOutput =
+                              _portionsCount * widget.weightPerPortion;
+                          _scaleByOutput(targetOutput);
+                        });
+                      },
                     ),
                   ),
                 ),
