@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../config/home_tour_config.dart';
+import '../core/feature_flags.dart';
+import '../core/subscription_entitlements.dart';
 import 'home/owner_home_content.dart';
 import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
@@ -16,6 +18,7 @@ import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/branded_auth_loading.dart';
 import '../widgets/tour_tooltip.dart';
+import '../utils/pos_hall_permissions.dart';
 
 /// Главный экран — контент домашней вкладки по роли.
 /// Нижняя навигация управляется AppShell (ShellRoute).
@@ -505,6 +508,13 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
+    final ent = SubscriptionEntitlements.from(accountManager.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(ent);
+    final canOpenShifts = posOn &&
+        (posCanManageHallTables(employee) ||
+            posCanViewPosShiftReport(employee) ||
+            employee.department == 'hall' ||
+            employee.department == 'dining_room');
     final loc = context.watch<LocalizationService>();
 
     if (employee == null) return const Scaffold(body: SizedBox());
@@ -538,6 +548,14 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
               ),
               'cabinet-settings',
             ),
+            if (canOpenShifts)
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(loc.t('pos_cash_tab_shift')),
+                subtitle: Text(loc.t('pos_cash_shift_active')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/pos/hall/cash-register?tab=shift'),
+              ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),

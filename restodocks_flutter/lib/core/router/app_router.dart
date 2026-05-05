@@ -805,10 +805,18 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/hall/cash-register',
-            pageBuilder: (context, state) => _slideTransitionPage(
-              state,
-              const HallCashRegisterScreen(),
-            ),
+            pageBuilder: (context, state) {
+              final tab = state.queryParameters['tab'];
+              final initialTab = switch (tab) {
+                'shift' => 2,
+                'disbursements' => 1,
+                _ => 0,
+              };
+              return _slideTransitionPage(
+                state,
+                HallCashRegisterScreen(initialTabIndex: initialTab),
+              );
+            },
           ),
           GoRoute(
             path: '/pos/hall/order-history',

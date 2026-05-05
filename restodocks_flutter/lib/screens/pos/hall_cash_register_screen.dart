@@ -13,7 +13,9 @@ import '../../widgets/app_bar_home_button.dart';
 
 /// Виртуальная касса: счета к оплате, выдача, смена.
 class HallCashRegisterScreen extends StatefulWidget {
-  const HallCashRegisterScreen({super.key});
+  const HallCashRegisterScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<HallCashRegisterScreen> createState() => _HallCashRegisterScreenState();
@@ -36,7 +38,11 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       setState(() {});
@@ -736,6 +742,12 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               onPressed: () => _closeShiftDialog(loc),
               icon: const Icon(Icons.lock),
               label: Text(loc.t('pos_cash_shift_close_action')),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => context.push('/pos/hall/orders'),
+              icon: const Icon(Icons.receipt_long),
+              label: Text(loc.t('pos_cash_tab_orders')),
             ),
             const SizedBox(height: 12),
             Text(
