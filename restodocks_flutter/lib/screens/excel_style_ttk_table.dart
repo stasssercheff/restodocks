@@ -20,6 +20,7 @@ const double _kTtkIngredientRowHeight = 44.0 * 0.8;
 
 /// Строка «Итого» слегка выше базовой (компактная версия для веб).
 const double _kTtkTotalRowHeight = 44.0 * 1.02;
+const Color _kTtkEditableCellFill = Color(0xFFFDF3F6);
 
 class ExcelStyleTtkTable extends StatefulWidget {
   final LocalizationService loc;
@@ -838,22 +839,20 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     ),
                     padding:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    alignment: Alignment.topLeft,
+                    alignment: Alignment.centerLeft,
                     child: widget.dishNameController != null
                         ? ValueListenableBuilder<TextEditingValue>(
                             valueListenable: widget.dishNameController!,
                             builder: (_, value, __) => Text(
                               value.text,
                               style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 10,
+                              softWrap: true,
                             ),
                           )
                         : Text(
                             widget.dishName,
                             style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 10,
+                            softWrap: true,
                           ),
                   ),
                 ),
@@ -1075,8 +1074,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         final name = _getIngredientDisplayName(ingredient, lang);
         final isPf = ingredient.sourceTechCardId != null &&
             ingredient.sourceTechCardId!.isNotEmpty;
-        return SizedBox(
+        return Container(
           height: _kTtkIngredientRowHeight,
+          color: _kTtkEditableCellFill,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
@@ -1621,36 +1621,56 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return SizedBox(
       height: rowHeight,
       child: widget.canEdit
-          ? TextField(
-              controller: controller,
-              focusNode: focusNode,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
-              ],
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-              textAlignVertical: TextAlignVertical.center,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
-                filled: false,
-              ),
-              onChanged: (v) {
-                _debounceTimers[key]?.cancel();
-                _debounceTimers[key] =
-                    Timer(const Duration(milliseconds: 150), () {
-                  if (!mounted) return;
-                  onChanged(v);
-                });
+          ? ListenableBuilder(
+              listenable: focusNode,
+              builder: (context, _) {
+                final cs = Theme.of(context).colorScheme;
+                final focused = focusNode.hasFocus;
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _kTtkEditableCellFill,
+                    border: Border.all(
+                      color: focused ? cs.primary : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
+                    ],
+                    style: const TextStyle(fontSize: 12, height: 1),
+                    strutStyle: const StrutStyle(
+                      forceStrutHeight: true,
+                      height: 1,
+                    ),
+                    textAlign: TextAlign.center,
+                    textAlignVertical: TextAlignVertical.center,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                      filled: false,
+                    ),
+                    onChanged: (v) {
+                      _debounceTimers[key]?.cancel();
+                      _debounceTimers[key] =
+                          Timer(const Duration(milliseconds: 150), () {
+                        if (!mounted) return;
+                        onChanged(v);
+                      });
+                    },
+                  ),
+                );
               },
             )
           : Align(
@@ -1690,49 +1710,52 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return SizedBox(
       height: _kTtkIngredientRowHeight,
       child: widget.canEdit
-          ? DropdownButton<String?>(
-              isExpanded: true,
-              hint: Text(widget.loc.t('ttk_cooking_method'),
-                  style: const TextStyle(fontSize: 12)),
-              value: cookingMethodDropdownValue(ingredient),
-              items: [
-                DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text(widget.loc.t('dash'),
-                      style: const TextStyle(fontSize: 12)),
-                ),
-                ...CookingProcess.defaultProcesses.map((process) {
-                  return DropdownMenuItem<String?>(
-                    value: process.id,
-                    child: Text(widget.loc.cookingProcessLabel(process),
+          ? ColoredBox(
+              color: _kTtkEditableCellFill,
+              child: DropdownButton<String?>(
+                isExpanded: true,
+                hint: Text(widget.loc.t('ttk_cooking_method'),
+                    style: const TextStyle(fontSize: 12)),
+                value: cookingMethodDropdownValue(ingredient),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(widget.loc.t('dash'),
                         style: const TextStyle(fontSize: 12)),
-                  );
-                }),
-              ],
-              onChanged: (processId) {
-                if (processId == null) {
+                  ),
+                  ...CookingProcess.defaultProcesses.map((process) {
+                    return DropdownMenuItem<String?>(
+                      value: process.id,
+                      child: Text(widget.loc.cookingProcessLabel(process),
+                          style: const TextStyle(fontSize: 12)),
+                    );
+                  }),
+                ],
+                onChanged: (processId) {
+                  if (processId == null) {
+                    _updateIngredient(
+                        rowIndex,
+                        ingredient.copyWith(
+                          cookingProcessId: null,
+                          cookingProcessName: null,
+                        ));
+                    return;
+                  }
+                  final process = CookingProcess.defaultProcesses
+                      .firstWhere((p) => p.id == processId);
                   _updateIngredient(
                       rowIndex,
                       ingredient.copyWith(
-                        cookingProcessId: null,
-                        cookingProcessName: null,
+                        cookingProcessId: processId,
+                        cookingProcessName:
+                            widget.loc.cookingProcessLabel(process),
                       ));
-                  return;
-                }
-                final process = CookingProcess.defaultProcesses
-                    .firstWhere((p) => p.id == processId);
-                _updateIngredient(
-                    rowIndex,
-                    ingredient.copyWith(
-                      cookingProcessId: processId,
-                      cookingProcessName:
-                          widget.loc.cookingProcessLabel(process),
-                    ));
-                widget.onSuggestCookingLoss?.call(rowIndex);
-              },
-              underline: const SizedBox(),
-              icon: const Icon(Icons.arrow_drop_down, size: 16),
-              style: const TextStyle(fontSize: 12, color: Colors.black),
+                  widget.onSuggestCookingLoss?.call(rowIndex);
+                },
+                underline: const SizedBox(),
+                icon: const Icon(Icons.arrow_drop_down, size: 16),
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+              ),
             )
           : Text(
               () {
@@ -2173,7 +2196,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     return SizedBox(
       height: _kTtkIngredientRowHeight,
       child: Material(
-        color: Colors.white,
+        color: _kTtkEditableCellFill,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _openPicker,
