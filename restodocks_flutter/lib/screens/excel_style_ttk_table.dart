@@ -791,12 +791,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                             : _buildTotalCell(widget.weightPerPortion == 0
                                 ? ''
                                 : widget.weightPerPortion.toStringAsFixed(0)),
-                        _buildTotalCell('1'), // порций(шт) в итого всегда 1
+                        _buildReadOnlyCell(
+                          '1',
+                          rowHeight: _kTtkTotalRowHeight,
+                        ), // порций(шт) в итого всегда 1
                         _buildTotalRowSpacer(),
                         widget.isCook
                             ? _buildTotalRowSpacer() // Скрываем стоимость для поваров
-                            : _buildTotalCell(
-                                '${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
+                            : _buildReadOnlyCell(
+                                '${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol',
+                                rowHeight: _kTtkTotalRowHeight,
+                              ), // Стоимость за кг готового продукта
                         _buildTotalRowSpacer(),
                       ],
                     ),
@@ -1640,9 +1645,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   child: TextField(
                     controller: controller,
                     focusNode: focusNode,
-                    expands: true,
-                    minLines: null,
-                    maxLines: null,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
@@ -1661,7 +1663,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       errorBorder: InputBorder.none,
                       focusedErrorBorder: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
-                      isDense: false,
+                      isDense: true,
+                      isCollapsed: true,
                       filled: false,
                     ),
                     onChanged: (v) {
@@ -1718,68 +1721,73 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: widget.canEdit
           ? ColoredBox(
               color: _kTtkEditableCellFill,
-              child: DropdownButton<String?>(
-                isExpanded: true,
-                isDense: true,
+              child: Align(
                 alignment: Alignment.center,
-                hint: Text(widget.loc.t('ttk_cooking_method'),
-                    style: const TextStyle(fontSize: 12)),
-                value: cookingMethodDropdownValue(ingredient),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(widget.loc.t('dash'),
-                        style: const TextStyle(fontSize: 12)),
-                  ),
-                  ...CookingProcess.defaultProcesses.map((process) {
-                    return DropdownMenuItem<String?>(
-                      value: process.id,
-                      child: Text(widget.loc.cookingProcessLabel(process),
+                child: DropdownButton<String?>(
+                  isExpanded: true,
+                  isDense: true,
+                  alignment: Alignment.center,
+                  hint: Text(widget.loc.t('ttk_cooking_method'),
+                      style: const TextStyle(fontSize: 12)),
+                  value: cookingMethodDropdownValue(ingredient),
+                  items: [
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text(widget.loc.t('dash'),
                           style: const TextStyle(fontSize: 12)),
-                    );
-                  }),
-                ],
-                onChanged: (processId) {
-                  if (processId == null) {
+                    ),
+                    ...CookingProcess.defaultProcesses.map((process) {
+                      return DropdownMenuItem<String?>(
+                        value: process.id,
+                        child: Text(widget.loc.cookingProcessLabel(process),
+                            style: const TextStyle(fontSize: 12)),
+                      );
+                    }),
+                  ],
+                  onChanged: (processId) {
+                    if (processId == null) {
+                      _updateIngredient(
+                          rowIndex,
+                          ingredient.copyWith(
+                            cookingProcessId: null,
+                            cookingProcessName: null,
+                          ));
+                      return;
+                    }
+                    final process = CookingProcess.defaultProcesses
+                        .firstWhere((p) => p.id == processId);
                     _updateIngredient(
                         rowIndex,
                         ingredient.copyWith(
-                          cookingProcessId: null,
-                          cookingProcessName: null,
+                          cookingProcessId: processId,
+                          cookingProcessName:
+                              widget.loc.cookingProcessLabel(process),
                         ));
-                    return;
-                  }
-                  final process = CookingProcess.defaultProcesses
-                      .firstWhere((p) => p.id == processId);
-                  _updateIngredient(
-                      rowIndex,
-                      ingredient.copyWith(
-                        cookingProcessId: processId,
-                        cookingProcessName:
-                            widget.loc.cookingProcessLabel(process),
-                      ));
-                  widget.onSuggestCookingLoss?.call(rowIndex);
-                },
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, size: 16),
-                style: const TextStyle(fontSize: 12, color: Colors.black),
+                    widget.onSuggestCookingLoss?.call(rowIndex);
+                  },
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, size: 16),
+                  style: const TextStyle(fontSize: 12, color: Colors.black),
+                ),
               ),
             )
-          : Text(
-              () {
-                final id = ingredient.cookingProcessId;
-                if (id != null) {
-                  final p = CookingProcess.findById(id);
-                  if (p != null) {
-                    return widget.loc.cookingProcessLabel(p);
+          : Center(
+              child: Text(
+                () {
+                  final id = ingredient.cookingProcessId;
+                  if (id != null) {
+                    final p = CookingProcess.findById(id);
+                    if (p != null) {
+                      return widget.loc.cookingProcessLabel(p);
+                    }
                   }
-                }
-                return ingredient.cookingProcessName ?? '';
-              }(),
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                  return ingredient.cookingProcessName ?? '';
+                }(),
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
     );
   }
