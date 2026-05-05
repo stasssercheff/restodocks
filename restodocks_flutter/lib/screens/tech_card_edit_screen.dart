@@ -5885,7 +5885,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                                 width: 320,
                                                 height: 56,
                                                 child: Transform.translate(
-                                                  offset: const Offset(0, 2),
+                                                  offset: const Offset(0, 4),
                                                   child: TextField(
                                                     controller: _nameController,
                                                     readOnly: !effectiveCanEdit,
