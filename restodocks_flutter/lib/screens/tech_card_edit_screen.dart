@@ -5034,7 +5034,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 
   /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото. Под технологией.
-  /// Ширина как у блока "Технология" (max 1000px).
+  /// Ширина как у блока "Технология" (под ширину таблицы).
   /// На мобиле — 2 фото в ряд, на десктопе — горизонтальный wrap.
   /// Тап по фото — полноэкранный просмотр.
   Widget _buildPhotoSection(LocalizationService loc, bool effectiveCanEdit) {
@@ -5112,10 +5112,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
     }
 
+    final centerDesktopWebBlock = kIsWeb && !isMobile;
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment:
+          centerDesktopWebBlock ? Alignment.topCenter : Alignment.centerLeft,
       child: SizedBox(
-        width: screenWidth > 1000 ? 1000 : screenWidth,
+        width: _ttkTechnologyStripWidth(context, !effectiveCanEdit),
         child: Container(
           margin: const EdgeInsets.only(top: 12),
           decoration: BoxDecoration(
@@ -5479,7 +5481,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     // Определяем, является ли устройство мобильным
     final isMobile = isHandheldNarrowLayout(context);
     final compositionHScrollThumbVisible = !kIsWeb || isMobile;
-    final centerReadOnlyWebBlock = kIsWeb && tableOnlyView && !isMobile;
+    final centerDesktopWebBlock = kIsWeb && !isMobile;
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -6144,7 +6146,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Align(
-                              alignment: centerReadOnlyWebBlock
+                              alignment: centerDesktopWebBlock
                                   ? Alignment.topCenter
                                   : Alignment.topLeft,
                               child: RawScrollbar(
@@ -6342,569 +6344,636 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                           sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
-                                if (!tableOnlyView)
-                                  Builder(
-                                    builder: (context) {
-                                      final totalOutput = _ingredients
-                                          .where((i) =>
-                                              i.productName.trim().isNotEmpty)
-                                          .fold<double>(
-                                              0, (s, i) => s + i.outputWeight);
-                                      final showAdjust = effectiveCanEdit &&
-                                          _portionWeight > 0 &&
-                                          totalOutput > 0 &&
-                                          (totalOutput - _portionWeight).abs() >
-                                              1;
-                                      if (!showAdjust)
-                                        return const SizedBox.shrink();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(top: 8),
-                                        child: OutlinedButton(
-                                          style: OutlinedButton.styleFrom(
-                                            minimumSize: const Size(0, 32),
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 12),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                          onPressed: () async {
-                                            final ok = await showDialog<bool>(
-                                              context: context,
-                                              builder: (ctx) => AlertDialog(
-                                                title: Text(loc.t(
-                                                    'ttk_adjust_waste_title')),
-                                                content: Text(
-                                                  loc
-                                                      .t(
-                                                          'ttk_adjust_waste_confirm')
-                                                      .replaceFirst(
-                                                          '%s',
-                                                          _portionWeight
-                                                              .toStringAsFixed(
-                                                                  0))
-                                                      .replaceFirst(
-                                                          '%s',
-                                                          totalOutput
-                                                              .toStringAsFixed(
-                                                                  0)),
+                            child: Align(
+                              alignment: centerDesktopWebBlock
+                                  ? Alignment.topCenter
+                                  : Alignment.topLeft,
+                              child: SizedBox(
+                                width: _ttkTechnologyStripWidth(
+                                    context, tableOnlyView),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
+                                    if (!tableOnlyView)
+                                      Builder(
+                                        builder: (context) {
+                                          final totalOutput = _ingredients
+                                              .where((i) => i.productName
+                                                  .trim()
+                                                  .isNotEmpty)
+                                              .fold<double>(0,
+                                                  (s, i) => s + i.outputWeight);
+                                          final showAdjust = effectiveCanEdit &&
+                                              _portionWeight > 0 &&
+                                              totalOutput > 0 &&
+                                              (totalOutput - _portionWeight)
+                                                      .abs() >
+                                                  1;
+                                          if (!showAdjust)
+                                            return const SizedBox.shrink();
+                                          return Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 8),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton(
+                                                style: OutlinedButton.styleFrom(
+                                                  minimumSize:
+                                                      const Size(0, 32),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 12),
+                                                  visualDensity:
+                                                      VisualDensity.compact,
                                                 ),
-                                                actions: [
-                                                  TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.of(ctx)
-                                                              .pop(false),
-                                                      child: Text(
-                                                          MaterialLocalizations
-                                                                  .of(ctx)
-                                                              .cancelButtonLabel)),
-                                                  FilledButton(
-                                                    onPressed: () =>
-                                                        Navigator.of(ctx)
-                                                            .pop(true),
-                                                    child: Text(
-                                                        loc.t('answer_yes')),
-                                                  ),
-                                                ],
+                                                onPressed: () async {
+                                                  final ok =
+                                                      await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (ctx) =>
+                                                        AlertDialog(
+                                                      title: Text(loc.t(
+                                                          'ttk_adjust_waste_title')),
+                                                      content: Text(
+                                                        loc
+                                                            .t(
+                                                                'ttk_adjust_waste_confirm')
+                                                            .replaceFirst(
+                                                                '%s',
+                                                                _portionWeight
+                                                                    .toStringAsFixed(
+                                                                        0))
+                                                            .replaceFirst(
+                                                                '%s',
+                                                                totalOutput
+                                                                    .toStringAsFixed(
+                                                                        0)),
+                                                      ),
+                                                      actions: [
+                                                        TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.of(
+                                                                        ctx)
+                                                                    .pop(false),
+                                                            child: Text(
+                                                                MaterialLocalizations
+                                                                        .of(ctx)
+                                                                    .cancelButtonLabel)),
+                                                        FilledButton(
+                                                          onPressed: () =>
+                                                              Navigator.of(ctx)
+                                                                  .pop(true),
+                                                          child: Text(loc
+                                                              .t('answer_yes')),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                  if (ok == true && mounted)
+                                                    _adjustWasteToMatchOutput(
+                                                        _portionWeight);
+                                                },
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.tune,
+                                                        size: 16,
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .primary),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                        loc.t(
+                                                            'ttk_adjust_waste_to_output'),
+                                                        style: const TextStyle(
+                                                            fontSize: 13)),
+                                                  ],
+                                                ),
                                               ),
-                                            );
-                                            if (ok == true && mounted)
-                                              _adjustWasteToMatchOutput(
-                                                  _portionWeight);
-                                          },
-                                          child: Row(
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
+                                    Align(
+                                      alignment: centerDesktopWebBlock
+                                          ? Alignment.topCenter
+                                          : Alignment.centerLeft,
+                                      child: SizedBox(
+                                        width: _ttkTechnologyStripWidth(
+                                            context, tableOnlyView),
+                                        child: Container(
+                                          margin:
+                                              const EdgeInsets.only(top: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .outline),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerLowest,
+                                          ),
+                                          child: Column(
                                             mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Icon(Icons.tune,
-                                                  size: 16,
+                                              Container(
+                                                width: double.infinity,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 12),
+                                                decoration: BoxDecoration(
                                                   color: Theme.of(context)
                                                       .colorScheme
-                                                      .primary),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                  loc.t(
-                                                      'ttk_adjust_waste_to_output'),
-                                                  style: const TextStyle(
-                                                      fontSize: 13)),
+                                                      .surfaceContainerHighest,
+                                                  border: const Border(
+                                                      bottom: BorderSide(
+                                                          color: Colors.grey,
+                                                          width: 1)),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Text(
+                                                        loc.t('ttk_technology'),
+                                                        style: const TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold)),
+                                                    if (_technologyTranslating) ...[
+                                                      const SizedBox(width: 8),
+                                                      const SizedBox(
+                                                          width: 14,
+                                                          height: 14,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2)),
+                                                      const SizedBox(width: 6),
+                                                      Text(loc.t('loading'),
+                                                          style:
+                                                              const TextStyle(
+                                                                  fontSize:
+                                                                      12)),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ),
+                                              SingleChildScrollView(
+                                                padding:
+                                                    const EdgeInsets.all(12),
+                                                child: effectiveCanEdit
+                                                    ? TextField(
+                                                        controller:
+                                                            _technologyController,
+                                                        maxLines: null,
+                                                        minLines: 2,
+                                                        style: const TextStyle(
+                                                            fontSize: 13),
+                                                        decoration:
+                                                            InputDecoration(
+                                                          border:
+                                                              InputBorder.none,
+                                                          isDense: true,
+                                                          filled: false,
+                                                          hintText: loc.t(
+                                                              'ttk_technology'),
+                                                        ),
+                                                      )
+                                                    : Text(
+                                                        _technologyController
+                                                                .text.isEmpty
+                                                            ? '—'
+                                                            : _technologyController
+                                                                .text,
+                                                        style: const TextStyle(
+                                                            fontSize: 13,
+                                                            height: 1.4),
+                                                      ),
+                                              ),
                                             ],
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
-                                Align(
-                                  alignment: centerReadOnlyWebBlock
-                                      ? Alignment.topCenter
-                                      : Alignment.centerLeft,
-                                  child: SizedBox(
-                                    width: _ttkTechnologyStripWidth(
-                                        context, tableOnlyView),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(top: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .outline),
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .surfaceContainerLowest,
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8, horizontal: 12),
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .surfaceContainerHighest,
-                                              border: const Border(
-                                                  bottom: BorderSide(
-                                                      color: Colors.grey,
-                                                      width: 1)),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Text(loc.t('ttk_technology'),
-                                                    style: const TextStyle(
-                                                        fontSize: 14,
-                                                        fontWeight:
-                                                            FontWeight.bold)),
-                                                if (_technologyTranslating) ...[
-                                                  const SizedBox(width: 8),
-                                                  const SizedBox(
-                                                      width: 14,
-                                                      height: 14,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                              strokeWidth: 2)),
-                                                  const SizedBox(width: 6),
-                                                  Text(loc.t('loading'),
-                                                      style: const TextStyle(
-                                                          fontSize: 12)),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                          SingleChildScrollView(
-                                            padding: const EdgeInsets.all(12),
-                                            child: effectiveCanEdit
-                                                ? TextField(
-                                                    controller:
-                                                        _technologyController,
-                                                    maxLines: null,
-                                                    minLines: 2,
-                                                    style: const TextStyle(
-                                                        fontSize: 13),
-                                                    decoration: InputDecoration(
-                                                      border: InputBorder.none,
-                                                      isDense: true,
-                                                      filled: false,
-                                                      hintText: loc
-                                                          .t('ttk_technology'),
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    _technologyController
-                                                            .text.isEmpty
-                                                        ? '—'
-                                                        : _technologyController
-                                                            .text,
-                                                    style: const TextStyle(
-                                                        fontSize: 13,
-                                                        height: 1.4),
-                                                  ),
-                                          ),
-                                        ],
                                       ),
                                     ),
-                                  ),
-                                ),
-                                // КБЖУ и аллергены (только для блюда)
-                                if (!_isSemiFinished && !tableOnlyView)
-                                  RepaintBoundary(
-                                    child: Builder(
-                                      builder: (ctx) {
-                                        final store = context
-                                            .read<ProductStoreSupabase>();
-                                        _ensureDishKbjuDerived(loc, store);
+                                    // КБЖУ и аллергены (только для блюда)
+                                    if (!_isSemiFinished && !tableOnlyView)
+                                      RepaintBoundary(
+                                        child: Builder(
+                                          builder: (ctx) {
+                                            final store = context
+                                                .read<ProductStoreSupabase>();
+                                            _ensureDishKbjuDerived(loc, store);
 
-                                        final totalCal = _dishKbjuTotalCal;
-                                        final totalProt = _dishKbjuTotalProt;
-                                        final totalFatVal = _dishKbjuTotalFat;
-                                        final totalCarbVal = _dishKbjuTotalCarb;
-                                        final missingNutritionIngredients =
-                                            _dishKbjuMissingNames;
-                                        final allergenStr =
-                                            _dishKbjuAllergenStr ??
-                                                (loc.currentLanguageCode == 'ru'
-                                                    ? 'нет'
-                                                    : 'none');
+                                            final totalCal = _dishKbjuTotalCal;
+                                            final totalProt =
+                                                _dishKbjuTotalProt;
+                                            final totalFatVal =
+                                                _dishKbjuTotalFat;
+                                            final totalCarbVal =
+                                                _dishKbjuTotalCarb;
+                                            final missingNutritionIngredients =
+                                                _dishKbjuMissingNames;
+                                            final allergenStr =
+                                                _dishKbjuAllergenStr ??
+                                                    (loc.currentLanguageCode ==
+                                                            'ru'
+                                                        ? 'нет'
+                                                        : 'none');
 
-                                        final showKbjuBlock = !(totalCal == 0 &&
-                                            totalProt == 0 &&
-                                            totalFatVal == 0 &&
-                                            totalCarbVal == 0);
+                                            final showKbjuBlock =
+                                                !(totalCal == 0 &&
+                                                    totalProt == 0 &&
+                                                    totalFatVal == 0 &&
+                                                    totalCarbVal == 0);
 
-                                        final kbjuMarginTop =
-                                            missingNutritionIngredients
-                                                    .isNotEmpty
-                                                ? 8.0
-                                                : 12.0;
+                                            final kbjuMarginTop =
+                                                missingNutritionIngredients
+                                                        .isNotEmpty
+                                                    ? 8.0
+                                                    : 12.0;
 
-                                        String? warningText;
-                                        if (missingNutritionIngredients
-                                            .isNotEmpty) {
-                                          const maxShown = 5;
-                                          final shown =
-                                              missingNutritionIngredients
-                                                  .take(maxShown)
-                                                  .join(', ');
-                                          final remaining =
-                                              missingNutritionIngredients
-                                                      .length -
+                                            String? warningText;
+                                            if (missingNutritionIngredients
+                                                .isNotEmpty) {
+                                              const maxShown = 5;
+                                              final shown =
                                                   missingNutritionIngredients
                                                       .take(maxShown)
-                                                      .length;
-                                          final listText = remaining > 0
-                                              ? '$shown (+$remaining)'
-                                              : shown;
-                                          warningText = loc
-                                              .t('kbju_incomplete_dish_nutrition_warning')
-                                              .replaceFirst('%s', listText);
-                                        }
+                                                      .join(', ');
+                                              final remaining =
+                                                  missingNutritionIngredients
+                                                          .length -
+                                                      missingNutritionIngredients
+                                                          .take(maxShown)
+                                                          .length;
+                                              final listText = remaining > 0
+                                                  ? '$shown (+$remaining)'
+                                                  : shown;
+                                              warningText = loc
+                                                  .t('kbju_incomplete_dish_nutrition_warning')
+                                                  .replaceFirst('%s', listText);
+                                            }
 
-                                        void showMissingNutritionDialog() {
-                                          if (missingNutritionIngredients
-                                              .isEmpty) {
-                                            return;
-                                          }
-                                          showDialog<void>(
-                                            context: ctx,
-                                            builder: (dCtx) {
-                                              return AlertDialog(
-                                                title: Text(
-                                                  loc.t(
-                                                      'kbju_incomplete_dish_nutrition_title'),
-                                                ),
-                                                content: SizedBox(
-                                                  width: 520,
-                                                  height: 320,
-                                                  child: ListView.builder(
-                                                    itemCount:
-                                                        missingNutritionIngredients
-                                                            .length,
-                                                    itemBuilder: (c, idx) {
-                                                      final name =
-                                                          missingNutritionIngredients[
-                                                              idx];
-                                                      return ListTile(
-                                                        dense: true,
-                                                        title: Text(
-                                                          name,
-                                                          maxLines: 2,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.of(dCtx)
-                                                            .pop(),
-                                                    child: Text(
-                                                        loc.t('dialog_ok')),
-                                                  ),
-                                                ],
+                                            void showMissingNutritionDialog() {
+                                              if (missingNutritionIngredients
+                                                  .isEmpty) {
+                                                return;
+                                              }
+                                              showDialog<void>(
+                                                context: ctx,
+                                                builder: (dCtx) {
+                                                  return AlertDialog(
+                                                    title: Text(
+                                                      loc.t(
+                                                          'kbju_incomplete_dish_nutrition_title'),
+                                                    ),
+                                                    content: SizedBox(
+                                                      width: 520,
+                                                      height: 320,
+                                                      child: ListView.builder(
+                                                        itemCount:
+                                                            missingNutritionIngredients
+                                                                .length,
+                                                        itemBuilder: (c, idx) {
+                                                          final name =
+                                                              missingNutritionIngredients[
+                                                                  idx];
+                                                          return ListTile(
+                                                            dense: true,
+                                                            title: Text(
+                                                              name,
+                                                              maxLines: 2,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.of(dCtx)
+                                                                .pop(),
+                                                        child: Text(
+                                                            loc.t('dialog_ok')),
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
                                               );
-                                            },
-                                          );
-                                        }
+                                            }
 
-                                        if (!showKbjuBlock) {
-                                          if (warningText == null) {
-                                            return const SizedBox.shrink();
-                                          }
-                                          return Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                              Container(
-                                                margin: const EdgeInsets.only(
-                                                    top: 12),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
+                                            if (!showKbjuBlock) {
+                                              if (warningText == null) {
+                                                return const SizedBox.shrink();
+                                              }
+                                              return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Container(
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            top: 12),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
                                                         horizontal: 12,
                                                         vertical: 10),
-                                                decoration: BoxDecoration(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .errorContainer
-                                                      .withOpacity(0.18),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .error
-                                                        .withOpacity(0.35),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  warningText,
-                                                  style: const TextStyle(
-                                                      fontSize: 13),
-                                                ),
-                                              ),
-                                              Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: TextButton(
-                                                  onPressed:
-                                                      showMissingNutritionDialog,
-                                                  child: Text(
-                                                    loc.t(
-                                                        'kbju_incomplete_dish_nutrition_show_list'),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        }
-
-                                        return Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            if (warningText != null)
-                                              Container(
-                                                margin: const EdgeInsets.only(
-                                                    top: 12, bottom: 8),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10),
-                                                decoration: BoxDecoration(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .errorContainer
-                                                      .withOpacity(0.18),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .error
-                                                        .withOpacity(0.35),
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .errorContainer
+                                                          .withOpacity(0.18),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      border: Border.all(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .error
+                                                            .withOpacity(0.35),
+                                                      ),
+                                                    ),
+                                                    child: Text(
                                                       warningText,
                                                       style: const TextStyle(
                                                           fontSize: 13),
                                                     ),
-                                                    Align(
-                                                      alignment:
-                                                          Alignment.centerLeft,
-                                                      child: TextButton(
-                                                        onPressed:
-                                                            showMissingNutritionDialog,
-                                                        child: Text(
-                                                          loc.t(
-                                                              'kbju_incomplete_dish_nutrition_show_list'),
-                                                        ),
+                                                  ),
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: TextButton(
+                                                      onPressed:
+                                                          showMissingNutritionDialog,
+                                                      child: Text(
+                                                        loc.t(
+                                                            'kbju_incomplete_dish_nutrition_show_list'),
                                                       ),
                                                     ),
-                                                  ],
-                                                ),
-                                              ),
-                                            Container(
-                                              margin: EdgeInsets.only(
-                                                  top: kbjuMarginTop),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
+                                                  ),
+                                                ],
+                                              );
+                                            }
+
+                                            return Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                if (warningText != null)
+                                                  Container(
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            top: 12, bottom: 8),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 10),
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .errorContainer
+                                                          .withOpacity(0.18),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      border: Border.all(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .error
+                                                            .withOpacity(0.35),
+                                                      ),
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          warningText,
+                                                          style:
+                                                              const TextStyle(
+                                                                  fontSize: 13),
+                                                        ),
+                                                        Align(
+                                                          alignment: Alignment
+                                                              .centerLeft,
+                                                          child: TextButton(
+                                                            onPressed:
+                                                                showMissingNutritionDialog,
+                                                            child: Text(
+                                                              loc.t(
+                                                                  'kbju_incomplete_dish_nutrition_show_list'),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                Container(
+                                                  margin: EdgeInsets.only(
+                                                      top: kbjuMarginTop),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
                                                       horizontal: 12,
                                                       vertical: 10),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primaryContainer
-                                                    .withOpacity(0.3),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                border: Border.all(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withOpacity(0.3),
+                                                  decoration: BoxDecoration(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primaryContainer
+                                                        .withOpacity(0.3),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    border: Border.all(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withOpacity(0.3),
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    loc
+                                                        .t(
+                                                            'kbju_allergens_in_dish')
+                                                        .replaceFirst(
+                                                            '%s',
+                                                            totalCal
+                                                                .round()
+                                                                .toString())
+                                                        .replaceFirst(
+                                                            '%s',
+                                                            totalProt
+                                                                .toStringAsFixed(
+                                                                    1))
+                                                        .replaceFirst(
+                                                            '%s',
+                                                            totalFatVal
+                                                                .toStringAsFixed(
+                                                                    1))
+                                                        .replaceFirst(
+                                                            '%s',
+                                                            totalCarbVal
+                                                                .toStringAsFixed(
+                                                                    1))
+                                                        .replaceFirst(
+                                                            '%s', allergenStr),
+                                                    style: const TextStyle(
+                                                        fontSize: 13),
+                                                  ),
                                                 ),
-                                              ),
-                                              child: Text(
-                                                loc
-                                                    .t('kbju_allergens_in_dish')
-                                                    .replaceFirst(
-                                                        '%s',
-                                                        totalCal
-                                                            .round()
-                                                            .toString())
-                                                    .replaceFirst(
-                                                        '%s',
-                                                        totalProt
-                                                            .toStringAsFixed(1))
-                                                    .replaceFirst(
-                                                        '%s',
-                                                        totalFatVal
-                                                            .toStringAsFixed(1))
-                                                    .replaceFirst(
-                                                        '%s',
-                                                        totalCarbVal
-                                                            .toStringAsFixed(1))
-                                                    .replaceFirst(
-                                                        '%s', allergenStr),
-                                                style: const TextStyle(
-                                                    fontSize: 13),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
-                                if (!tableOnlyView)
-                                  _buildPhotoSection(loc, effectiveCanEdit),
-                                // Описание и состав для зала (только для блюд)
-                                if (!_isSemiFinished && !tableOnlyView)
-                                  _buildHallFieldsSection(
-                                      loc, effectiveCanEdit),
-                                if (effectiveCanEdit)
-                                  SafeArea(
-                                    top: false,
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          12, 12, 12, 12),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Row(
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
+                                    if (!tableOnlyView)
+                                      _buildPhotoSection(loc, effectiveCanEdit),
+                                    // Описание и состав для зала (только для блюд)
+                                    if (!_isSemiFinished && !tableOnlyView)
+                                      _buildHallFieldsSection(
+                                          loc, effectiveCanEdit),
+                                    if (effectiveCanEdit)
+                                      SafeArea(
+                                        top: false,
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              12, 12, 12, 12),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              FilledButton(
-                                                onPressed:
-                                                    _saving ? null : _save,
-                                                child: _saving
-                                                    ? SizedBox(
-                                                        width: 20,
-                                                        height: 20,
-                                                        child:
-                                                            CircularProgressIndicator(
+                                              Row(
+                                                children: [
+                                                  FilledButton(
+                                                    onPressed:
+                                                        _saving ? null : _save,
+                                                    child: _saving
+                                                        ? SizedBox(
+                                                            width: 20,
+                                                            height: 20,
+                                                            child: CircularProgressIndicator(
                                                                 strokeWidth: 2,
                                                                 color: Theme.of(
                                                                         context)
                                                                     .colorScheme
                                                                     .onPrimary))
-                                                    : Text(loc.t('save')),
-                                                style: FilledButton.styleFrom(
-                                                    minimumSize:
-                                                        const Size(120, 48),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 24,
-                                                        vertical: 14)),
-                                              ),
-                                              const SizedBox(width: 16),
-                                              TextButton.icon(
-                                                icon: Icon(Icons.clear_all,
-                                                    size: 20,
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface),
-                                                label: Text(
-                                                    loc.t('clear_ttk_form')),
-                                                onPressed: () =>
-                                                    _confirmClearForm(
-                                                        context, loc),
-                                                style: TextButton.styleFrom(
-                                                    minimumSize:
-                                                        const Size(100, 48),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 16)),
-                                              ),
-                                              if (!_isNew) ...[
-                                                const SizedBox(width: 16),
-                                                TextButton.icon(
-                                                  icon: Icon(
-                                                      Icons.delete_outline,
-                                                      size: 20,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .error),
-                                                  label: Text(
-                                                      loc.t('delete_tech_card'),
-                                                      style: TextStyle(
+                                                        : Text(loc.t('save')),
+                                                    style:
+                                                        FilledButton.styleFrom(
+                                                            minimumSize:
+                                                                const Size(120,
+                                                                    48),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        24,
+                                                                    vertical:
+                                                                        14)),
+                                                  ),
+                                                  const SizedBox(width: 16),
+                                                  TextButton.icon(
+                                                    icon: Icon(Icons.clear_all,
+                                                        size: 20,
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface),
+                                                    label: Text(loc
+                                                        .t('clear_ttk_form')),
+                                                    onPressed: () =>
+                                                        _confirmClearForm(
+                                                            context, loc),
+                                                    style: TextButton.styleFrom(
+                                                        minimumSize:
+                                                            const Size(100, 48),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal:
+                                                                    16)),
+                                                  ),
+                                                  if (!_isNew) ...[
+                                                    const SizedBox(width: 16),
+                                                    TextButton.icon(
+                                                      icon: Icon(
+                                                          Icons.delete_outline,
+                                                          size: 20,
                                                           color:
                                                               Theme.of(context)
                                                                   .colorScheme
+                                                                  .error),
+                                                      label: Text(
+                                                          loc.t(
+                                                              'delete_tech_card'),
+                                                          style: TextStyle(
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
                                                                   .error)),
+                                                      onPressed: () =>
+                                                          _confirmDelete(
+                                                              context, loc),
+                                                      style: TextButton.styleFrom(
+                                                          minimumSize:
+                                                              const Size(
+                                                                  120, 48),
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      16)),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              if (!_isNew) ...[
+                                                const SizedBox(height: 8),
+                                                TextButton.icon(
+                                                  icon: Icon(Icons.history,
+                                                      size: 16,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant),
+                                                  label: Text(
+                                                      loc.t('ttk_history'),
+                                                      style: TextStyle(
+                                                          fontSize: 13,
+                                                          color: Theme.of(
+                                                                  context)
+                                                              .colorScheme
+                                                              .onSurfaceVariant)),
                                                   onPressed: () =>
-                                                      _confirmDelete(
-                                                          context, loc),
+                                                      _showTechCardHistory(
+                                                          context),
                                                   style: TextButton.styleFrom(
                                                       minimumSize:
-                                                          const Size(120, 48),
+                                                          const Size(0, 36),
                                                       padding: const EdgeInsets
                                                           .symmetric(
-                                                          horizontal: 16)),
+                                                          horizontal: 0)),
                                                 ),
                                               ],
                                             ],
                                           ),
-                                          if (!_isNew) ...[
-                                            const SizedBox(height: 8),
-                                            TextButton.icon(
-                                              icon: Icon(Icons.history,
-                                                  size: 16,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurfaceVariant),
-                                              label: Text(loc.t('ttk_history'),
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurfaceVariant)),
-                                              onPressed: () =>
-                                                  _showTechCardHistory(context),
-                                              style: TextButton.styleFrom(
-                                                  minimumSize:
-                                                      const Size(0, 36),
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 0)),
-                                            ),
-                                          ],
-                                        ],
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                              ],
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
