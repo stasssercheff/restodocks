@@ -1626,6 +1626,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       controller.text = value;
     }
 
+    final verticalPadding = ((rowHeight - 14) / 2).clamp(0.0, 24.0);
     return SizedBox(
       height: rowHeight,
       child: widget.canEdit
@@ -1655,16 +1656,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     textAlign: TextAlign.center,
                     textAlignVertical: TextAlignVertical.center,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       border: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       disabledBorder: InputBorder.none,
                       errorBorder: InputBorder.none,
                       focusedErrorBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: verticalPadding),
                       isDense: true,
-                      isCollapsed: true,
                       filled: false,
                     ),
                     onChanged: (v) {
@@ -1726,6 +1727,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 child: DropdownButton<String?>(
                   isExpanded: true,
                   isDense: true,
+                  itemHeight: _kTtkIngredientRowHeight,
                   alignment: Alignment.center,
                   hint: Text(widget.loc.t('ttk_cooking_method'),
                       style: const TextStyle(fontSize: 12)),
@@ -1733,8 +1735,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   items: [
                     DropdownMenuItem<String?>(
                       value: null,
-                      child: Text(widget.loc.t('dash'),
-                          style: const TextStyle(fontSize: 12)),
+                      child: Center(
+                        child: Text(
+                          widget.loc.t('dash'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
                     ),
                     ...CookingProcess.defaultProcesses.map((process) {
                       return DropdownMenuItem<String?>(
