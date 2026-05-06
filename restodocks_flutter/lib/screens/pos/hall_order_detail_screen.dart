@@ -700,6 +700,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   Future<void> _addDish(
     TechCard tc,
     LocalizationService loc, {
+    double quantity = 1,
+    String? comment,
     int courseNumber = 1,
     int? guestNumber,
   }) async {
@@ -707,7 +709,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       await PosOrderService.instance.addLine(
         orderId: widget.orderId,
         techCardId: tc.id,
-        quantity: 1,
+        quantity: quantity,
+        comment: comment,
         courseNumber: courseNumber,
         guestNumber: guestNumber,
       );
@@ -988,11 +991,13 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
           loading: _menuLoading,
           guestCount: guestCount,
           initialGuestNumber: initialGuest,
-          onPick: (tc, courseNumber, guestNumber) async {
+          onPick: (tc, quantity, comment, courseNumber, guestNumber) async {
             Navigator.pop(ctx);
             await _addDish(
               tc,
               loc,
+              quantity: quantity,
+              comment: comment,
               courseNumber: courseNumber,
               guestNumber: guestNumber,
             );
@@ -1804,7 +1809,13 @@ class _AddDishSheet extends StatefulWidget {
   final bool loading;
   final int guestCount;
   final int? initialGuestNumber;
-  final Future<void> Function(TechCard tc, int courseNumber, int? guestNumber)
+  final Future<void> Function(
+    TechCard tc,
+    double quantity,
+    String? comment,
+    int courseNumber,
+    int? guestNumber,
+  )
       onPick;
 
   @override
@@ -1813,6 +1824,8 @@ class _AddDishSheet extends StatefulWidget {
 
 class _AddDishSheetState extends State<_AddDishSheet> {
   final _search = TextEditingController();
+  final _qty = TextEditingController(text: '1');
+  final _comment = TextEditingController();
   String _tab = 'kitchen';
   int _course = 1;
   int? _guest;
@@ -1829,6 +1842,8 @@ class _AddDishSheetState extends State<_AddDishSheet> {
   @override
   void dispose() {
     _search.dispose();
+    _qty.dispose();
+    _comment.dispose();
     super.dispose();
   }
 
@@ -1967,6 +1982,41 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  SizedBox(
+                    width: 130,
+                    child: TextField(
+                      controller: _qty,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: loc.t('pos_order_line_qty'),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _comment,
+                      maxLines: 1,
+                      decoration: InputDecoration(
+                        labelText: loc.t('pos_order_line_comment'),
+                        hintText: loc.t('pos_order_line_comment_hint'),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 4),
             Expanded(
               child: widget.loading && widget.dishes.isEmpty
@@ -2011,7 +2061,25 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                                       ),
                                     )
                                   : null,
-                              onTap: () => widget.onPick(tc, _course, _guest),
+                              onTap: () {
+                                final qtyRaw =
+                                    _qty.text.replaceAll(',', '.').trim();
+                                final qty = double.tryParse(qtyRaw);
+                                if (qty == null || qty <= 0) {
+                                  AppToastService.show(
+                                    loc.t('pos_order_line_qty_invalid'),
+                                  );
+                                  return;
+                                }
+                                final comment = _comment.text.trim();
+                                widget.onPick(
+                                  tc,
+                                  qty,
+                                  comment.isEmpty ? null : comment,
+                                  _course,
+                                  _guest,
+                                );
+                              },
                             );
                           },
                         ),
