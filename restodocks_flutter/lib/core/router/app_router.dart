@@ -530,6 +530,13 @@ class AppRouter {
             ),
           ),
           GoRoute(
+            path: '/pos/orders-display',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosOrdersDisplayHubScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/settings/fiscal-tax',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,

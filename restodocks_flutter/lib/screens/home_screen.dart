@@ -549,6 +549,7 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
     final canOpenShifts = posOn &&
         (posCanManageHallTables(employee) ||
             posCanViewPosShiftReport(employee) ||
+            employee.department == 'kitchen' ||
             employee.department == 'hall' ||
             employee.department == 'dining_room');
     final loc = context.watch<LocalizationService>();
@@ -585,7 +586,7 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
             if (canOpenShifts) ...[
               ListTile(
                 leading: const Icon(Icons.badge_outlined),
-                title: Text(loc.t('pos_cash_tab_shift')),
+                title: const Text('Экран заказов'),
                 subtitle: _cabinetShiftHintLoaded
                     ? Text(
                         _cabinetShiftOpen == true
@@ -595,19 +596,10 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
                     : null,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
-                  await context.push('/pos/hall/cash-register?tab=shift');
+                  await context.push('/pos/orders-display');
                   if (mounted) await _reloadCabinetShiftHint();
                 },
               ),
-              if (posCanConfigureOrdersDisplay(employee))
-                ListTile(
-                  leading: const Icon(Icons.cast_connected),
-                  title: Text(loc.t('pos_kds_link_settings_title')),
-                  subtitle: Text(loc.t('pos_kds_link_settings_subtitle')),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      context.push('/settings/kitchen-display-link'),
-                ),
             ],
             const Divider(),
             ListTile(

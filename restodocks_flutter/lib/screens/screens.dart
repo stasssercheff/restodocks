@@ -74,6 +74,7 @@ export 'pos/pos_kitchen_display_screen.dart';
 export 'pos/pos_kitchen_display_public_screen.dart';
 export 'pos/pos_kitchen_display_link_settings_screen.dart';
 export 'pos/kds_public_url.dart';
+export 'pos/pos_orders_display_hub_screen.dart';
 export 'sales/kitchen_bar_sales_hub_screen.dart';
 export 'sales/kitchen_bar_sales_statistics_screen.dart';
 export 'sales/kitchen_bar_sales_plan_screen.dart';

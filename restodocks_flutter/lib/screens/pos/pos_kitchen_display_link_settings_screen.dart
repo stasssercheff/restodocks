@@ -136,13 +136,21 @@ class _PosKitchenDisplayLinkSettingsScreenState
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
+      final raw = _error.toString();
+      final missingMigration = raw.contains('pos_kitchen_display_tokens') &&
+          (raw.contains('PGRST205') || raw.contains('404'));
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('${loc.t('error')}: $_error', textAlign: TextAlign.center),
+              Text(
+                missingMigration
+                    ? 'Нужна миграция БД для внешнего экрана заказов. Примените последние SQL-миграции и повторите.'
+                    : '${loc.t('error')}: $_error',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _load,
