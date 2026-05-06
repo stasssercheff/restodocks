@@ -113,6 +113,19 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     }
   }
 
+  String _cashRegisterAppBarTitle(LocalizationService loc) {
+    switch (_tabController.index) {
+      case 0:
+        return loc.t('pos_cash_tab_orders');
+      case 1:
+        return loc.t('pos_cash_tab_disbursements');
+      case 2:
+        return loc.t('pos_cash_tab_shift');
+      default:
+        return loc.t('pos_hall_cash_title');
+    }
+  }
+
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
       case PosOrderStatus.draft:
@@ -496,7 +509,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('pos_hall_cash_title')),
+        title: Text(_cashRegisterAppBarTitle(loc)),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -708,6 +721,12 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               onPressed: () => _openShiftDialog(loc),
               icon: const Icon(Icons.lock_open),
               label: Text(loc.t('pos_cash_shift_open_action')),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => context.push('/pos/kds/kitchen'),
+              icon: const Icon(Icons.restaurant_menu),
+              label: Text(loc.t('pos_kds_title')),
             ),
           ] else ...[
             Text(

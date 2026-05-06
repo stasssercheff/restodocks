@@ -417,11 +417,45 @@ class PersonalCabinetScreen extends StatefulWidget {
 class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
   bool _tourCheckDone = false;
   SpotlightController? _tourController;
+  bool _cabinetShiftHintLoaded = false;
+  bool? _cabinetShiftOpen;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTour());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTour();
+      _reloadCabinetShiftHint();
+    });
+  }
+
+  Future<void> _reloadCabinetShiftHint() async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est == null) {
+      if (mounted) {
+        setState(() {
+          _cabinetShiftHintLoaded = true;
+          _cabinetShiftOpen = null;
+        });
+      }
+      return;
+    }
+    try {
+      final shift =
+          await PosCashHallService.instance.fetchActiveShift(est.id);
+      if (!mounted) return;
+      setState(() {
+        _cabinetShiftOpen = shift != null;
+        _cabinetShiftHintLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cabinetShiftOpen = null;
+        _cabinetShiftHintLoaded = true;
+      });
+    }
   }
 
   Future<void> _maybeShowTour() async {
@@ -548,14 +582,31 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
               ),
               'cabinet-settings',
             ),
-            if (canOpenShifts)
+            if (canOpenShifts) ...[
               ListTile(
                 leading: const Icon(Icons.badge_outlined),
                 title: Text(loc.t('pos_cash_tab_shift')),
-                subtitle: Text(loc.t('pos_cash_shift_active')),
+                subtitle: _cabinetShiftHintLoaded
+                    ? Text(
+                        _cabinetShiftOpen == true
+                            ? loc.t('pos_cash_shift_active')
+                            : loc.t('pos_cash_shift_closed_short'),
+                      )
+                    : null,
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/pos/hall/cash-register?tab=shift'),
+                onTap: () async {
+                  await context.push('/pos/hall/cash-register?tab=shift');
+                  if (mounted) await _reloadCabinetShiftHint();
+                },
               ),
+              ListTile(
+                leading: const Icon(Icons.restaurant_menu),
+                title: Text(loc.t('pos_kds_title')),
+                subtitle: Text(loc.t('pos_kds_hint')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/pos/kds/kitchen'),
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),

@@ -117,41 +117,62 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
             title: Text(existing == null
                 ? loc.t('pos_tables_manage_add')
                 : loc.t('pos_tables_manage_edit')),
+            contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
                     controller: floorCtrl,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_tables_field_floor')),
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_tables_field_floor'),
+                    ),
                   ),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: roomCtrl,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_tables_field_room')),
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_tables_field_room'),
+                    ),
                   ),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: numCtrl,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_tables_field_number')),
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_tables_field_number'),
+                    ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: sortCtrl,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_tables_field_sort')),
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_tables_field_sort'),
+                    ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'-?[0-9]*'))
                     ],
                   ),
+                  const SizedBox(height: 14),
                   DropdownButtonFormField<PosTableStatus>(
                     key: ValueKey(status),
                     initialValue: status,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_tables_field_status')),
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_tables_field_status'),
+                    ),
                     items: PosTableStatus.values.map((s) {
                       return DropdownMenuItem(
                         value: s,
@@ -265,21 +286,8 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
         leading: appBarBackButton(context),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(loc.t('pos_tables_manage_title')),
-            Text(
-              loc.t('pos_tables_manage_owner_hint'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
+        title: Text(loc.t('pos_tables_manage_title')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
