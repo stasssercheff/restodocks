@@ -74,6 +74,7 @@ bool _isPlatformAdmin(String email) =>
 /// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
 bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
+  if (loc.startsWith('/display/kds/')) return true;
   if (loc.startsWith('/login') ||
       loc.startsWith('/register') ||
       loc.startsWith('/register-co-owner') ||
@@ -213,6 +214,7 @@ class AppRouter {
         final isProcurementInProd = p.startsWith('/pos/procurement/');
         if ((p.startsWith('/pos') && !isProcurementInProd) ||
             p == '/settings/orders-display' ||
+            p == '/settings/kitchen-display-link' ||
             p == '/settings/fiscal-tax' ||
             p == '/settings/fiscal-outbox') {
           return '/';
@@ -341,6 +343,16 @@ class AppRouter {
           state,
           const LegalDocumentScreen(type: LegalDocumentType.publicOffer),
         ),
+      ),
+      GoRoute(
+        path: '/display/kds/:department',
+        pageBuilder: (context, state) {
+          final dept = state.pathParameters['department'] ?? 'kitchen';
+          return _slideTransitionPage(
+            state,
+            PosKitchenDisplayPublicScreen(department: dept),
+          );
+        },
       ),
       // Редирект Supabase после подтверждения email — восстанавливаем сессию и ведём в /home
       GoRoute(
@@ -508,6 +520,13 @@ class AppRouter {
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
               const PosOrdersDisplaySettingsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/settings/kitchen-display-link',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosKitchenDisplayLinkSettingsScreen(),
             ),
           ),
           GoRoute(

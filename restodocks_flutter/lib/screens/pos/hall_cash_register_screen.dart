@@ -546,7 +546,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
                   children: [
                     _ordersTab(loc, timeFmt),
                     _disbursementsTab(loc),
-                    _shiftTab(loc, timeFmt),
+                    _shiftTab(loc, timeFmt, emp),
                   ],
                 ),
       floatingActionButton: _tabController.index == 1 && !_loading && _error == null
@@ -704,7 +704,8 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     );
   }
 
-  Widget _shiftTab(LocalizationService loc, DateFormat timeFmt) {
+  Widget _shiftTab(
+      LocalizationService loc, DateFormat timeFmt, Employee? emp) {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -723,11 +724,19 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               label: Text(loc.t('pos_cash_shift_open_action')),
             ),
             const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: () => context.push('/pos/kds/kitchen'),
-              icon: const Icon(Icons.restaurant_menu),
-              label: Text(loc.t('pos_kds_title')),
-            ),
+            if (posCanConfigureOrdersDisplay(emp))
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/settings/kitchen-display-link'),
+                icon: const Icon(Icons.cast_connected),
+                label: Text(loc.t('pos_kds_link_settings_title')),
+              )
+            else
+              TextButton.icon(
+                onPressed: () => context.push('/pos/kds/kitchen'),
+                icon: const Icon(Icons.restaurant_menu),
+                label: Text(loc.t('pos_kds_title')),
+              ),
           ] else ...[
             Text(
               loc.t('pos_cash_shift_active'),
@@ -768,6 +777,15 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               icon: const Icon(Icons.receipt_long),
               label: Text(loc.t('pos_cash_tab_orders')),
             ),
+            if (posCanConfigureOrdersDisplay(emp)) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/settings/kitchen-display-link'),
+                icon: const Icon(Icons.cast_connected),
+                label: Text(loc.t('pos_kds_link_settings_short')),
+              ),
+            ],
             const SizedBox(height: 12),
             Text(
               'Аудитория отчета закрытия: ${_shiftReportAudience.isAll ? 'Весь объект' : 'Только выбранные зоны (${_shiftReportAudience.zones.map((z) => _zoneLabel(loc, z)).join(', ')})'}',

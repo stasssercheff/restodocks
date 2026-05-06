@@ -599,13 +599,15 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
                   if (mounted) await _reloadCabinetShiftHint();
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.restaurant_menu),
-                title: Text(loc.t('pos_kds_title')),
-                subtitle: Text(loc.t('pos_kds_hint')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/pos/kds/kitchen'),
-              ),
+              if (posCanConfigureOrdersDisplay(employee))
+                ListTile(
+                  leading: const Icon(Icons.cast_connected),
+                  title: Text(loc.t('pos_kds_link_settings_title')),
+                  subtitle: Text(loc.t('pos_kds_link_settings_subtitle')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      context.push('/settings/kitchen-display-link'),
+                ),
             ],
             const Divider(),
             ListTile(
