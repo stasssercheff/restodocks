@@ -33,7 +33,10 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   DateTime? _highlightUntil;
   bool _soundEnabled = true;
   bool _autoRefreshEnabled = true;
+  bool _clock24h = true;
   Timer? _autoRefreshTimer;
+  Timer? _clockTimer;
+  DateTime _now = DateTime.now();
 
   @override
   void initState() {
@@ -58,7 +61,9 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       final prefs = await SharedPreferences.getInstance();
       _soundEnabled = prefs.getBool('kds_public_sound_enabled') ?? true;
       _autoRefreshEnabled = prefs.getBool('kds_public_auto_refresh') ?? true;
+      _clock24h = prefs.getBool('kds_public_clock_24h') ?? true;
       _restartAutoRefresh();
+      _restartClock();
       if (mounted) setState(() {});
     } catch (_) {}
   }
@@ -68,6 +73,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('kds_public_sound_enabled', _soundEnabled);
       await prefs.setBool('kds_public_auto_refresh', _autoRefreshEnabled);
+      await prefs.setBool('kds_public_clock_24h', _clock24h);
     } catch (_) {}
   }
 
@@ -77,6 +83,14 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!mounted || _loading) return;
       _load(silent: true);
+    });
+  }
+
+  void _restartClock() {
+    _clockTimer?.cancel();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
     });
   }
 
@@ -142,6 +156,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
@@ -158,7 +173,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: context.canPop(),
-          title: Text(loc.t('pos_kds_public_title')),
+          title: _kdsTitle(context, loc),
           actions: [
             IconButton(
               icon: const Icon(Icons.tune),
@@ -176,6 +191,41 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
         body: _body(context, loc, bigStyle),
       ),
     );
+  }
+
+  Widget _kdsTitle(BuildContext context, LocalizationService loc) {
+    return LayoutBuilder(
+      builder: (ctx, c) {
+        final time = _formatClock(_now, use24h: _clock24h);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(loc.t('pos_kds_public_title')),
+            ),
+            Text(
+              time,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatClock(DateTime dt, {required bool use24h}) {
+    final hh = dt.hour;
+    final mm = dt.minute.toString().padLeft(2, '0');
+    if (use24h) {
+      return '${hh.toString().padLeft(2, '0')}:$mm';
+    }
+    final h12raw = hh % 12;
+    final h12 = (h12raw == 0 ? 12 : h12raw).toString();
+    final suffix = hh >= 12 ? 'PM' : 'AM';
+    return '$h12:$mm $suffix';
   }
 
   Widget _body(
@@ -358,8 +408,8 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     final data = row.techCardPreviewByLineId[line.id];
     final name =
         data?['dish_name']?.toString() ?? line.dishTitleForLang(loc.currentLanguageCode);
-    final comp = data?['composition_for_hall']?.toString() ?? '';
-    final desc = data?['description_for_hall']?.toString() ?? '';
+    final portion = (data?['portion_weight'] as num?)?.toDouble();
+    final yieldG = (data?['yield'] as num?)?.toDouble();
     final lang = loc.currentLanguageCode;
     dynamic techLocalized = data?['technology_localized'];
     String tech = '';
@@ -371,6 +421,17 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
           .trim();
     }
 
+    final ingredients = <TTIngredient>[];
+    final rawIngredients = data?['ingredients'];
+    if (rawIngredients is List) {
+      for (final e in rawIngredients) {
+        if (e is! Map) continue;
+        try {
+          ingredients.add(TTIngredient.fromJson(Map<String, dynamic>.from(e)));
+        } catch (_) {}
+      }
+    }
+
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -380,17 +441,63 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (desc.isNotEmpty) Text(desc),
-              if (comp.isNotEmpty) ...[
-                if (desc.isNotEmpty) const SizedBox(height: 12),
-                Text(comp),
+              if (portion != null && portion > 0)
+                Text('${loc.t('portion_weight')}: ${portion.toStringAsFixed(0)}'),
+              if (yieldG != null && yieldG > 0)
+                Text('${loc.t('yield_g')}: ${yieldG.toStringAsFixed(0)}'),
+              if ((portion != null && portion > 0) || (yieldG != null && yieldG > 0))
+                const SizedBox(height: 12),
+              if (ingredients.isNotEmpty) ...[
+                Text(
+                  loc.t('tech_cards_ingredients_count')
+                      .replaceAll('%s', '${ingredients.length}'),
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                for (final ing in ingredients)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ing.sourceTechCardName?.trim().isNotEmpty == true
+                                ? '${ing.productName} (${ing.sourceTechCardName})'
+                                : ing.productName,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${loc.t('ttk_gross')}: ${ing.grossWeight.toStringAsFixed(0)}',
+                          style: Theme.of(ctx).textTheme.bodySmall,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '${loc.t('ttk_net')}: ${ing.netWeight.toStringAsFixed(0)}',
+                          style: Theme.of(ctx).textTheme.bodySmall,
+                        ),
+                        if (ing.outputWeight > 0) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            '${loc.t('ttk_output')}: ${ing.outputWeight.toStringAsFixed(0)}',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
               ],
               if (tech.isNotEmpty) ...[
-                if (desc.isNotEmpty || comp.isNotEmpty)
-                  const SizedBox(height: 12),
+                if (ingredients.isNotEmpty) const SizedBox(height: 12),
                 Text(tech),
               ],
-              if (desc.isEmpty && comp.isEmpty && tech.isEmpty)
+              if ((portion == null || portion == 0) &&
+                  (yieldG == null || yieldG == 0) &&
+                  ingredients.isEmpty &&
+                  tech.isEmpty)
                 Text(loc.t('pos_kds_public_ttk_empty')),
             ],
           ),
@@ -424,67 +531,80 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     final loc = context.read<LocalizationService>();
     final initialSound = _soundEnabled;
     final initialAuto = _autoRefreshEnabled;
+    final initialClock = _clock24h;
     var localSound = _soundEnabled;
     var localAuto = _autoRefreshEnabled;
+    var localClock = _clock24h;
     final selectedLang = ValueNotifier<String>(loc.currentLanguageCode);
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  value: localAuto,
-                  onChanged: (v) => setLocal(() => localAuto = v),
-                  title: const Text('Auto refresh'),
-                ),
-                SwitchListTile(
-                  value: localSound,
-                  onChanged: (v) => setLocal(() => localSound = v),
-                  title: const Text('Sound on new items'),
-                ),
-                const SizedBox(height: 8),
-                ValueListenableBuilder<String>(
-                  valueListenable: selectedLang,
-                  builder: (_, value, __) {
-                    return DropdownButtonFormField<String>(
-                      initialValue: value,
-                      items: const [
-                        DropdownMenuItem(value: 'ru', child: Text('Русский')),
-                        DropdownMenuItem(value: 'en', child: Text('English')),
-                        DropdownMenuItem(value: 'es', child: Text('Español')),
-                        DropdownMenuItem(value: 'kk', child: Text('Қазақша')),
-                      ],
-                      onChanged: (v) {
-                        if (v == null) return;
-                        selectedLang.value = v;
-                      },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Language',
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Done'),
-                ),
-              ],
-            ),
-          );
-        },
+      builder: (ctx) => AlertDialog(
+        contentPadding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    value: localAuto,
+                    onChanged: (v) => setLocal(() => localAuto = v),
+                    title: Text(loc.t('pos_kds_public_settings_auto_refresh')),
+                  ),
+                  SwitchListTile(
+                    value: localSound,
+                    onChanged: (v) => setLocal(() => localSound = v),
+                    title: Text(loc.t('pos_kds_public_settings_sound')),
+                  ),
+                  SwitchListTile(
+                    value: localClock,
+                    onChanged: (v) => setLocal(() => localClock = v),
+                    title: Text(loc.t('pos_kds_public_settings_clock_24h')),
+                  ),
+                  const SizedBox(height: 8),
+                  ValueListenableBuilder<String>(
+                    valueListenable: selectedLang,
+                    builder: (_, value, __) {
+                      return DropdownButtonFormField<String>(
+                        initialValue: value,
+                        items: const [
+                          DropdownMenuItem(value: 'ru', child: Text('Русский')),
+                          DropdownMenuItem(value: 'en', child: Text('English')),
+                          DropdownMenuItem(value: 'es', child: Text('Español')),
+                          DropdownMenuItem(value: 'kk', child: Text('Қазақша')),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          selectedLang.value = v;
+                        },
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: loc.t('language'),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(loc.t('done')),
+          ),
+        ],
       ),
     );
     if (!mounted) return;
     _soundEnabled = localSound;
     _autoRefreshEnabled = localAuto;
-    if (initialSound != _soundEnabled || initialAuto != _autoRefreshEnabled) {
+    _clock24h = localClock;
+    if (initialSound != _soundEnabled ||
+        initialAuto != _autoRefreshEnabled ||
+        initialClock != _clock24h) {
       await _savePrefs();
       _restartAutoRefresh();
     }
