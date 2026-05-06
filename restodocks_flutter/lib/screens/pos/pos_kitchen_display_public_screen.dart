@@ -1,13 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_order_live_duration.dart';
-import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
 /// KDS по секретной ссылке: без входа в учётку, только очередь + ТТК + «отдано».
 class PosKitchenDisplayPublicScreen extends StatefulWidget {
@@ -26,6 +28,12 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   bool _loading = true;
   String? _errorCode;
   KdsGuestSnapshot? _snapshot;
+  final Map<String, Set<String>> _knownLineIdsByOrder = <String, Set<String>>{};
+  final Set<String> _justAddedLineIds = <String>{};
+  DateTime? _highlightUntil;
+  bool _soundEnabled = true;
+  bool _autoRefreshEnabled = true;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
@@ -41,10 +49,38 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     final q = GoRouterState.of(context).queryParameters;
     final t = q['kds_token']?.trim() ?? '';
     _token = t;
+    _restorePrefs();
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _restorePrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _soundEnabled = prefs.getBool('kds_public_sound_enabled') ?? true;
+      _autoRefreshEnabled = prefs.getBool('kds_public_auto_refresh') ?? true;
+      _restartAutoRefresh();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _savePrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('kds_public_sound_enabled', _soundEnabled);
+      await prefs.setBool('kds_public_auto_refresh', _autoRefreshEnabled);
+    } catch (_) {}
+  }
+
+  void _restartAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    if (!_autoRefreshEnabled || _token.isEmpty) return;
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted || _loading) return;
+      _load(silent: true);
+    });
+  }
+
+  Future<void> _load({bool silent = false}) async {
     if (_token.isEmpty) {
       setState(() {
         _loading = false;
@@ -53,10 +89,12 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _errorCode = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _errorCode = null;
+      });
+    }
     final snap = await PosKdsGuestService.instance.fetchOrders(
       token: _token,
       department: _department,
@@ -70,6 +108,27 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       });
       return;
     }
+    final addedNow = <String>{};
+    for (final row in snap.rows) {
+      final orderId = row.order.id;
+      final prev = _knownLineIdsByOrder[orderId] ?? <String>{};
+      final current = row.lines.map((e) => e.id).toSet();
+      for (final id in current) {
+        if (!prev.contains(id) && _knownLineIdsByOrder.isNotEmpty) {
+          addedNow.add(id);
+        }
+      }
+      _knownLineIdsByOrder[orderId] = current;
+    }
+    if (addedNow.isNotEmpty) {
+      _justAddedLineIds
+        ..clear()
+        ..addAll(addedNow);
+      _highlightUntil = DateTime.now().add(const Duration(seconds: 75));
+      if (_soundEnabled) {
+        SystemSound.play(SystemSoundType.alert);
+      }
+    }
     setState(() {
       _loading = false;
       _snapshot = snap;
@@ -77,6 +136,13 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
         _department = snap.department;
       }
     });
+    _restartAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -94,6 +160,11 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
           automaticallyImplyLeading: context.canPop(),
           title: Text(loc.t('pos_kds_public_title')),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'KDS settings',
+              onPressed: _openSettingsSheet,
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed:
@@ -149,7 +220,8 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       );
     }
 
-    final rows = snap.sortedForList();
+    final rows = snap.sortedForList()
+      ..sort((a, b) => b.order.updatedAt.compareTo(a.order.updatedAt));
     if (rows.isEmpty) {
       return RefreshIndicator(
         onRefresh: _load,
@@ -173,8 +245,6 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
           final r = rows[i];
           final o = r.order;
           final tn = o.tableNumber ?? 0;
-          final due = r.grandDue;
-          final partial = r.menuDuePartial;
           final elapsed = loc.t('pos_order_list_timer', args: {
             'time': formatPosOrderLiveDuration(o.createdAt),
           });
@@ -205,14 +275,6 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
                       style:
                           bigStyle.copyWith(fontSize: bigStyle.fontSize! - 2),
                     ),
-                    if (due > 0 || partial)
-                      Text(
-                        '${partial ? '≈ ' : ''}${formatPosOrderMenuDue(context, due)}',
-                        style: bigStyle.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
                     Text(
                       elapsed,
                       style: Theme.of(context).textTheme.bodyLarge,
@@ -221,15 +283,59 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
                       subline,
                       style: posOrderListSubtitleStyle(context),
                     ),
+                    const SizedBox(height: 8),
+                    for (final line in r.lines)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _lineColor(context, line),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                line.dishTitleForLang(loc.currentLanguageCode),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Text('x${line.quantity}'),
+                            const SizedBox(width: 8),
+                            TextButton(
+                              onPressed: () => _showTechCardDialog(
+                                  context, loc, line, r),
+                              child: Text(loc.t('pos_kds_public_ttk_title')),
+                            ),
+                            if (line.servedAt == null &&
+                                o.status == PosOrderStatus.sent)
+                              FilledButton.tonal(
+                                onPressed: () => _markLine(r, line),
+                                child: Text(loc.t('pos_order_line_mark_served')),
+                              ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
-              onTap: () => _openOrderSheet(context, loc, r),
             ),
           );
         },
       ),
     );
+  }
+
+  Color _lineColor(BuildContext context, PosOrderLine line) {
+    final cs = Theme.of(context).colorScheme;
+    if (line.servedAt != null) return Colors.green.withValues(alpha: 0.16);
+    final activeHighlight = _highlightUntil != null &&
+        DateTime.now().isBefore(_highlightUntil!) &&
+        _justAddedLineIds.contains(line.id);
+    if (activeHighlight) return cs.tertiaryContainer.withValues(alpha: 0.75);
+    return cs.surfaceContainerHighest.withValues(alpha: 0.45);
   }
 
   String _messageForCode(LocalizationService loc, String code) {
@@ -243,53 +349,15 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     }
   }
 
-  Future<void> _openOrderSheet(
-    BuildContext context,
-    LocalizationService loc,
-    KdsGuestOrderRow row,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.72,
-          minChildSize: 0.45,
-          maxChildSize: 0.95,
-          builder: (ctx, scrollController) {
-            return _KdsGuestOrderSheet(
-              loc: loc,
-              token: _token,
-              department: _department,
-              row: row,
-              scrollController: scrollController,
-              onChanged: () {
-                if (mounted) _load();
-              },
-              onShowTechCard: (tcId) =>
-                  _showTechCardDialog(ctx, loc, tcId),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _showTechCardDialog(
     BuildContext context,
     LocalizationService loc,
-    String techCardId,
+    PosOrderLine line,
+    KdsGuestOrderRow row,
   ) async {
-    final data = await PosKdsGuestService.instance.techCardPreview(
-      token: _token,
-      department: _department,
-      techCardId: techCardId,
-    );
-    if (!context.mounted) return;
+    final data = row.techCardPreviewByLineId[line.id];
     final name =
-        data?['dish_name']?.toString() ?? loc.t('pos_kds_public_ttk_title');
+        data?['dish_name']?.toString() ?? line.dishTitleForLang(loc.currentLanguageCode);
     final comp = data?['composition_for_hall']?.toString() ?? '';
     final desc = data?['description_for_hall']?.toString() ?? '';
     final lang = loc.currentLanguageCode;
@@ -336,119 +404,93 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       ),
     );
   }
-}
 
-class _KdsGuestOrderSheet extends StatefulWidget {
-  const _KdsGuestOrderSheet({
-    required this.loc,
-    required this.token,
-    required this.department,
-    required this.row,
-    required this.scrollController,
-    required this.onChanged,
-    required this.onShowTechCard,
-  });
-
-  final LocalizationService loc;
-  final String token;
-  final String department;
-  final KdsGuestOrderRow row;
-  final ScrollController scrollController;
-  final VoidCallback onChanged;
-  final void Function(String techCardId) onShowTechCard;
-
-  @override
-  State<_KdsGuestOrderSheet> createState() => _KdsGuestOrderSheetState();
-}
-
-class _KdsGuestOrderSheetState extends State<_KdsGuestOrderSheet> {
-  bool _busy = false;
-
-  Future<void> _mark(PosOrderLine line) async {
-    if (line.servedAt != null) return;
-    if (widget.row.order.status != PosOrderStatus.sent) {
-      AppToastService.show(widget.loc.t('pos_order_line_mark_served_forbidden'));
-      return;
-    }
-    setState(() => _busy = true);
+  Future<void> _markLine(KdsGuestOrderRow row, PosOrderLine line) async {
     final ok = await PosKdsGuestService.instance.markLineServed(
-      token: widget.token,
-      department: widget.department,
-      orderId: widget.row.order.id,
+      token: _token,
+      department: _department,
+      orderId: row.order.id,
       lineId: line.id,
     );
     if (!mounted) return;
-    setState(() => _busy = false);
-    if (ok) {
-      AppToastService.show(widget.loc.t('pos_kds_public_marked_ok'));
-      widget.onChanged();
-      if (mounted) Navigator.of(context).pop();
-    } else {
-      AppToastService.show(widget.loc.t('pos_kds_public_mark_failed'));
+    if (!ok) {
+      AppToastService.show(context.read<LocalizationService>().t('pos_kds_public_mark_failed'));
+      return;
     }
+    await _load(silent: true);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final loc = widget.loc;
-    final o = widget.row.order;
-    final lines = widget.row.lines;
-    final name =
-        loc.t('pos_table_number', args: {'n': '${o.tableNumber ?? 0}'});
-    final timeFmt =
-        DateFormat.Hm(Localizations.localeOf(context).toString());
-
-    return ListView(
-      controller: widget.scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      children: [
-        Text(name, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Text(
-          posFloorRoomSummaryLine(loc, floorName: o.floorName, roomName: o.roomName),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 16),
-        for (final line in lines) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(line.dishTitleForLang(loc.currentLanguageCode)),
-            subtitle: Text(
-              [
-                '${loc.t('pos_order_line_qty_short')}: ${line.quantity}',
-                if (line.guestNumber != null)
-                  loc.t('pos_order_line_guest_short',
-                      args: {'n': '${line.guestNumber}'}),
-                if (line.servedAt != null)
-                  loc.t('pos_order_line_served_at', args: {
-                    'time': timeFmt.format(line.servedAt!.toLocal()),
-                  }),
-              ].join(' · '),
-            ),
-            trailing: Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+  Future<void> _openSettingsSheet() async {
+    final loc = context.read<LocalizationService>();
+    final initialSound = _soundEnabled;
+    final initialAuto = _autoRefreshEnabled;
+    var localSound = _soundEnabled;
+    var localAuto = _autoRefreshEnabled;
+    final selectedLang = ValueNotifier<String>(loc.currentLanguageCode);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => widget.onShowTechCard(line.techCardId),
-                  child: Text(loc.t('pos_kds_public_ttk_title')),
+                SwitchListTile(
+                  value: localAuto,
+                  onChanged: (v) => setLocal(() => localAuto = v),
+                  title: const Text('Auto refresh'),
                 ),
-                if (line.servedAt == null &&
-                    o.status == PosOrderStatus.sent)
-                  FilledButton(
-                    onPressed: _busy ? null : () => _mark(line),
-                    child: Text(loc.t('pos_order_line_mark_served')),
-                  ),
+                SwitchListTile(
+                  value: localSound,
+                  onChanged: (v) => setLocal(() => localSound = v),
+                  title: const Text('Sound on new items'),
+                ),
+                const SizedBox(height: 8),
+                ValueListenableBuilder<String>(
+                  valueListenable: selectedLang,
+                  builder: (_, value, __) {
+                    return DropdownButtonFormField<String>(
+                      initialValue: value,
+                      items: const [
+                        DropdownMenuItem(value: 'ru', child: Text('Русский')),
+                        DropdownMenuItem(value: 'en', child: Text('English')),
+                        DropdownMenuItem(value: 'es', child: Text('Español')),
+                        DropdownMenuItem(value: 'kk', child: Text('Қазақша')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        selectedLang.value = v;
+                      },
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Language',
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Done'),
+                ),
               ],
             ),
-          ),
-          const Divider(height: 1),
-        ],
-      ],
+          );
+        },
+      ),
     );
+    if (!mounted) return;
+    _soundEnabled = localSound;
+    _autoRefreshEnabled = localAuto;
+    if (initialSound != _soundEnabled || initialAuto != _autoRefreshEnabled) {
+      await _savePrefs();
+      _restartAutoRefresh();
+    }
+    if (selectedLang.value != loc.currentLanguageCode) {
+      await loc.setLocale(Locale(selectedLang.value), userChoice: true);
+    }
+    if (mounted) setState(() {});
   }
 }

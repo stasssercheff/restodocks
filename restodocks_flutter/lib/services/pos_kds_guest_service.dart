@@ -9,6 +9,7 @@ class KdsGuestOrderRow {
   const KdsGuestOrderRow({
     required this.order,
     required this.lines,
+    required this.techCardPreviewByLineId,
     required this.bucket,
     required this.grandDue,
     required this.menuDuePartial,
@@ -17,6 +18,7 @@ class KdsGuestOrderRow {
 
   final PosOrder order;
   final List<PosOrderLine> lines;
+  final Map<String, Map<String, dynamic>> techCardPreviewByLineId;
   final String bucket;
   final double grandDue;
   final bool menuDuePartial;
@@ -26,12 +28,24 @@ class KdsGuestOrderRow {
     final om = Map<String, dynamic>.from(m['order'] as Map);
     final order = PosOrder.fromJson(om);
     final linesRaw = m['lines'] as List<dynamic>? ?? const [];
-    final lines = linesRaw
-        .map((e) => PosOrderLine.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final lines = <PosOrderLine>[];
+    final byLine = <String, Map<String, dynamic>>{};
+    for (final e in linesRaw) {
+      if (e is! Map) continue;
+      final row = Map<String, dynamic>.from(e);
+      final parsed = PosOrderLine.fromJson(row);
+      lines.add(parsed);
+      final tcRaw = row['tech_cards'];
+      if (tcRaw is Map<String, dynamic>) {
+        byLine[parsed.id] = Map<String, dynamic>.from(tcRaw);
+      } else if (tcRaw is Map) {
+        byLine[parsed.id] = Map<String, dynamic>.from(tcRaw);
+      }
+    }
     return KdsGuestOrderRow(
       order: order,
       lines: lines,
+      techCardPreviewByLineId: byLine,
       bucket: (m['bucket'] as String?) ?? 'active',
       grandDue: (m['grand_due'] as num?)?.toDouble() ?? 0,
       menuDuePartial: m['menu_due_partial'] == true,

@@ -1526,6 +1526,8 @@ class _LineTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = line.dishTitleForLang(lang);
+    // Temporarily disabled in UI; can be re-enabled by changing condition.
+    final showMarkingUi = line.id.startsWith('__enable_marking__');
     final sub = <String>[
       '${loc.t('pos_order_line_qty_short')}: ${_formatPosQty(line.quantity)}',
       if (line.courseNumber > 1)
@@ -1601,7 +1603,8 @@ class _LineTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (!compactDeptStaff &&
+            if (showMarkingUi &&
+                !compactDeptStaff &&
                 (line.markingCodes.isNotEmpty ||
                     onScanMarking != null)) ...[
               const SizedBox(height: 10),
