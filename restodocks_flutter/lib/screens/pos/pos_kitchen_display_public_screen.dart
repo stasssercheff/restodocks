@@ -30,6 +30,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   KdsGuestSnapshot? _snapshot;
   final Map<String, Set<String>> _knownLineIdsByOrder = <String, Set<String>>{};
   final Set<String> _justAddedLineIds = <String>{};
+  final Set<String> _expandedOrderIds = <String>{};
   DateTime? _highlightUntil;
   bool _soundEnabled = true;
   bool _autoRefreshEnabled = true;
@@ -305,139 +306,198 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
       onRefresh: _load,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          const cols = 4;
-          final cellWidth = (constraints.maxWidth - 32 - ((cols - 1) * 10)) / cols;
-          final targetHeight = (constraints.maxHeight - 32 - ((4 - 1) * 10)) / 4;
-          final ratio = cellWidth / (targetHeight <= 0 ? 1 : targetHeight);
-          return GridView.builder(
+          final totalWidth = constraints.maxWidth - 32;
+          final cols = totalWidth >= 1400
+              ? 4
+              : totalWidth >= 980
+                  ? 3
+                  : totalWidth >= 640
+                      ? 2
+                      : 1;
+          final cardWidth = (totalWidth - ((cols - 1) * 10)) / cols;
+          return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: cols,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: ratio.clamp(0.72, 2.2),
-            ),
-            itemCount: rows.length,
-            itemBuilder: (context, i) {
-              final r = rows[i];
-              final o = r.order;
-              final tn = o.tableNumber ?? 0;
-              final orderNo = o.id.length > 8 ? o.id.substring(0, 8) : o.id;
-              final elapsed = loc.t('pos_order_list_timer', args: {
-                'time': formatPosOrderLiveDuration(o.createdAt),
-              });
-              final subParts = [
-                '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
-                if (r.bucket == 'served') loc.t('pos_kds_public_served_chip'),
-              ];
-              final subline = subParts.join(' · ');
-              return Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.t('pos_table_number', args: {'n': '$tn'}),
-                        style: bigStyle.copyWith(fontSize: (bigStyle.fontSize ?? 22) - 8),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'Заказ #$orderNo',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      Text(
-                        posFloorRoomSummaryLine(loc, floorName: o.floorName, roomName: o.roomName),
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(elapsed, style: Theme.of(context).textTheme.bodySmall),
-                      Text(subline, style: posOrderListSubtitleStyle(context), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: r.lines.length,
-                          itemBuilder: (context, lineIdx) {
-                            final line = r.lines[lineIdx];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 5),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _lineColor(context, line),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          line.dishTitleForLang(loc.currentLanguageCode),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text('x${line.quantity}', style: const TextStyle(fontSize: 12)),
-                                    ],
-                                  ),
-                                  if ((line.comment ?? '').trim().isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      (line.comment ?? '').trim(),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      TextButton(
-                                        style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                                          minimumSize: Size.zero,
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                        onPressed: () => _showTechCardDialog(context, loc, line, r),
-                                        child: Text(loc.t('pos_kds_public_ttk_title')),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      if (line.servedAt == null && o.status == PosOrderStatus.sent)
-                                        FilledButton.tonal(
-                                          style: FilledButton.styleFrom(
-                                            visualDensity: VisualDensity.compact,
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                          ),
-                                          onPressed: () => _markLine(r, line),
-                                          child: Text(loc.t('pos_order_line_mark_served')),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            children: [
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final r in rows)
+                    SizedBox(
+                      width: cardWidth,
+                      child: _buildOrderCard(context, loc, bigStyle, r),
+                    ),
+                ],
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(
+    BuildContext context,
+    LocalizationService loc,
+    TextStyle bigStyle,
+    KdsGuestOrderRow r,
+  ) {
+    const collapsedLinesLimit = 4;
+    final o = r.order;
+    final tn = o.tableNumber ?? 0;
+    final orderNo = o.id.length > 8 ? o.id.substring(0, 8) : o.id;
+    final elapsed = loc.t('pos_order_list_timer', args: {
+      'time': formatPosOrderLiveDuration(o.createdAt),
+    });
+    final subParts = [
+      '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
+      if (r.bucket == 'served') loc.t('pos_kds_public_served_chip'),
+    ];
+    final subline = subParts.join(' · ');
+    final expanded = _expandedOrderIds.contains(o.id);
+    final allLines = r.lines;
+    final visibleLines =
+        expanded ? allLines : allLines.take(collapsedLinesLimit).toList();
+    final hasOverflow = allLines.length > collapsedLinesLimit;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.t('pos_table_number', args: {'n': '$tn'}),
+              style: bigStyle.copyWith(fontSize: (bigStyle.fontSize ?? 22) - 8),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'Заказ #$orderNo',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            Text(
+              posFloorRoomSummaryLine(
+                loc,
+                floorName: o.floorName,
+                roomName: o.roomName,
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(elapsed, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              subline,
+              style: posOrderListSubtitleStyle(context),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            for (final line in visibleLines) _buildOrderLineTile(context, loc, r, line),
+            if (hasOverflow)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      if (expanded) {
+                        _expandedOrderIds.remove(o.id);
+                      } else {
+                        _expandedOrderIds.add(o.id);
+                      }
+                    });
+                  },
+                  icon: Icon(
+                    expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                  ),
+                  label: Text(
+                    expanded
+                        ? loc.t('ui_collapse')
+                        : '${loc.t('ui_expand')} (+${allLines.length - visibleLines.length})',
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderLineTile(
+    BuildContext context,
+    LocalizationService loc,
+    KdsGuestOrderRow row,
+    PosOrderLine line,
+  ) {
+    final o = row.order;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: _lineColor(context, line),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  line.dishTitleForLang(loc.currentLanguageCode),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text('x${line.quantity}', style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+          if ((line.comment ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              (line.comment ?? '').trim(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _showTechCardDialog(context, loc, line, row),
+                child: Text(loc.t('pos_kds_public_ttk_title')),
+              ),
+              if (line.servedAt == null && o.status == PosOrderStatus.sent)
+                FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  ),
+                  onPressed: () => _markLine(row, line),
+                  child: Text(loc.t('pos_order_line_mark_served')),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
