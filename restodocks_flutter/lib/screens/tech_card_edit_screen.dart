@@ -1179,7 +1179,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (widget.initialFromAi != null) {
       return 'tech_card_edit_import_${_importDraftKeyHash(widget.initialFromAi!)}';
     }
-    final dept = widget.department.trim().toLowerCase() == 'bar' ? 'bar' : 'kitchen';
+    final dept =
+        (widget.department ?? '').trim().toLowerCase() == 'bar' ? 'bar' : 'kitchen';
     return 'tech_card_edit_new_$dept';
   }
 
