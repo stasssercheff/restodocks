@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
@@ -5257,7 +5258,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         continue;
       }
       // Если ИИ вернул дубликат ПФ/Блюдо с одним составом, оставляем блюдо.
-      if (prev.isSemiFinished && !c.isSemiFinished) {
+      if ((prev.isSemiFinished == true) && (c.isSemiFinished != true)) {
         map[sig] = c;
       }
     }
