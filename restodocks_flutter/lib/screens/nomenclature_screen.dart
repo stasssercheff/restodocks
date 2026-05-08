@@ -160,9 +160,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         // Название не меняем — только как вставил пользователь. ИИ — КБЖУ и пр.
         final storedName = item.name.trim();
-        final names = <String, String>{
-          for (final c in allLangs) c: storedName
-        };
+        final names = <String, String>{for (final c in allLangs) c: storedName};
 
         final normalizedLower = storedName.toLowerCase();
 
@@ -413,9 +411,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final estId = account.establishment?.id;
     if (_unitScopeEstablishmentId != estId) {
       _unitScopeEstablishmentId = estId;
-      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+      unawaited(
+          context.read<UnitSystemPreferenceService>().ensureScopeSynced());
     }
-    final lite = SubscriptionEntitlements.from(account.establishment).isLiteTier;
+    final lite =
+        SubscriptionEntitlements.from(account.establishment).isLiteTier;
     if (lite && _selectedTab == _NomTab.iiko) {
       setState(() => _selectedTab = _NomTab.nomenclature);
     }
@@ -641,8 +641,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         setState(() => _iikoUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_generic',
-                args: {'error': '$e'})),
+            content: Text(
+                loc.t('product_upload_error_generic', args: {'error': '$e'})),
           ),
         );
       }
@@ -1009,8 +1009,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(loc.t('duplicates_need_more'))),
+        SnackBar(content: Text(loc.t('duplicates_need_more'))),
       );
       return;
     }
@@ -1024,8 +1023,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              loc.t('duplicates_none')),
+          content: Text(loc.t('duplicates_none')),
           action: SnackBarAction(
             label: loc.t('duplicates_search_ai'),
             onPressed: () => _showDuplicatesWithAI(),
@@ -1045,8 +1043,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(loc.t('duplicates_need_more'))),
+        SnackBar(content: Text(loc.t('duplicates_need_more'))),
       );
       return;
     }
@@ -1073,8 +1070,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                  child: Text(loc.t('duplicates_ai_progress'))),
+              Expanded(child: Text(loc.t('duplicates_ai_progress'))),
             ],
           ),
         ),
@@ -1106,9 +1102,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
       if (duplicateGroups.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  loc.t('duplicates_none'))),
+          SnackBar(content: Text(loc.t('duplicates_none'))),
         );
         return;
       }
@@ -1739,7 +1733,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         const SizedBox(width: 10),
                         Text(
                           loc.t('create_product'),
-                          style: TextStyle(color: accent, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                              color: accent, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -2450,8 +2445,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ];
       for (var c = 0; c < values.length; c++) {
         final v = values[c];
-        final cell =
-            sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        final cell = sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
         if (v == null) {
           cell.value = TextCellValue('');
         } else if (v is num) {
@@ -2543,8 +2538,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       int updated = 0;
       int failed = 0;
 
-      String cellAt(List<Data?> row, int index) =>
-          index < row.length ? (row[index]?.value?.toString() ?? '').trim() : '';
+      String cellAt(List<Data?> row, int index) => index < row.length
+          ? (row[index]?.value?.toString() ?? '').trim()
+          : '';
       double? toDouble(String s) => s.isEmpty ? null : double.tryParse(s);
       bool? toBoolNullable(String s) {
         final v = s.trim().toLowerCase();
@@ -2632,9 +2628,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             containsGluten: toBoolNullable(cellAt(row, cContainsGluten)),
             containsLactose: toBoolNullable(cellAt(row, cContainsLactose)),
             basePrice: toDouble(cellAt(row, cPrice)),
-            currency: cellAt(row, cCurrency).isEmpty
-                ? null
-                : cellAt(row, cCurrency),
+            currency:
+                cellAt(row, cCurrency).isEmpty ? null : cellAt(row, cCurrency),
             packagePrice: toDouble(cellAt(row, cPackagePrice)),
             packageWeightGrams: toDouble(cellAt(row, cPackageWeight)),
             gramsPerPiece: toDouble(cellAt(row, cGramsPerPiece)),
@@ -2662,13 +2657,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               }
             }
             srcLng ??= loc.currentLanguageCode;
-            final safeSrc =
-                codes.contains(srcLng) ? srcLng! : codes.first;
+            final safeSrc = codes.contains(srcLng) ? srcLng! : codes.first;
             final srcText =
                 (names[safeSrc] ?? names[srcLng] ?? productName).trim();
-            final missing = codes
-                .where((c) => (names[c] ?? '').trim().isEmpty)
-                .toList();
+            final missing =
+                codes.where((c) => (names[c] ?? '').trim().isEmpty).toList();
             try {
               final tm = TranslationManager(
                 aiService: context.read<AiServiceSupabase>(),
@@ -2907,12 +2900,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       await _addProductsFromText(text, loc);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t(
-                'excel_file_process_error',
-                args: {'error': '$e'},
-              ))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(loc.t(
+        'excel_file_process_error',
+        args: {'error': '$e'},
+      ))));
     }
   }
 
@@ -3119,8 +3111,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           group.where((i) => !_selectedToRemove.contains(i.id)).toList();
       if (kept.length != 1) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-                  content: Text(loc.t('duplicates_merge_need_one_kept'))),
+          SnackBar(content: Text(loc.t('duplicates_merge_need_one_kept'))),
         );
         return;
       }
@@ -3128,8 +3119,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           group.where((i) => _selectedToRemove.contains(i.id)).toList();
       if (removed.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t('duplicates_merge_pick_per_group'))),
+          SnackBar(content: Text(loc.t('duplicates_merge_pick_per_group'))),
         );
         return;
       }
@@ -3138,8 +3128,10 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
     try {
       for (final group in widget.groups) {
         final kept = group.firstWhere((i) => !_selectedToRemove.contains(i.id));
-        final sources =
-            group.where((i) => _selectedToRemove.contains(i.id)).map((i) => i.id).toList();
+        final sources = group
+            .where((i) => _selectedToRemove.contains(i.id))
+            .map((i) => i.id)
+            .toList();
         if (sources.isEmpty) continue;
         await merge(kept.id, sources);
       }
@@ -3257,13 +3249,13 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
         ),
         if (widget.onMergeProducts != null) ...[
           OutlinedButton(
-            onPressed: _saving || _selectedToRemove.isEmpty
-                ? null
-                : _applyRemoval,
+            onPressed:
+                _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
             child: Text(widget.loc.t('duplicates_nomenclature_only')),
           ),
           FilledButton(
-            onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyMerge,
+            onPressed:
+                _saving || _selectedToRemove.isEmpty ? null : _applyMerge,
             child: _saving
                 ? const SizedBox(
                     width: 16,
@@ -4720,8 +4712,8 @@ class _CatalogTab extends StatelessWidget {
       final msg = fmt;
       scaffold.showSnackBar(SnackBar(content: Text(msg)));
     } on DuplicateProductNameException {
-      scaffold.showSnackBar(SnackBar(
-          content: Text(loc.t('product_name_duplicate'))));
+      scaffold.showSnackBar(
+          SnackBar(content: Text(loc.t('product_name_duplicate'))));
     } catch (e) {
       scaffold.showSnackBar(SnackBar(
           content: Text(
@@ -4812,9 +4804,9 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         canonicalUnit: 'g',
         system: to,
       ).value;
-      _packageWeightController.text =
-          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
-              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+      _packageWeightController.text = UnitConverter.roundUi(shown,
+              fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+          .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
     }
     final gpp = _parseNum(_gramsPerPieceController.text);
     if (gpp != null && gpp > 0) {
@@ -4828,9 +4820,9 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         canonicalUnit: 'g',
         system: to,
       ).value;
-      _gramsPerPieceController.text =
-          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
-              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+      _gramsPerPieceController.text = UnitConverter.roundUi(shown,
+              fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+          .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
     }
   }
 
@@ -4868,8 +4860,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');
     _wastePctController = TextEditingController(
         text: p.primaryWastePct?.toStringAsFixed(1) ?? '0');
-    final unitMap = {'кг': 'kg', 'г': 'g', 'шт': 'pcs', 'л': 'l', 'мл': 'ml'};
-    _unit = unitMap[p.unit] ?? p.unit ?? 'g';
+    _unit = _normalizeUnitForSave(p.unit ?? 'g');
     if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'g';
     _currency = p.currency ?? 'VND';
     _containsGluten = p.containsGluten ?? false;
@@ -4932,6 +4923,29 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final s = v.trim().replaceAll(',', '.');
     if (s.isEmpty) return null;
     return double.tryParse(s);
+  }
+
+  String _normalizeUnitForSave(String unit) {
+    final u = unit.trim().toLowerCase();
+    switch (u) {
+      case 'шт':
+      case 'piece':
+      case 'pieces':
+      case 'штука':
+        return 'pcs';
+      case 'кг':
+        return 'kg';
+      case 'г':
+      case 'гр':
+      case 'грамм':
+        return 'g';
+      case 'л':
+        return 'l';
+      case 'мл':
+        return 'ml';
+      default:
+        return u;
+    }
   }
 
   bool get _currencyFollowsEstablishment =>
@@ -5070,16 +5084,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         final text = widget.loc
             .t('ai_name_suggestion_only')
             .replaceAll('%s', result.normalizedName);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(text)));
         if (result.suggestedUnit != null &&
             CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
           setState(() => _unit = result.suggestedUnit!);
         }
       } else if (result != null && result.normalizedName == name && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(widget.loc.t('ai_name_ok'))),
+          SnackBar(content: Text(widget.loc.t('ai_name_ok'))),
         );
       }
     } catch (_) {}
@@ -5087,6 +5100,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   }
 
   Future<void> _save() async {
+    FocusScope.of(context).unfocus();
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -5125,7 +5139,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             system: unitPrefs.unitSystem,
           );
 
-    final gppInput = CulinaryUnits.isCountable(_unit)
+    final normalizedUnit = _normalizeUnitForSave(_unit);
+    final gppInput = CulinaryUnits.isCountable(normalizedUnit)
         ? _parseNum(_gramsPerPieceController.text)
         : null;
     final gpp = gppInput == null
@@ -5146,8 +5161,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       packageWeightGrams: pkgWeight,
       clearPackageWeight: !_priceByPackage,
       gramsPerPiece: gpp,
-      clearGramsPerPiece: !CulinaryUnits.isCountable(_unit),
-      unit: _unit,
+      clearGramsPerPiece: !CulinaryUnits.isCountable(normalizedUnit),
+      unit: normalizedUnit,
       primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
       calories: calories,
       protein: protein,
@@ -5183,7 +5198,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             sourceLanguage: curLang,
             sourceText: name,
           );
-          await widget.store.updateProduct(savedUpdated.copyWith(names: namesMap));
+          await widget.store
+              .updateProduct(savedUpdated.copyWith(names: namesMap));
         } catch (_) {}
       } else {
         await widget.store.updateProduct(updated);
@@ -5207,8 +5223,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
               .t(widget.isCreate ? 'product_added' : 'product_saved'))));
     } on DuplicateProductNameException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(widget.loc.t('product_name_duplicate'))));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(widget.loc.t('product_name_duplicate'))));
       }
     } catch (e) {
       if (mounted) {
@@ -5302,7 +5318,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                         setState(() => _switchingUnitSystem = true);
                         _reformatWeightControllersForSystem(from: from, to: to);
                         await unitPrefs.setUnitSystem(to);
-                        if (mounted) setState(() => _switchingUnitSystem = false);
+                        if (mounted)
+                          setState(() => _switchingUnitSystem = false);
                       },
               ),
               if (CulinaryUnits.isCountable(_unit)) ...[
@@ -5310,7 +5327,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 TextFormField(
                   controller: _gramsPerPieceController,
                   decoration: InputDecoration(
-                    labelText: '${widget.loc.t('grams_per_piece_label')} ($gLabel)',
+                    labelText:
+                        '${widget.loc.t('grams_per_piece_label')} ($gLabel)',
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType:
@@ -5336,8 +5354,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _caloriesController,
                                 decoration: InputDecoration(
-                                  labelText:
-                                      widget.loc.t('ttk_calories'),
+                                  labelText: widget.loc.t('ttk_calories'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -5351,8 +5368,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _proteinController,
                                 decoration: InputDecoration(
-                                  labelText:
-                                      widget.loc.t('ttk_protein'),
+                                  labelText: widget.loc.t('ttk_protein'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -5380,8 +5396,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _carbsController,
                                 decoration: InputDecoration(
-                                  labelText:
-                                      widget.loc.t('ttk_carbs'),
+                                  labelText: widget.loc.t('ttk_carbs'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -5474,7 +5489,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packageWeightController,
                         decoration: InputDecoration(
-                          labelText: '${widget.loc.t('package_weight_label')} ($gLabel)',
+                          labelText:
+                              '${widget.loc.t('package_weight_label')} ($gLabel)',
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -5809,8 +5825,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_generic',
-                args: {'error': '$e'})),
+            content: Text(
+                loc.t('product_upload_error_generic', args: {'error': '$e'})),
           ),
         );
       }

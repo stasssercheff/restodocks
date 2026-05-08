@@ -1177,8 +1177,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
     // Для новых ТТК (в т.ч. AI/import) используем общий ключ департамента,
     // чтобы кнопка "завершить создание" всегда находила незавершенный черновик.
-    final dept =
-        (widget.department ?? '').trim().toLowerCase().contains('bar') ? 'bar' : 'kitchen';
+    final dept = (widget.department ?? '').trim().toLowerCase().contains('bar')
+        ? 'bar'
+        : 'kitchen';
     return 'tech_card_edit_new_$dept';
   }
 
@@ -1195,6 +1196,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   @override
   bool get restoreDraftAfterLoad => true;
+
+  @override
+  int get scheduleSaveDebounceMs => kIsWeb ? 900 : 600;
 
   @override
   Map<String, dynamic> getCurrentState() {
@@ -3577,12 +3581,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           dishName: saveName,
           category: category,
           sections: _selectedSections,
-          department: (widget.department ?? '')
-                  .trim()
-                  .toLowerCase()
-                  .contains('bar')
-              ? 'bar'
-              : 'kitchen',
+          department:
+              (widget.department ?? '').trim().toLowerCase().contains('bar')
+                  ? 'bar'
+                  : 'kitchen',
           isSemiFinished: _isSemiFinished,
           establishmentId: targetEstablishmentId,
           createdBy: emp.id,
@@ -4077,7 +4079,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (row is Map && row['order_id'] != null) row['order_id'].toString(),
       };
       if (ids.isEmpty) return null;
-      final shortIds = ids.map((e) => e.length > 8 ? e.substring(0, 8) : e).join(', ');
+      final shortIds =
+          ids.map((e) => e.length > 8 ? e.substring(0, 8) : e).join(', ');
       return shortIds;
     } catch (_) {
       return null;
@@ -4086,7 +4089,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   Future<bool> _archiveTechCardInsteadOfDelete() async {
     final svc = context.read<TechCardServiceSupabase>();
-    final tc = _techCard ?? await svc.getTechCardById(widget.techCardId, preferCache: false);
+    final tc = _techCard ??
+        await svc.getTechCardById(widget.techCardId, preferCache: false);
     if (tc == null) return false;
     final archived = tc.copyWith(
       sections: const ['archived'],
@@ -4149,7 +4153,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             : (linkedHint == null
                 ? 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.'
                 : 'Cannot delete this tech card: it is used in orders ($linkedHint). Remove or reassign linked order items first.');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

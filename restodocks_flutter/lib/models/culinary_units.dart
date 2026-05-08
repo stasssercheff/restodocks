@@ -73,7 +73,6 @@ class CulinaryUnits {
     (id: 'g', ru: 'г', en: 'g'),
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
-    (id: 'шт', ru: 'штук', en: 'pcs'),
     (id: 'pcs', ru: 'штук', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
@@ -99,7 +98,8 @@ class CulinaryUnits {
   }
 
   /// Конвертировать граммы обратно в единицу (для отображения)
-  static double fromGrams(double grams, String unitId, {double? gramsPerPiece}) {
+  static double fromGrams(double grams, String unitId,
+      {double? gramsPerPiece}) {
     final u = unitId.toLowerCase().trim();
     if (u == 'pcs' || u == 'шт') {
       final gpp = gramsPerPiece ?? 50;

@@ -61,7 +61,10 @@ class _BarModifierDef {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       options: opts is List
-          ? opts.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
+          ? opts
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
           : const [],
     );
   }
@@ -509,8 +512,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     });
     final aiQuotaEstablishmentId = _resolveAiQuotaEstablishmentId(acc);
     if (aiQuotaEstablishmentId != null) {
-      final cachedRemaining = AiTtkQuotaCacheService.instance
-          .readCachedRemaining(
+      final cachedRemaining =
+          AiTtkQuotaCacheService.instance.readCachedRemaining(
         aiQuotaEstablishmentId,
         department: widget.department,
       );
@@ -546,16 +549,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final paidTier = account.subscriptionEntitlements.paidTier;
     return (
-      limit:
-          paidTier == AppSubscriptionTier.ultra
-              ? _aiTtkUltraMonthLimit
-              : _aiTtkProMonthLimit,
+      limit: paidTier == AppSubscriptionTier.ultra
+          ? _aiTtkUltraMonthLimit
+          : _aiTtkProMonthLimit,
       periodType: 'month',
       periodKey: monthKey,
     );
   }
 
-  String _aiTtkRemainingLabel(LocalizationService loc, int remaining, int total) {
+  String _aiTtkRemainingLabel(
+      LocalizationService loc, int remaining, int total) {
     final template = _localizedOrFallback(
       loc,
       'ai_ttk_quota_remaining_status',
@@ -664,9 +667,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (acc.establishment == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  loc.t('ttk_import_no_establishment'))),
+          SnackBar(content: Text(loc.t('ttk_import_no_establishment'))),
         );
       }
       return 0;
@@ -716,8 +717,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     try {
-      final remaining = await AiTtkQuotaCacheService.instance
-          .refreshForEstablishment(
+      final remaining =
+          await AiTtkQuotaCacheService.instance.refreshForEstablishment(
         establishmentId,
         account: account,
         department: widget.department,
@@ -1172,7 +1173,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   List<({String category, List<TechCard> cards})> _groupByCategory(
       List<TechCard> cards) {
     final dep = widget.department.trim().toLowerCase();
-    final order = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final order =
+        dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     final grouped = <String, List<TechCard>>{};
     for (final tc in cards) {
       final cat = tc.category.isNotEmpty ? tc.category : 'misc';
@@ -1848,7 +1850,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final title = isRu ? 'Завершить черновик ТТК' : 'Finish TTK draft';
     return RefreshIndicator(
       onRefresh: _refreshFinishDraftCount,
-      child: FutureBuilder<List<({String storageSuffix, String cloudKey, String title})>>(
+      child: FutureBuilder<
+          List<({String storageSuffix, String cloudKey, String title})>>(
         future: _finishDraftEntries(),
         builder: (context, snapshot) {
           final entries = snapshot.data ?? const [];
@@ -1933,10 +1936,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (_modifierDefs.isEmpty)
             Text(
               isRu ? 'Пока нет модификаторов.' : 'No modifiers yet.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ..._modifierDefs.map((m) => Card(
                 child: ListTile(
@@ -1949,7 +1950,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     children: [
                       IconButton(
                         tooltip: isRu ? 'Редактировать' : 'Edit',
-                        onPressed: () => _openModifierEditorDialog(loc, initial: m),
+                        onPressed: () =>
+                            _openModifierEditorDialog(loc, initial: m),
                         icon: const Icon(Icons.edit_outlined),
                       ),
                       IconButton(
@@ -2053,18 +2055,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     for (final ing in tc.ingredients) {
       if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
         final issuesList = <String>[];
-        if (ing.netWeight <= 0) issuesList.add(_locRuEn(
-          context.read<LocalizationService>(),
-          'ttk_review_missing_netto',
-          ruFallback: 'нетто',
-          enFallback: 'net',
-        ));
-        if (ing.grossWeight <= 0) issuesList.add(_locRuEn(
-          context.read<LocalizationService>(),
-          'ttk_review_missing_brutto',
-          ruFallback: 'брутто',
-          enFallback: 'gross',
-        ));
+        if (ing.netWeight <= 0)
+          issuesList.add(_locRuEn(
+            context.read<LocalizationService>(),
+            'ttk_review_missing_netto',
+            ruFallback: 'нетто',
+            enFallback: 'net',
+          ));
+        if (ing.grossWeight <= 0)
+          issuesList.add(_locRuEn(
+            context.read<LocalizationService>(),
+            'ttk_review_missing_brutto',
+            ruFallback: 'брутто',
+            enFallback: 'gross',
+          ));
         final prefix = _locRuEn(
           context.read<LocalizationService>(),
           'ttk_review_missing_weight_prefix',
@@ -2133,10 +2137,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         return StatefulBuilder(
           builder: (ctx2, setStateDlg) {
             final media = MediaQuery.of(ctx2);
-            final maxDialogWidth = media.size.width > 860 ? 820.0 : media.size.width - 24;
+            final maxDialogWidth =
+                media.size.width > 860 ? 820.0 : media.size.width - 24;
             final maxDialogHeight = media.size.height * 0.78;
             return Dialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
               child: SizedBox(
                 width: maxDialogWidth,
                 height: maxDialogHeight,
@@ -2148,341 +2154,356 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     bottom: 12 + media.viewInsets.bottom,
                   ),
                   child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            loc
-                                .t('ttk_review_sheet_title')
-                                .replaceFirst('%s', _tcListName(tc, lang)),
-                            style: Theme.of(ctx2)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed:
-                              saving ? null : () => Navigator.of(ctx2).pop(),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView(
-                        shrinkWrap: true,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
                         children: [
-                          // Секция неоднозначных ПФ
-                          if (ambiguousMatches.isNotEmpty) ...[
-                            Text(
+                          Expanded(
+                            child: Text(
                               loc
-                                  .t('ttk_review_ambiguous_pf_section')
-                                  .replaceFirst(
-                                      '%s', '${ambiguousMatches.length}'),
-                              style:
-                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  .t('ttk_review_sheet_title')
+                                  .replaceFirst('%s', _tcListName(tc, lang)),
+                              style: Theme.of(ctx2)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 8),
-                            ...ambiguousMatches.map((m) {
-                              final selId =
-                                  selected[m.ing.id] ?? m.candidates.first.id;
-                              final selPf = m.candidates.firstWhere(
-                                  (c) => c.id == selId,
-                                  orElse: () => m.candidates.first);
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: Theme.of(ctx2)
-                                          .colorScheme
-                                          .outlineVariant),
-                                  borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2)
-                                      .colorScheme
-                                      .surfaceContainerLowest,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Text(m.ing.productName,
-                                        style: Theme.of(ctx2)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 8),
-                                    DropdownButtonFormField<String>(
-                                      value: selId,
-                                      isExpanded: true,
-                                      decoration: InputDecoration(
-                                          isDense: true,
-                                          labelText:
-                                              loc.t('ttk_pf_candidate_label')),
-                                      items: m.candidates
-                                          .map((c) => DropdownMenuItem<String>(
-                                                value: c.id,
-                                                child:
-                                                    Text(_tcListName(c, lang)),
-                                              ))
-                                          .toList(),
-                                      onChanged: saving
-                                          ? null
-                                          : (v) {
-                                              if (v == null) return;
-                                              setStateDlg(
-                                                  () => selected[m.ing.id] = v);
-                                            },
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: TextButton(
-                                        onPressed: () =>
-                                            _showTechCardCompositionDialog(
-                                                ctx2, selPf, lang),
-                                        child: Text(
-                                            loc.t('ttk_composition_short')),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                          // Секция ингредиентов без цен
-                          if (missingPriceIngredients.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty)
-                              const SizedBox(height: 16),
-                            Text(
-                              loc.t('ttk_review_no_price_section').replaceFirst(
-                                  '%s', '${missingPriceIngredients.length}'),
-                              style:
-                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...missingPriceIngredients.map((ing) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: Theme.of(ctx2)
-                                          .colorScheme
-                                          .outlineVariant),
-                                  borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2)
-                                      .colorScheme
-                                      .surfaceContainerLowest,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.warning, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        ing.productName,
-                                        style:
-                                            Theme.of(ctx2).textTheme.bodyMedium,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                          // Секция проблем с весом
-                          if (missingWeightIssues.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty ||
-                                missingPriceIngredients.isNotEmpty)
-                              const SizedBox(height: 16),
-                            Text(
-                              loc.t('ttk_review_weight_section').replaceFirst(
-                                  '%s', '${missingWeightIssues.length}'),
-                              style:
-                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...missingWeightIssues.map((issue) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: Theme.of(ctx2)
-                                          .colorScheme
-                                          .outlineVariant),
-                                  borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2)
-                                      .colorScheme
-                                      .surfaceContainerLowest,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.scale, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        issue,
-                                        style:
-                                            Theme.of(ctx2).textTheme.bodyMedium,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                          // Секция проблем с технологией
-                          if (missingTechnologyIssues.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty ||
-                                missingPriceIngredients.isNotEmpty ||
-                                missingWeightIssues.isNotEmpty)
-                              const SizedBox(height: 16),
-                            Text(
-                              loc
-                                  .t('ttk_review_technology_section')
-                                  .replaceFirst('%s',
-                                      '${missingTechnologyIssues.length}'),
-                              style:
-                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...missingTechnologyIssues.map((issue) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: Theme.of(ctx2)
-                                          .colorScheme
-                                          .outlineVariant),
-                                  borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2)
-                                      .colorScheme
-                                      .surfaceContainerLowest,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.engineering, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        issue,
-                                        style:
-                                            Theme.of(ctx2).textTheme.bodyMedium,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
+                          ),
+                          IconButton(
+                            onPressed:
+                                saving ? null : () => Navigator.of(ctx2).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: saving
-                                ? null
-                                : () async {
-                                    Navigator.of(ctx2).pop();
-                                    final needRefresh =
-                                        await context.push<bool>(
-                                      '/tech-cards/${tc.id}',
-                                      extra: {'initialTechCard': tc},
-                                    );
-                                    if (mounted && needRefresh == true) {
-                                      _TtkListMemoryCache.invalidate();
-                                      await _load(showLoading: false);
-                                    }
-                                  },
-                            child: Text(loc.t('ttk_open_tech_card')),
-                          ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            // Секция неоднозначных ПФ
+                            if (ambiguousMatches.isNotEmpty) ...[
+                              Text(
+                                loc
+                                    .t('ttk_review_ambiguous_pf_section')
+                                    .replaceFirst(
+                                        '%s', '${ambiguousMatches.length}'),
+                                style: Theme.of(ctx2)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...ambiguousMatches.map((m) {
+                                final selId =
+                                    selected[m.ing.id] ?? m.candidates.first.id;
+                                final selPf = m.candidates.firstWhere(
+                                    (c) => c.id == selId,
+                                    orElse: () => m.candidates.first);
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Theme.of(ctx2)
+                                            .colorScheme
+                                            .outlineVariant),
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Theme.of(ctx2)
+                                        .colorScheme
+                                        .surfaceContainerLowest,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(m.ing.productName,
+                                          style: Theme.of(ctx2)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w700)),
+                                      const SizedBox(height: 8),
+                                      DropdownButtonFormField<String>(
+                                        value: selId,
+                                        isExpanded: true,
+                                        decoration: InputDecoration(
+                                            isDense: true,
+                                            labelText: loc
+                                                .t('ttk_pf_candidate_label')),
+                                        items: m.candidates
+                                            .map(
+                                                (c) => DropdownMenuItem<String>(
+                                                      value: c.id,
+                                                      child: Text(
+                                                          _tcListName(c, lang)),
+                                                    ))
+                                            .toList(),
+                                        onChanged: saving
+                                            ? null
+                                            : (v) {
+                                                if (v == null) return;
+                                                setStateDlg(() =>
+                                                    selected[m.ing.id] = v);
+                                              },
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: TextButton(
+                                          onPressed: () =>
+                                              _showTechCardCompositionDialog(
+                                                  ctx2, selPf, lang),
+                                          child: Text(
+                                              loc.t('ttk_composition_short')),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                            // Секция ингредиентов без цен
+                            if (missingPriceIngredients.isNotEmpty) ...[
+                              if (ambiguousMatches.isNotEmpty)
+                                const SizedBox(height: 16),
+                              Text(
+                                loc
+                                    .t('ttk_review_no_price_section')
+                                    .replaceFirst('%s',
+                                        '${missingPriceIngredients.length}'),
+                                style: Theme.of(ctx2)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...missingPriceIngredients.map((ing) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Theme.of(ctx2)
+                                            .colorScheme
+                                            .outlineVariant),
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Theme.of(ctx2)
+                                        .colorScheme
+                                        .surfaceContainerLowest,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.warning, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          ing.productName,
+                                          style: Theme.of(ctx2)
+                                              .textTheme
+                                              .bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                            // Секция проблем с весом
+                            if (missingWeightIssues.isNotEmpty) ...[
+                              if (ambiguousMatches.isNotEmpty ||
+                                  missingPriceIngredients.isNotEmpty)
+                                const SizedBox(height: 16),
+                              Text(
+                                loc.t('ttk_review_weight_section').replaceFirst(
+                                    '%s', '${missingWeightIssues.length}'),
+                                style: Theme.of(ctx2)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...missingWeightIssues.map((issue) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Theme.of(ctx2)
+                                            .colorScheme
+                                            .outlineVariant),
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Theme.of(ctx2)
+                                        .colorScheme
+                                        .surfaceContainerLowest,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.scale, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          issue,
+                                          style: Theme.of(ctx2)
+                                              .textTheme
+                                              .bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                            // Секция проблем с технологией
+                            if (missingTechnologyIssues.isNotEmpty) ...[
+                              if (ambiguousMatches.isNotEmpty ||
+                                  missingPriceIngredients.isNotEmpty ||
+                                  missingWeightIssues.isNotEmpty)
+                                const SizedBox(height: 16),
+                              Text(
+                                loc
+                                    .t('ttk_review_technology_section')
+                                    .replaceFirst('%s',
+                                        '${missingTechnologyIssues.length}'),
+                                style: Theme.of(ctx2)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...missingTechnologyIssues.map((issue) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Theme.of(ctx2)
+                                            .colorScheme
+                                            .outlineVariant),
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Theme.of(ctx2)
+                                        .colorScheme
+                                        .surfaceContainerLowest,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.engineering, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          issue,
+                                          style: Theme.of(ctx2)
+                                              .textTheme
+                                              .bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        if (ambiguousMatches.isNotEmpty)
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
                           Expanded(
-                            child: FilledButton(
+                            child: OutlinedButton(
                               onPressed: saving
                                   ? null
                                   : () async {
-                                      setStateDlg(() => saving = true);
-                                      try {
-                                        final svc = context
-                                            .read<TechCardServiceSupabase>();
-                                        final updatedIngredients =
-                                            tc.ingredients.map((ing) {
-                                          final pickedId = selected[ing.id];
-                                          if (pickedId == null) return ing;
-                                          final pf = _list.firstWhere(
-                                            (x) => x.id == pickedId,
-                                            orElse: () =>
-                                                _pfCandidatesByNormalizedName
-                                                    .values
-                                                    .expand((e) => e)
-                                                    .firstWhere((x) =>
-                                                        x.id == pickedId),
-                                          );
-                                          final display = _tcListName(pf, lang);
-                                          return ing.copyWith(
-                                            sourceTechCardId: pf.id,
-                                            sourceTechCardName: display,
-                                            productName: display,
-                                          );
-                                        }).toList();
-                                        final updatedTc = tc.copyWith(
-                                            ingredients: updatedIngredients);
-                                        await svc.saveTechCard(updatedTc);
-                                        if (mounted) {
-                                          _TtkListMemoryCache.invalidate();
-                                          await _load();
-                                        }
-                                        if (ctx2.mounted)
-                                          Navigator.of(ctx2).pop();
-                                      } catch (e) {
-                                        if (ctx2.mounted) {
-                                          ScaffoldMessenger.of(ctx2)
-                                              .showSnackBar(SnackBar(
-                                                  content: Text(loc
-                                                      .t('save_error')
-                                                      .replaceFirst(
-                                                          '%s', '$e'))));
-                                        }
-                                      } finally {
-                                        if (ctx2.mounted)
-                                          setStateDlg(() => saving = false);
+                                      Navigator.of(ctx2).pop();
+                                      final needRefresh =
+                                          await context.push<bool>(
+                                        '/tech-cards/${tc.id}',
+                                        extra: {'initialTechCard': tc},
+                                      );
+                                      if (mounted && needRefresh == true) {
+                                        _TtkListMemoryCache.invalidate();
+                                        await _load(showLoading: false);
                                       }
                                     },
-                              child: saving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2))
-                                  : Text(loc.t('apply')),
+                              child: Text(loc.t('ttk_open_tech_card')),
                             ),
                           ),
-                      ],
-                    ),
+                          const SizedBox(width: 12),
+                          if (ambiguousMatches.isNotEmpty)
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: saving
+                                    ? null
+                                    : () async {
+                                        setStateDlg(() => saving = true);
+                                        try {
+                                          final svc = context
+                                              .read<TechCardServiceSupabase>();
+                                          final updatedIngredients =
+                                              tc.ingredients.map((ing) {
+                                            final pickedId = selected[ing.id];
+                                            if (pickedId == null) return ing;
+                                            final pf = _list.firstWhere(
+                                              (x) => x.id == pickedId,
+                                              orElse: () =>
+                                                  _pfCandidatesByNormalizedName
+                                                      .values
+                                                      .expand((e) => e)
+                                                      .firstWhere((x) =>
+                                                          x.id == pickedId),
+                                            );
+                                            final display =
+                                                _tcListName(pf, lang);
+                                            return ing.copyWith(
+                                              sourceTechCardId: pf.id,
+                                              sourceTechCardName: display,
+                                              productName: display,
+                                            );
+                                          }).toList();
+                                          final updatedTc = tc.copyWith(
+                                              ingredients: updatedIngredients);
+                                          await svc.saveTechCard(updatedTc);
+                                          if (mounted) {
+                                            _TtkListMemoryCache.invalidate();
+                                            await _load();
+                                          }
+                                          if (ctx2.mounted)
+                                            Navigator.of(ctx2).pop();
+                                        } catch (e) {
+                                          if (ctx2.mounted) {
+                                            ScaffoldMessenger.of(ctx2)
+                                                .showSnackBar(SnackBar(
+                                                    content: Text(loc
+                                                        .t('save_error')
+                                                        .replaceFirst(
+                                                            '%s', '$e'))));
+                                          }
+                                        } finally {
+                                          if (ctx2.mounted)
+                                            setStateDlg(() => saving = false);
+                                        }
+                                      },
+                                child: saving
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
+                                    : Text(loc.t('apply')),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -3783,8 +3804,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     }
                     Navigator.of(ctx).pop((mode: dialogMode, files: valid));
                   },
-                  child:
-                      Text(l.t('ttk_import_select_files') ?? 'Select files'),
+                  child: Text(l.t('ttk_import_select_files') ?? 'Select files'),
                 ),
               ],
             );
@@ -4088,10 +4108,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (!mounted) return;
       if (failedCount > 0 && allCards.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              (loc.t('ttk_import_partial'))
-                  .replaceFirst('%s', '${allCards.length}')
-                  .replaceFirst('%s', '${files.length}')),
+          content: Text((loc.t('ttk_import_partial'))
+              .replaceFirst('%s', '${allCards.length}')
+              .replaceFirst('%s', '${files.length}')),
           duration: const Duration(seconds: 3),
         ));
       }
@@ -4193,42 +4212,41 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
     final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
-    final aiQuotaRemaining =
-        canShowAiQuota ? _aiTtkRemainingQuota : null;
+    final aiQuotaRemaining = canShowAiQuota ? _aiTtkRemainingQuota : null;
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) {
-          final mq = MediaQuery.of(ctx);
-          final screenH = mq.size.height;
-          final screenW = mq.size.width;
-          final kb = mq.viewInsets.bottom;
-          final safePad = mq.padding.vertical;
-          final isLandscape = mq.orientation == Orientation.landscape;
-          final isDesktopLike = screenW >= 900;
-          final useCompactLayout = isLandscape && !isDesktopLike;
-          // Заголовок + actions + отступы диалога.
-          final dialogChrome = useCompactLayout ? 108.0 : 168.0;
-          final availableH = screenH - kb - safePad;
-          final maxBody = (availableH - dialogChrome).clamp(150.0, screenH * 0.62);
-          final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontSize: useCompactLayout ? 14 : null,
-                height: useCompactLayout ? 1.15 : null,
-              );
-          final fieldStyle = Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                fontSize: useCompactLayout ? 13 : 15,
-                height: useCompactLayout ? 1.25 : 1.3,
-              );
-          final hintStyle = Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                fontSize: useCompactLayout ? 11 : 13,
-                height: useCompactLayout ? 1.2 : 1.25,
-              );
-          final dialogMinW = isDesktopLike ? 640.0 : 280.0;
-          final dialogMaxW =
-              isDesktopLike
-                  ? (screenW * 0.78).clamp(dialogMinW, 920.0)
-                  : (useCompactLayout ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0);
-          return AlertDialog(
+        final mq = MediaQuery.of(ctx);
+        final screenH = mq.size.height;
+        final screenW = mq.size.width;
+        final kb = mq.viewInsets.bottom;
+        final safePad = mq.padding.vertical;
+        final isLandscape = mq.orientation == Orientation.landscape;
+        final isDesktopLike = screenW >= 900;
+        final useCompactLayout = isLandscape && !isDesktopLike;
+        // Заголовок + actions + отступы диалога.
+        final dialogChrome = useCompactLayout ? 108.0 : 168.0;
+        final availableH = screenH - kb - safePad;
+        final maxBody =
+            (availableH - dialogChrome).clamp(150.0, screenH * 0.62);
+        final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
+              fontSize: useCompactLayout ? 14 : null,
+              height: useCompactLayout ? 1.15 : null,
+            );
+        final fieldStyle = Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+              fontSize: useCompactLayout ? 13 : 15,
+              height: useCompactLayout ? 1.25 : 1.3,
+            );
+        final hintStyle = Theme.of(ctx).textTheme.bodySmall?.copyWith(
+              fontSize: useCompactLayout ? 11 : 13,
+              height: useCompactLayout ? 1.2 : 1.25,
+            );
+        final dialogMinW = isDesktopLike ? 640.0 : 280.0;
+        final dialogMaxW = isDesktopLike
+            ? (screenW * 0.78).clamp(dialogMinW, 920.0)
+            : (useCompactLayout ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0);
+        return AlertDialog(
           constraints: BoxConstraints(
             minWidth: dialogMinW,
             maxWidth: dialogMaxW,
@@ -4240,9 +4258,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           titlePadding: useCompactLayout
               ? const EdgeInsets.fromLTRB(16, 10, 16, 6)
               : null,
-          contentPadding: useCompactLayout
-              ? const EdgeInsets.fromLTRB(16, 0, 16, 8)
-              : null,
+          contentPadding:
+              useCompactLayout ? const EdgeInsets.fromLTRB(16, 0, 16, 8) : null,
           actionsPadding: useCompactLayout
               ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
               : null,
@@ -4527,8 +4544,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t('ai_tech_card_excel_format_hint'))),
+          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
         );
         return;
       }
@@ -4541,9 +4557,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         await _openTechCardEditAndRefresh(
-            path: widget.department.trim().toLowerCase().contains('bar')
-                ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
-                : '/tech-cards/new',
+          path: widget.department.trim().toLowerCase().contains('bar')
+              ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
+              : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
               ? {
                   'result': list.single,
@@ -4671,8 +4687,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t('ai_tech_card_excel_format_hint'))),
+          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
         );
         return;
       }
@@ -4975,8 +4990,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
     final draftKey = await _resolveCreateDraftKeyForContinue();
-    final localDraft =
-        await DraftStorageService().loadTechCardEditDraft(draftKey.storageSuffix);
+    final localDraft = await DraftStorageService()
+        .loadTechCardEditDraft(draftKey.storageSuffix);
     if (localDraft != null &&
         DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
       final choice = await showDialog<_TtkNewDraftChoice>(
@@ -5004,9 +5019,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (!mounted) return;
       if (choice == null || choice == _TtkNewDraftChoice.cancel) return;
       if (choice == _TtkNewDraftChoice.startNew) {
-        await DraftStorageService()
-            .clearTechCardEditDraftEverywhere(
-                draftKey.storageSuffix, draftKey.cloudKey);
+        await DraftStorageService().clearTechCardEditDraftEverywhere(
+            draftKey.storageSuffix, draftKey.cloudKey);
       }
     }
     final dep = widget.department.trim().toLowerCase();
@@ -5159,7 +5173,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               Navigator.pop(
                 ctx,
                 _BarModifierDef(
-                  id: initial?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+                  id: initial?.id ??
+                      DateTime.now().microsecondsSinceEpoch.toString(),
                   name: name,
                   options: options,
                 ),
@@ -5277,9 +5292,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _openDraftEntry(
       ({String storageSuffix, String cloudKey, String title}) entry,
       LocalizationService loc) async {
-    final active = _newDraftKeyForDepartment().replaceFirst('tech_card_edit_', '');
+    final active =
+        _newDraftKeyForDepartment().replaceFirst('tech_card_edit_', '');
     if (entry.storageSuffix != active) {
-      final d = await DraftStorageService().loadTechCardEditDraft(entry.storageSuffix);
+      final d = await DraftStorageService()
+          .loadTechCardEditDraft(entry.storageSuffix);
       if (d != null) {
         await DraftStorageService().saveTechCardEditDraft(active, d);
         await DraftStorageService().clearTechCardEditDraft(entry.storageSuffix);
@@ -5310,7 +5327,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = acc.establishment;
     if (est != null) {
       try {
-        await svc.clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
+        await svc
+            .clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
         if (est.isBranch) {
           await svc.clearTechCardsListCacheForEstablishment(est.id);
         }
@@ -5397,12 +5415,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           loc.t('create_with_ai').trim().isEmpty
                               ? 'Create with AI'
                               : loc.t('create_with_ai'),
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -5418,12 +5437,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       Expanded(
                         child: Text(
                           loc.t('ttk_import_file'),
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
                         ),
                       ),
                       if (showTrialImportQuotaBadge) ...[
@@ -5443,12 +5463,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                             loc.t('ttk_import_paste_text').trim().isEmpty
                                 ? 'Paste text'
                                 : loc.t('ttk_import_paste_text'),
-                            style:
-                                Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.onSurface,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.w500,
+                                ),
                           ),
                         ),
                         if (showTrialImportQuotaBadge) ...[
@@ -5641,7 +5663,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           badgeCount: _finishDraftCount,
         );
     Widget chipModifiers() => _ttkTabChip(
-          isRu ? 'Модиф.' : 'Modifiers',
+          isRu ? 'Моды' : 'Mods',
           selected: selectedIndex == 4,
           badgeCount: _modifierDefs.length,
         );
@@ -5758,7 +5780,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _ensureLowerSearchNameCache(loc);
     final query = _appliedSearchQuery;
     final dep = widget.department.trim().toLowerCase();
-    final catOrder = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final catOrder =
+        dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     final customCatsInList = _list
         .map((tc) => tc.category)
         .where(TechCardServiceSupabase.isCustomCategory)
@@ -5864,8 +5887,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         clipBehavior: Clip.antiAlias,
         child: TabBar(
           controller: _tabController,
-          isScrollable: false,
-          tabAlignment: TabAlignment.center,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelPadding: EdgeInsets.zero,
           dividerColor: Colors.transparent,
           overlayColor: WidgetStateProperty.all(Colors.transparent),
@@ -5951,8 +5974,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           horizontal: 10, vertical: 8),
                     ),
                     items: [
-                      DropdownMenuItem(
-                          value: null, child: Text(loc.t('all'))),
+                      DropdownMenuItem(value: null, child: Text(loc.t('all'))),
                       ..._sectionOrder
                           .where((s) => s != 'hidden' && s != 'all')
                           .map((s) => DropdownMenuItem(
@@ -5976,8 +5998,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           horizontal: 10, vertical: 8),
                     ),
                     items: [
-                      DropdownMenuItem(
-                          value: null, child: Text(loc.t('all'))),
+                      DropdownMenuItem(value: null, child: Text(loc.t('all'))),
                       ...filterCatOrder.map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(_categoryLabel(c, loc)),
@@ -6073,14 +6094,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (runes.length <= 4) return compact;
       return '${String.fromCharCodes(runes.take(3))}.';
     }
+
     final categoryHeaderLabel = isMobile
         ? shortHeaderLabel(loc.t('column_category'))
         : loc.t('column_category');
     final actionLabelRaw = loc.t('edit');
-    final actionHeaderLabel =
-        (isMobile || actionLabelRaw.runes.length > 4)
-            ? shortHeaderLabel(actionLabelRaw)
-            : actionLabelRaw;
+    final actionHeaderLabel = (isMobile || actionLabelRaw.runes.length > 4)
+        ? shortHeaderLabel(actionLabelRaw)
+        : actionLabelRaw;
     // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
     final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;
@@ -6090,7 +6111,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final costSym = est?.currencySymbol ??
         Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final dep = widget.department.trim().toLowerCase();
-    final catOrder = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final catOrder =
+        dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     List<TechCard> sortCards(List<TechCard> cards, bool bySection) {
       return List.from(cards)
         ..sort((a, b) {
