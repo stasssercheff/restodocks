@@ -1778,6 +1778,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return RefreshIndicator(
       onRefresh: _pullToRefresh,
       child: ListView.separated(
+        physics: const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         itemCount: list.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -4802,7 +4805,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
-    final draftKey = _newDraftKeyForDepartment();
+    final draftKey = await _resolveCreateDraftKeyForContinue();
     final merged = await DraftStorageService()
         .loadTechCardEditDraftMerged(draftKey, draftKey);
     if (merged != null &&
@@ -4848,12 +4851,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ? 'tech_card_edit_new_bar'
           : 'tech_card_edit_new_kitchen';
 
-  Future<bool> _hasUnsavedCreateDraft() async {
-    final draftKey = _newDraftKeyForDepartment();
-    final merged = await DraftStorageService()
-        .loadTechCardEditDraftMerged(draftKey, draftKey);
-    return merged != null &&
-        DraftStorageService.techCardDraftLooksNonEmpty(merged);
+  List<String> _createDraftCandidateKeys() {
+    final out = <String>{};
+    out.add(_newDraftKeyForDepartment());
+    // Legacy key used by older builds.
+    out.add('new');
+    return out.toList(growable: false);
+  }
+
+  Future<String> _resolveCreateDraftKeyForContinue() async {
+    for (final key in _createDraftCandidateKeys()) {
+      final merged =
+          await DraftStorageService().loadTechCardEditDraftMerged(key, key);
+      if (merged != null && DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+        return key;
+      }
+    }
+    return _newDraftKeyForDepartment();
+  }
+
+  Future<int> _unsavedCreateDraftCount() async {
+    var count = 0;
+    for (final key in _createDraftCandidateKeys()) {
+      final merged =
+          await DraftStorageService().loadTechCardEditDraftMerged(key, key);
+      if (merged != null && DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+        count++;
+      }
+    }
+    return count;
   }
 
   Future<void> _openTechCardEditAndRefresh({
@@ -5426,10 +5452,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ),
         ),
       ),
-      FutureBuilder<bool>(
-        future: _hasUnsavedCreateDraft(),
+      FutureBuilder<int>(
+        future: _unsavedCreateDraftCount(),
         builder: (context, snapshot) {
-          if (snapshot.data != true) return const SizedBox.shrink();
+          final count = snapshot.data ?? 0;
+          if (count <= 0) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Align(
@@ -5437,7 +5464,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               child: OutlinedButton.icon(
                 onPressed: _loading ? null : () => _openManualTechCardCreate(loc),
                 icon: const Icon(Icons.edit_note),
-                label: Text(loc.t('continue_action')),
+                label: Text('${loc.t('continue_action')} ($count)'),
               ),
             ),
           );
@@ -5695,6 +5722,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return RefreshIndicator(
       onRefresh: _pullToRefresh,
       child: CustomScrollView(
+        physics: const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         slivers: [
           SliverPersistentHeader(
             pinned: false,
