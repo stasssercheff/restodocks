@@ -1678,9 +1678,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           lower.contains('soda') ||
           lower.contains('juice')) return 'non_alcoholic_drinks';
       if (lower.contains('кофе') ||
+          lower.contains('капучино') ||
+          lower.contains('латте') ||
+          lower.contains('эспрессо') ||
+          lower.contains('раф') ||
           lower.contains('чай') ||
           lower.contains('какао') ||
           lower.contains('coffee') ||
+          lower.contains('cappuccino') ||
+          lower.contains('latte') ||
+          lower.contains('espresso') ||
+          lower.contains('flat white') ||
           lower.contains('tea') ||
           lower.contains('cocoa')) return 'hot_drinks';
       if (lower.contains('виски') ||
@@ -6322,6 +6330,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               hideTechnologyBlock: true,
                                               omitTableHeader: false,
                                               shrinkWrap: true,
+                                              isBarDepartment:
+                                                  _categoryDepartment == 'bar',
                                               onTapPfIngredient: (id) => context
                                                   .push('/tech-cards/$id'),
                                             ),

@@ -65,6 +65,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
 
   /// Шапка таблицы вынесена в [compositionPinnedHeader] (закреп над скроллом страницы).
   final bool omitTableHeader;
+  final bool isBarDepartment;
 
   ExcelStyleTtkTable({
     super.key,
@@ -93,6 +94,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.onTapPfIngredient,
     this.shrinkWrap = false,
     this.omitTableHeader = false,
+    this.isBarDepartment = false,
   });
 
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
@@ -1732,6 +1734,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
+    final availableProcesses = widget.isBarDepartment
+        ? CookingProcess.forDepartment('bar')
+        : CookingProcess.defaultProcesses;
+
     String? cookingMethodDropdownValue(TTIngredient ing) {
       if (ing.cookingProcessId == 'custom') return 'mixing';
       if (ing.cookingProcessId == null && ing.cookingProcessName != null) {
@@ -1771,7 +1777,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         ),
                       ),
                     ),
-                    ...CookingProcess.defaultProcesses.map((process) {
+                    ...availableProcesses.map((process) {
                       return DropdownMenuItem<String?>(
                         value: process.id,
                         child: Text(widget.loc.cookingProcessLabel(process),
@@ -1789,7 +1795,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                           ));
                       return;
                     }
-                    final process = CookingProcess.defaultProcesses
+                    final process = availableProcesses
                         .firstWhere((p) => p.id == processId);
                     _updateIngredient(
                         rowIndex,

@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
             "Fields: dishName, technologyText, isSemiFinished, yieldGrams, ingredients[] " +
             "{productName,grossGrams,unit,primaryWastePct,netGrams,cookingLossPct,outputGrams,ingredientType,cookingProcessId}. " +
             "cookingProcessId is REQUIRED for every ingredient, one of these Latin ids: " +
-            "boiling,frying,baking,stewing,sous_vide,fermentation,grilling,torch_browning,sauteing,blanching,steaming,canning,cutting. " +
+            "boiling,frying,baking,stewing,sous_vide,fermentation,grilling,torch_browning,sauteing,blanching,steaming,canning,cutting,shaking,stirring,building,blending,espresso_extraction. " +
             "Pick by meaning (grilled vegetables → grilling, bake → baking, raw cut → cutting). " +
             "cookingLossPct — estimated shrinkage % for that line (0–60), consistent with cookingProcessId. " +
             "technologyText: 3–5 short steps. At least 3 ingredients. No markdown. " +
