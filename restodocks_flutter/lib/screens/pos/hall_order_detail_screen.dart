@@ -981,26 +981,29 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     final initialGuest = preset != null && preset >= 1 && preset <= guestCount
         ? preset
         : null;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
+      barrierDismissible: true,
       builder: (ctx) {
-        return _AddDishSheet(
-          loc: loc,
-          dishes: _menuDishes,
-          loading: _menuLoading,
-          guestCount: guestCount,
-          initialGuestNumber: initialGuest,
-          onPick: (tc, quantity, comment, courseNumber, guestNumber) async {
-            await _addDish(
-              tc,
-              loc,
-              quantity: quantity,
-              comment: comment,
-              courseNumber: courseNumber,
-              guestNumber: guestNumber,
-            );
-          },
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: _AddDishSheet(
+            loc: loc,
+            dishes: _menuDishes,
+            loading: _menuLoading,
+            guestCount: guestCount,
+            initialGuestNumber: initialGuest,
+            onPick: (tc, quantity, comment, courseNumber, guestNumber) async {
+              await _addDish(
+                tc,
+                loc,
+                quantity: quantity,
+                comment: comment,
+                courseNumber: courseNumber,
+                guestNumber: guestNumber,
+              );
+            },
+          ),
         );
       },
     );
@@ -1883,11 +1886,7 @@ class _AddDishSheetState extends State<_AddDishSheet> {
         _guest,
       );
       if (!mounted) return;
-      setState(() {
-        _selectedDish = null;
-        _comment.clear();
-        _search.clear();
-      });
+      Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _adding = false);
     }
@@ -1899,9 +1898,18 @@ class _AddDishSheetState extends State<_AddDishSheet> {
     final lang = loc.currentLanguageCode;
     final h = MediaQuery.sizeOf(context).height * 0.85;
 
-    return SafeArea(
-      child: SizedBox(
-        height: h,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: h,
+            maxWidth: 760,
+          ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -2142,6 +2150,7 @@ class _AddDishSheetState extends State<_AddDishSheet> {
               ),
           ],
         ),
+      ),
       ),
     );
   }
