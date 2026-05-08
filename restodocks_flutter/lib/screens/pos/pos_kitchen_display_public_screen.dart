@@ -23,6 +23,12 @@ class PosKitchenDisplayPublicScreen extends StatefulWidget {
 }
 
 class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicScreen> {
+  static const _soundStyleBell = 'bell';
+  static const _soundStyleDoubleBell = 'double_bell';
+  static const _soundStyleTriplePing = 'triple_ping';
+  static const _soundStylePulse = 'pulse';
+  static const _soundStyleSoft = 'soft';
+
   late String _department;
   String _token = '';
   bool _loading = true;
@@ -33,6 +39,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   final Set<String> _expandedOrderIds = <String>{};
   DateTime? _highlightUntil;
   bool _soundEnabled = true;
+  String _soundStyle = _soundStyleBell;
   bool _autoRefreshEnabled = true;
   bool _clock24h = true;
   Timer? _autoRefreshTimer;
@@ -61,6 +68,17 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     try {
       final prefs = await SharedPreferences.getInstance();
       _soundEnabled = prefs.getBool('kds_public_sound_enabled') ?? true;
+      final style = prefs.getString('kds_public_sound_style');
+      if (style != null &&
+          {
+            _soundStyleBell,
+            _soundStyleDoubleBell,
+            _soundStyleTriplePing,
+            _soundStylePulse,
+            _soundStyleSoft,
+          }.contains(style)) {
+        _soundStyle = style;
+      }
       _autoRefreshEnabled = prefs.getBool('kds_public_auto_refresh') ?? true;
       _clock24h = prefs.getBool('kds_public_clock_24h') ?? true;
       _restartAutoRefresh();
@@ -73,6 +91,7 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('kds_public_sound_enabled', _soundEnabled);
+      await prefs.setString('kds_public_sound_style', _soundStyle);
       await prefs.setBool('kds_public_auto_refresh', _autoRefreshEnabled);
       await prefs.setBool('kds_public_clock_24h', _clock24h);
     } catch (_) {}
@@ -156,12 +175,37 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   }
 
   void _playNewOrderSignal() {
-    // On web `alert` can be ignored by browser/device profile, so also send `click`.
-    SystemSound.play(SystemSoundType.alert);
-    Future<void>.delayed(
-      const Duration(milliseconds: 120),
-      () => SystemSound.play(SystemSoundType.click),
-    );
+    Future<void> playAfter(int ms, SystemSoundType type) {
+      if (ms == 0) return SystemSound.play(type);
+      return Future<void>.delayed(Duration(milliseconds: ms), () {
+        SystemSound.play(type);
+      });
+    }
+
+    switch (_soundStyle) {
+      case _soundStyleDoubleBell:
+        playAfter(0, SystemSoundType.alert);
+        playAfter(170, SystemSoundType.alert);
+        break;
+      case _soundStyleTriplePing:
+        playAfter(0, SystemSoundType.click);
+        playAfter(120, SystemSoundType.click);
+        playAfter(240, SystemSoundType.click);
+        break;
+      case _soundStylePulse:
+        playAfter(0, SystemSoundType.alert);
+        playAfter(220, SystemSoundType.click);
+        playAfter(430, SystemSoundType.alert);
+        break;
+      case _soundStyleSoft:
+        playAfter(0, SystemSoundType.click);
+        break;
+      case _soundStyleBell:
+      default:
+        playAfter(0, SystemSoundType.alert);
+        playAfter(120, SystemSoundType.click);
+        break;
+    }
   }
 
   @override
@@ -654,9 +698,11 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
   Future<void> _openSettingsSheet() async {
     final loc = context.read<LocalizationService>();
     final initialSound = _soundEnabled;
+    final initialSoundStyle = _soundStyle;
     final initialAuto = _autoRefreshEnabled;
     final initialClock = _clock24h;
     var localSound = _soundEnabled;
+    var localSoundStyle = _soundStyle;
     var localAuto = _autoRefreshEnabled;
     var localClock = _clock24h;
     final selectedLang = ValueNotifier<String>(loc.currentLanguageCode);
@@ -681,6 +727,46 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
                     onChanged: (v) => setLocal(() => localSound = v),
                     title: Text(loc.t('pos_kds_public_settings_sound')),
                   ),
+                  DropdownButtonFormField<String>(
+                    initialValue: localSoundStyle,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: loc.t('pos_kds_public_settings_sound_type'),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: _soundStyleBell,
+                        child:
+                            Text(loc.t('pos_kds_public_settings_sound_type_bell')),
+                      ),
+                      DropdownMenuItem(
+                        value: _soundStyleDoubleBell,
+                        child: Text(loc
+                            .t('pos_kds_public_settings_sound_type_double_bell')),
+                      ),
+                      DropdownMenuItem(
+                        value: _soundStyleTriplePing,
+                        child: Text(loc
+                            .t('pos_kds_public_settings_sound_type_triple_ping')),
+                      ),
+                      DropdownMenuItem(
+                        value: _soundStylePulse,
+                        child:
+                            Text(loc.t('pos_kds_public_settings_sound_type_pulse')),
+                      ),
+                      DropdownMenuItem(
+                        value: _soundStyleSoft,
+                        child: Text(loc.t('pos_kds_public_settings_sound_type_soft')),
+                      ),
+                    ],
+                    onChanged: localSound
+                        ? (v) {
+                            if (v == null) return;
+                            setLocal(() => localSoundStyle = v);
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
                   SwitchListTile(
                     value: localClock,
                     onChanged: (v) => setLocal(() => localClock = v),
@@ -724,9 +810,11 @@ class _PosKitchenDisplayPublicScreenState extends State<PosKitchenDisplayPublicS
     );
     if (!mounted) return;
     _soundEnabled = localSound;
+    _soundStyle = localSoundStyle;
     _autoRefreshEnabled = localAuto;
     _clock24h = localClock;
     if (initialSound != _soundEnabled ||
+        initialSoundStyle != _soundStyle ||
         initialAuto != _autoRefreshEnabled ||
         initialClock != _clock24h) {
       await _savePrefs();

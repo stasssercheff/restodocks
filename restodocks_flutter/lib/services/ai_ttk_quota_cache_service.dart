@@ -9,35 +9,51 @@ class AiTtkQuotaCacheService {
   AiTtkQuotaCacheService._();
   static final AiTtkQuotaCacheService instance = AiTtkQuotaCacheService._();
 
-  final Map<String, int> _remainingByEstablishment = <String, int>{};
+  final Map<String, int> _remainingByEstablishmentAndDepartment = <String, int>{};
 
-  int? readCachedRemaining(String establishmentId) {
-    final key = establishmentId.trim();
-    if (key.isEmpty) return null;
-    return _remainingByEstablishment[key];
+  String _cacheKey(String establishmentId, String department) =>
+      '${establishmentId.trim()}|${department.trim().toLowerCase()}';
+
+  int? readCachedRemaining(
+    String establishmentId, {
+    String department = 'kitchen',
+  }) {
+    final est = establishmentId.trim();
+    if (est.isEmpty) return null;
+    return _remainingByEstablishmentAndDepartment[_cacheKey(est, department)];
   }
 
-  Future<int?> preloadForCurrentSession({bool force = false}) async {
+  Future<int?> preloadForCurrentSession({
+    bool force = false,
+    String department = 'kitchen',
+  }) async {
     final account = AccountManagerSupabase();
     if (!_canCreateTtkWithAi(account)) return null;
     final establishmentId = _resolveAiQuotaEstablishmentId(account);
     if (establishmentId == null || establishmentId.isEmpty) return null;
     if (!force) {
-      final cached = _remainingByEstablishment[establishmentId];
+      final cached = _remainingByEstablishmentAndDepartment[
+          _cacheKey(establishmentId, department)];
       if (cached != null) return cached;
     }
-    return refreshForEstablishment(establishmentId, account: account);
+    return refreshForEstablishment(
+      establishmentId,
+      account: account,
+      department: department,
+    );
   }
 
   Future<int?> refreshForEstablishment(
     String establishmentId, {
     AccountManagerSupabase? account,
+    String department = 'kitchen',
   }) async {
     final resolved = establishmentId.trim();
     if (resolved.isEmpty) return null;
     final acc = account ?? AccountManagerSupabase();
     if (!_canCreateTtkWithAi(acc)) {
-      _remainingByEstablishment.remove(resolved);
+      _remainingByEstablishmentAndDepartment
+          .remove(_cacheKey(resolved, department));
       return null;
     }
     try {
@@ -45,6 +61,7 @@ class AiTtkQuotaCacheService {
         'ai-create-tech-card',
         body: <String, dynamic>{
           'establishmentId': resolved,
+          'department': department.trim().toLowerCase(),
           'checkOnly': true,
         },
       );
@@ -56,18 +73,29 @@ class AiTtkQuotaCacheService {
       final used = (data['used'] as num?)?.toInt() ?? 0;
       final remainingFromServer = (data['remaining'] as num?)?.toInt();
       final remaining = (remainingFromServer ?? (limit - used)).clamp(0, limit);
-      _remainingByEstablishment[resolved] = remaining;
+      _remainingByEstablishmentAndDepartment[
+          _cacheKey(resolved, department)] = remaining;
       return remaining;
     } catch (e, st) {
       devLog('AiTtkQuotaCacheService.refreshForEstablishment: $e $st');
-      return _remainingByEstablishment[resolved];
+      return _remainingByEstablishmentAndDepartment[
+          _cacheKey(resolved, department)];
     }
   }
 
-  void clearForEstablishment(String establishmentId) {
+  void clearForEstablishment(
+    String establishmentId, {
+    String? department,
+  }) {
     final key = establishmentId.trim();
     if (key.isEmpty) return;
-    _remainingByEstablishment.remove(key);
+    if (department != null) {
+      _remainingByEstablishmentAndDepartment
+          .remove(_cacheKey(key, department));
+      return;
+    }
+    _remainingByEstablishmentAndDepartment
+        .removeWhere((k, _) => k.startsWith('$key|'));
   }
 
   String? _resolveAiQuotaEstablishmentId(AccountManagerSupabase account) {

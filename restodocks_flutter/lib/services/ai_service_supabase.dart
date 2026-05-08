@@ -566,6 +566,7 @@ class AiServiceSupabase implements AiService {
   Future<List<TechCardRecognitionResult>> createTechCardsFromPrompt(
     String prompt, {
     String? establishmentId,
+    String? department,
     String? unitSystem,
     String? outputLocale,
   }) async {
@@ -573,6 +574,10 @@ class AiServiceSupabase implements AiService {
     final body = <String, dynamic>{'prompt': prompt};
     if (establishmentId != null && establishmentId.isNotEmpty) {
       body['establishmentId'] = establishmentId;
+    }
+    final dep = department?.trim().toLowerCase();
+    if (dep != null && dep.isNotEmpty) {
+      body['department'] = dep;
     }
     if (unitSystem != null && unitSystem.trim().isNotEmpty) {
       body['unitSystem'] = unitSystem.trim().toLowerCase();

@@ -16,7 +16,12 @@ import '../../utils/pos_order_totals.dart';
 import '../../widgets/app_bar_home_button.dart';
 import '../../widgets/pos_marking_scanner_screen.dart';
 
-bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
+bool _isBarDish(TechCard tc) {
+  final dep = tc.department.trim().toLowerCase();
+  if (dep == 'bar') return true;
+  if (dep == 'kitchen') return false;
+  return posLineIsBarDish(tc.category, tc.sections);
+}
 
 /// Карточка заказа зала: позиции из меню (ТТК).
 class HallOrderDetailScreen extends StatefulWidget {

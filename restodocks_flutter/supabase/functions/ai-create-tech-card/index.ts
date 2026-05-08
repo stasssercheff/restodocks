@@ -24,12 +24,17 @@ Deno.serve(async (req: Request) => {
     const body = (await req.json()) as {
       prompt?: string;
       establishmentId?: string;
+      department?: string;
       locale?: string;
       checkOnly?: boolean;
     };
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : "";
     const checkOnly = body.checkOnly === true;
+    const department =
+      typeof body.department === "string" && body.department.trim().toLowerCase() === "bar"
+        ? "bar"
+        : "kitchen";
     const rawLocale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";
     const localeTag = rawLocale.length >= 2 ? rawLocale.slice(0, 2) : "en";
     if (!checkOnly && !prompt) {
@@ -42,8 +47,8 @@ Deno.serve(async (req: Request) => {
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage, getAiTtkUsageStatus } = await import("../_shared/ai_ttk_limit.ts");
       const status = checkOnly
-        ? await getAiTtkUsageStatus(establishmentId)
-        : await checkAndIncrementAiTtkUsage(establishmentId);
+        ? await getAiTtkUsageStatus(establishmentId, department)
+        : await checkAndIncrementAiTtkUsage(establishmentId, department);
       const { allowed, reason, count, limit } = status;
       if (!allowed) {
         return new Response(
@@ -77,6 +82,10 @@ Deno.serve(async (req: Request) => {
         : localeTag === "en"
         ? "All natural-language fields (dishName, each productName, technologyText) MUST be in English. Do not mix in Russian or other languages."
         : `All natural-language fields (dishName, each productName, technologyText) MUST be written in the primary language for UI locale "${localeTag}". Avoid mixing languages.`;
+    const departmentRule =
+      department === "bar"
+        ? "Department is BAR. Prefer beverage/snack categories by meaning: coffee/cappuccino/latte/tea/cocoa -> non_alcoholic or hot drinks, NEVER alcoholic cocktails."
+        : "Department is KITCHEN. Avoid bar-only drink classification unless explicitly a beverage card.";
 
     const content = await chatText({
       messages: [
@@ -92,7 +101,9 @@ Deno.serve(async (req: Request) => {
             "Pick by meaning (grilled vegetables → grilling, bake → baking, raw cut → cutting). " +
             "cookingLossPct — estimated shrinkage % for that line (0–60), consistent with cookingProcessId. " +
             "technologyText: 3–5 short steps. At least 3 ingredients. No markdown. " +
-            langRule,
+            langRule +
+            " " +
+            departmentRule,
         },
         { role: "user", content: prompt },
       ],

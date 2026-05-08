@@ -247,6 +247,7 @@ class _CategoryPickerField extends StatelessWidget {
         : (categoryOptions.isNotEmpty ? categoryOptions.first : 'misc');
     return DropdownButtonFormField<String>(
       value: displayValue,
+      isExpanded: true,
       decoration: InputDecoration(
           labelText: loc.t('category'),
           isDense: true,
@@ -1178,7 +1179,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (widget.initialFromAi != null) {
       return 'tech_card_edit_import_${_importDraftKeyHash(widget.initialFromAi!)}';
     }
-    return 'tech_card_edit_new';
+    final dept = widget.department.trim().toLowerCase() == 'bar' ? 'bar' : 'kitchen';
+    return 'tech_card_edit_new_$dept';
   }
 
   /// Детерминированный хеш для уникального ключа черновика при открытии из импорта.
@@ -1996,11 +1998,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               _isSemiFinished = ai.isSemiFinished!;
             }
             if (widget.initialCategory != null &&
-                _categoryOptions.contains(widget.initialCategory)) {
+                _categoryOptions.contains(widget.initialCategory) &&
+                widget.department != 'bar') {
               _selectedCategory = widget.initialCategory!;
-            } else if (ai.dishName != null && ai.dishName!.isNotEmpty) {
+            }
+            if (ai.dishName != null && ai.dishName!.isNotEmpty) {
               final cat = _inferCategory(ai.dishName!);
               if (_categoryOptions.contains(cat)) _selectedCategory = cat;
+            } else if (widget.initialCategory != null &&
+                _categoryOptions.contains(widget.initialCategory)) {
+              _selectedCategory = widget.initialCategory!;
             }
             if (widget.initialSections != null &&
                 widget.initialSections!.isNotEmpty) {
@@ -5913,7 +5920,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               ),
                                               const SizedBox(width: 8),
                                               SizedBox(
-                                                width: 180,
+                                                width: 280,
                                                 child: _CategoryPickerField(
                                                   selectedCategory:
                                                       _categoryOptions.contains(

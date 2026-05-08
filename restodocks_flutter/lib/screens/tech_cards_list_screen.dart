@@ -471,7 +471,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final aiQuotaEstablishmentId = _resolveAiQuotaEstablishmentId(acc);
     if (aiQuotaEstablishmentId != null) {
       final cachedRemaining = AiTtkQuotaCacheService.instance
-          .readCachedRemaining(aiQuotaEstablishmentId);
+          .readCachedRemaining(
+        aiQuotaEstablishmentId,
+        department: widget.department,
+      );
       if (cachedRemaining != null && mounted) {
         setState(() {
           _aiTtkRemainingQuota = cachedRemaining;
@@ -675,7 +678,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     try {
       final remaining = await AiTtkQuotaCacheService.instance
-          .refreshForEstablishment(establishmentId, account: account);
+          .refreshForEstablishment(
+        establishmentId,
+        account: account,
+        department: widget.department,
+      );
       if (remaining == null) {
         throw StateError('ai quota check returned null');
       }
@@ -4206,6 +4213,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         final createdCards = await aiService.createTechCardsFromPrompt(
           result,
           establishmentId: establishmentId,
+          department: widget.department,
           unitSystem: unitPrefs.isImperial ? 'imperial' : 'metric',
           outputLocale: loc.currentLanguageCode,
         );
@@ -4789,7 +4797,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
-    const draftKey = 'tech_card_edit_new';
+    final draftKey = _newDraftKeyForDepartment();
     final merged = await DraftStorageService()
         .loadTechCardEditDraftMerged('new', draftKey);
     if (merged != null &&
@@ -4827,6 +4835,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ? '/tech-cards/new?department=bar'
         : '/tech-cards/new';
     await _openTechCardEditAndRefresh(path: path);
+  }
+
+  String _newDraftKeyForDepartment() =>
+      widget.department.trim().toLowerCase() == 'bar'
+          ? 'tech_card_edit_new_bar'
+          : 'tech_card_edit_new_kitchen';
+
+  Future<bool> _hasUnsavedCreateDraft() async {
+    final merged = await DraftStorageService()
+        .loadTechCardEditDraftMerged('new', _newDraftKeyForDepartment());
+    return merged != null &&
+        DraftStorageService.techCardDraftLooksNonEmpty(merged);
   }
 
   Future<void> _openTechCardEditAndRefresh({
@@ -5400,6 +5420,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             selectedIndex: _tabController.index,
           ),
         ),
+      ),
+      FutureBuilder<bool>(
+        future: _hasUnsavedCreateDraft(),
+        builder: (context, snapshot) {
+          if (snapshot.data != true) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : () => _openManualTechCardCreate(loc),
+                icon: const Icon(Icons.edit_note),
+                label: Text(loc.t('continue_action')),
+              ),
+            ),
+          );
+        },
       ),
       if (_listDetailsHydrating)
         LinearProgressIndicator(

@@ -154,18 +154,17 @@ class _MenuScreenState extends State<MenuScreen> {
       } else if (widget.department == 'bar') {
         tcs = allTcs
             .where((tc) =>
-            !tc.isSemiFinished &&
-            (_barCategories.contains(tc.category) ||
-                tc.sections.contains('bar') ||
-                    tc.sections.contains('all')))
+                !tc.isSemiFinished &&
+                (tc.department.trim().toLowerCase() == 'bar' ||
+                    _barCategories.contains(tc.category) ||
+                    tc.sections.contains('bar')))
             .toList();
       } else {
-        // Кухня/бар: показываем ВСЕ блюда отдела в меню для сотрудников подразделения (без фильтра по цехам).
+        // Кухня: строго без барного отдела.
         final byDept = allTcs
             .where((tc) =>
-            !tc.isSemiFinished &&
-                (!_barCategories.contains(tc.category) ||
-                    tc.sections.contains('all')))
+                !tc.isSemiFinished &&
+                tc.department.trim().toLowerCase() != 'bar')
             .toList();
         tcs = byDept;
       }
@@ -181,11 +180,17 @@ class _MenuScreenState extends State<MenuScreen> {
         }
       }
       if (mounted) {
+        bool isBarCard(TechCard tc) {
+          final dep = tc.department.trim().toLowerCase();
+          if (dep == 'bar') return true;
+          if (dep == 'kitchen') return false;
+          return _barCategories.contains(tc.category) || tc.sections.contains('bar');
+        }
         final barOnly = enriched
-            .where((tc) => _barCategories.contains(tc.category))
+            .where(isBarCard)
             .toList();
         final kitchenOnly = enriched
-            .where((tc) => !_barCategories.contains(tc.category))
+            .where((tc) => !isBarCard(tc))
             .toList();
         setState(() {
           _dishes = enriched;
