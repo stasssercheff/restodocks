@@ -9,6 +9,71 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+function text(v: unknown): string {
+  return typeof v === "string" ? v.trim().toLowerCase() : "";
+}
+
+function containsAny(haystack: string, needles: string[]): boolean {
+  return needles.some((n) => haystack.includes(n));
+}
+
+function normalizeBarCard(card: Record<string, unknown>): Record<string, unknown> {
+  const dishName = text(card["dishName"]);
+  const ingredients = Array.isArray(card["ingredients"]) ? card["ingredients"] as Record<string, unknown>[] : [];
+  const joined = [
+    dishName,
+    ...ingredients.map((i) => text(i["productName"])),
+  ].join(" ");
+
+  const hasStrongAlcohol = containsAny(joined, [
+    "vodka", "gin", "rum", "whisky", "whiskey", "tequila", "liqueur", "ликер",
+    "виски", "водка", "ром", "джин", "текила", "коньяк", "brandy", "vermouth",
+  ]);
+  const hasCoffeeTea = containsAny(joined, [
+    "coffee", "espresso", "cappuccino", "latte", "flat white", "americano", "glace",
+    "кофе", "эспрессо", "капуч", "латте", "американо", "глясе", "чай", "tea", "какао", "cocoa",
+  ]);
+  const hasNonAlcoholDrink = containsAny(joined, [
+    "lemonade", "smoothie", "juice", "soda", "tonic", "mocktail", "лимонад", "сок", "смузи",
+  ]);
+  const hasNeatDrink = containsAny(joined, [
+    "beer", "wine", "пиво", "вино", "шот", "shot",
+  ]);
+
+  let normalizedCategory = text(card["category"]);
+  if (hasCoffeeTea) {
+    normalizedCategory = "hot_drinks";
+  } else if (hasStrongAlcohol && containsAny(joined, ["cocktail", "коктейл", "spritz", "margarita", "mojito"])) {
+    normalizedCategory = "alcoholic_cocktails";
+  } else if (hasNeatDrink && hasStrongAlcohol) {
+    normalizedCategory = "drinks_pure";
+  } else if (hasNonAlcoholDrink) {
+    normalizedCategory = "non_alcoholic_drinks";
+  }
+
+  const normalizedIngredients = ingredients.map((raw) => {
+    const ing = { ...raw };
+    const n = text(ing["productName"]);
+    const current = text(ing["cookingProcessId"]);
+    if (!current || current === "mixing") {
+      if (containsAny(n, ["espresso", "кофе эспрессо", "эспрессо"])) {
+        ing["cookingProcessId"] = "espresso_extraction";
+      } else if (containsAny(n, ["milk", "молоко", "сливки"]) && hasCoffeeTea) {
+        ing["cookingProcessId"] = "steaming";
+      } else if (containsAny(n, ["boiling water", "кипяток", "hot water", "сироп"]) ) {
+        ing["cookingProcessId"] = "boiling";
+      }
+    }
+    return ing;
+  });
+
+  return {
+    ...card,
+    category: normalizedCategory || card["category"],
+    ingredients: normalizedIngredients,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
@@ -127,8 +192,12 @@ Deno.serve(async (req: Request) => {
     const cards = Array.isArray(cardsRaw)
       ? cardsRaw
       : [parsed];
+    const normalizedCards =
+      department === "bar"
+        ? cards.map((c) => (c && typeof c === "object" ? normalizeBarCard(c as Record<string, unknown>) : c))
+        : cards;
 
-    return new Response(JSON.stringify({ cards }), {
+    return new Response(JSON.stringify({ cards: normalizedCards }), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
