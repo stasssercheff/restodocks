@@ -2686,6 +2686,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return processedAll.where((tc) {
         final dep = tc.department.trim().toLowerCase();
         if (dep == 'bar') return true;
+        if (dep == 'kitchen') return false;
         // Исторические карточки могли сохраниться с неверным отделом.
         return _legacyBarCardMatch(tc, customBarIds);
       }).toList();

@@ -4062,6 +4062,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return v.toString();
   }
 
+  Future<int?> _countOrderLineLinks(String techCardId) async {
+    try {
+      final rows = await context
+          .read<SupabaseService>()
+          .client
+          .from('pos_order_lines')
+          .select('id')
+          .eq('tech_card_id', techCardId)
+          .limit(5000);
+      if (rows is List) return rows.length;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, LocalizationService loc) async {
     final ok = await showDialog<bool>(
@@ -4093,10 +4109,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     } catch (e) {
       if (!mounted) return;
       if (e is PostgrestException && e.code == '23503') {
+        final links = await _countOrderLineLinks(widget.techCardId);
         final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
         final msg = isRu
-            ? 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.'
-            : 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.';
+            ? (links != null
+                ? links > 0
+                    ? 'Нельзя удалить ТТК: найдены связанные позиции в заказах ($links). Сначала удалите или переназначьте эти позиции.'
+                    : 'Нельзя удалить ТТК из-за связей в БД (FK 23503), хотя прямых строк в pos_order_lines не найдено. Нужна проверка других ссылок.'
+                : 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.')
+            : (links != null
+                ? links > 0
+                    ? 'Cannot delete this tech card: linked order lines found ($links). Remove or reassign those order items first.'
+                    : 'Cannot delete this tech card due to DB links (FK 23503), while no direct rows were found in pos_order_lines. Other references should be checked.'
+                : 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.');
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(msg)));
         return;
