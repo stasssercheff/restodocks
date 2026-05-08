@@ -992,7 +992,6 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
           guestCount: guestCount,
           initialGuestNumber: initialGuest,
           onPick: (tc, quantity, comment, courseNumber, guestNumber) async {
-            Navigator.pop(ctx);
             await _addDish(
               tc,
               loc,
@@ -1829,6 +1828,8 @@ class _AddDishSheetState extends State<_AddDishSheet> {
   String _tab = 'kitchen';
   int _course = 1;
   int? _guest;
+  TechCard? _selectedDish;
+  bool _adding = false;
 
   @override
   void initState() {
@@ -1861,6 +1862,37 @@ class _AddDishSheetState extends State<_AddDishSheet> {
     }).toList();
   }
 
+  Future<void> _confirmAdd(LocalizationService loc) async {
+    final tc = _selectedDish;
+    if (tc == null) return;
+    final qtyRaw = _qty.text.replaceAll(',', '.').trim();
+    final qty = double.tryParse(qtyRaw);
+    if (qty == null || qty <= 0) {
+      AppToastService.show(loc.t('pos_order_line_qty_invalid'));
+      return;
+    }
+    if (_adding) return;
+    setState(() => _adding = true);
+    try {
+      final comment = _comment.text.trim();
+      await widget.onPick(
+        tc,
+        qty,
+        comment.isEmpty ? null : comment,
+        _course,
+        _guest,
+      );
+      if (!mounted) return;
+      setState(() {
+        _selectedDish = null;
+        _comment.clear();
+        _search.clear();
+      });
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = widget.loc;
@@ -1875,9 +1907,20 @@ class _AddDishSheetState extends State<_AddDishSheet> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                loc.t('pos_order_line_add'),
-                style: Theme.of(context).textTheme.titleLarge,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      loc.t('pos_order_line_add'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: loc.t('close'),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -1908,114 +1951,6 @@ class _AddDishSheetState extends State<_AddDishSheet> {
               ],
               selected: {_tab},
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Text(
-                loc.t('pos_order_add_course_guest_hint'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          loc.t('pos_order_add_course_label'),
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        DropdownButton<int>(
-                          isExpanded: true,
-                          value: _course.clamp(1, 8),
-                          items: [
-                            for (var c = 1; c <= 8; c++)
-                              DropdownMenuItem(value: c, child: Text('$c')),
-                          ],
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() => _course = v);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          loc.t('pos_order_add_guest_label'),
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        DropdownButton<int?>(
-                          isExpanded: true,
-                          value: _guest,
-                          items: [
-                            DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text(loc.t('pos_order_add_guest_any')),
-                            ),
-                            for (var g = 1; g <= widget.guestCount; g++)
-                              DropdownMenuItem(
-                                value: g,
-                                child: Text(
-                                  loc.t('pos_order_line_guest_short',
-                                      args: {'n': '$g'}),
-                                ),
-                              ),
-                          ],
-                          onChanged: (v) => setState(() => _guest = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  SizedBox(
-                    width: 130,
-                    child: TextField(
-                      controller: _qty,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                      ],
-                      decoration: InputDecoration(
-                        labelText: loc.t('pos_order_line_qty'),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _comment,
-                      maxLines: 1,
-                      decoration: InputDecoration(
-                        labelText: loc.t('pos_order_line_comment'),
-                        hintText: loc.t('pos_order_line_comment_hint'),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 4),
             Expanded(
@@ -2062,28 +1997,149 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                                     )
                                   : null,
                               onTap: () {
-                                final qtyRaw =
-                                    _qty.text.replaceAll(',', '.').trim();
-                                final qty = double.tryParse(qtyRaw);
-                                if (qty == null || qty <= 0) {
-                                  AppToastService.show(
-                                    loc.t('pos_order_line_qty_invalid'),
-                                  );
-                                  return;
-                                }
-                                final comment = _comment.text.trim();
-                                widget.onPick(
-                                  tc,
-                                  qty,
-                                  comment.isEmpty ? null : comment,
-                                  _course,
-                                  _guest,
-                                );
+                                setState(() => _selectedDish = tc);
                               },
                             );
                           },
                         ),
             ),
+            if (_selectedDish != null)
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _selectedDish!.dishNameLocalized?[lang]
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true
+                          ? _selectedDish!.dishNameLocalized![lang]!
+                          : _selectedDish!.dishName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      loc.t('pos_order_add_course_guest_hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                loc.t('pos_order_add_course_label'),
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              DropdownButton<int>(
+                                isExpanded: true,
+                                value: _course.clamp(1, 8),
+                                items: [
+                                  for (var c = 1; c <= 8; c++)
+                                    DropdownMenuItem(value: c, child: Text('$c')),
+                                ],
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() => _course = v);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                loc.t('pos_order_add_guest_label'),
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              DropdownButton<int?>(
+                                isExpanded: true,
+                                value: _guest,
+                                items: [
+                                  DropdownMenuItem<int?>(
+                                    value: null,
+                                    child: Text(loc.t('pos_order_add_guest_any')),
+                                  ),
+                                  for (var g = 1; g <= widget.guestCount; g++)
+                                    DropdownMenuItem(
+                                      value: g,
+                                      child: Text(
+                                        loc.t('pos_order_line_guest_short',
+                                            args: {'n': '$g'}),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (v) => setState(() => _guest = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 130,
+                          child: TextField(
+                            controller: _qty,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                            ],
+                            decoration: InputDecoration(
+                              labelText: loc.t('pos_order_line_qty'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _comment,
+                            maxLines: 1,
+                            decoration: InputDecoration(
+                              labelText: loc.t('pos_order_line_comment'),
+                              hintText: loc.t('pos_order_line_comment_hint'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: _adding ? null : () => _confirmAdd(loc),
+                      icon: _adding
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add_circle_outline),
+                      label: Text(loc.t('pos_order_line_add')),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

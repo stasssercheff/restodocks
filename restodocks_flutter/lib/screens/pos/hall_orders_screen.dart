@@ -22,13 +22,14 @@ class HallOrdersScreen extends StatefulWidget {
   State<HallOrdersScreen> createState() => _HallOrdersScreenState();
 }
 
-enum _HallBucket { active, served }
+enum _HallBucket { active, served, history }
 
 class _HallOrdersScreenState extends State<HallOrdersScreen> {
   bool _loading = true;
   Object? _error;
   PosDepartmentOrderBuckets _buckets =
       const PosDepartmentOrderBuckets(active: [], served: []);
+  List<PosOrder> _history = const [];
   _HallBucket _bucket = _HallBucket.active;
   Timer? _elapsedTimer;
   PosOrdersDisplaySettingsService? _displaySettings;
@@ -96,9 +97,16 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         est.id,
         'hall',
       );
+      final employee = account.currentEmployee;
+      final canSeeHistory = employee != null &&
+          (employee.hasRole('owner') || employee.department == 'management');
+      final history = canSeeHistory
+          ? await PosOrderService.instance.fetchHallOrderHistory(est.id)
+          : const <PosOrder>[];
       if (!mounted) return;
       setState(() {
         _buckets = buckets;
+        _history = history;
         _loading = false;
       });
     } catch (e) {
@@ -262,6 +270,8 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     final loc = context.watch<LocalizationService>();
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
+    final canSeeHistory =
+        emp != null && (emp.hasRole('owner') || emp.department == 'management');
 
     return Scaffold(
       appBar: AppBar(
@@ -274,11 +284,12 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
               onPressed: () => context.push('/settings/orders-display'),
               tooltip: loc.t('pos_orders_display_settings_title'),
             ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () => context.push('/pos/hall/order-history'),
-            tooltip: loc.t('pos_order_history_button'),
-          ),
+          if (canSeeHistory)
+            IconButton(
+              icon: const Icon(Icons.history),
+              onPressed: () => context.push('/pos/hall/order-history'),
+              tooltip: loc.t('pos_order_history_button'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
@@ -299,6 +310,9 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
       _bucket == _HallBucket.active ? _buckets.active : _buckets.served;
 
   Widget _body(BuildContext context, LocalizationService loc) {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final canSeeHistory =
+        emp != null && (emp.hasRole('owner') || emp.department == 'management');
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -308,7 +322,15 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
           : loc.t('pos_tables_load_error');
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
-    if (_buckets.active.isEmpty && _buckets.served.isEmpty) {
+    final hasHistoryForRole =
+        _history.isNotEmpty ||
+        ((context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') ??
+                false) ||
+            (context.read<AccountManagerSupabase>().currentEmployee?.department ==
+                'management'));
+    if (_buckets.active.isEmpty &&
+        _buckets.served.isEmpty &&
+        !hasHistoryForRole) {
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -345,6 +367,11 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                 value: _HallBucket.served,
                 label: Text(loc.t('pos_department_orders_tab_served')),
               ),
+              if (canSeeHistory)
+                ButtonSegment(
+                  value: _HallBucket.history,
+                  label: Text(loc.t('order_history')),
+                ),
             ],
             selected: {_bucket},
             onSelectionChanged: (s) => setState(() => _bucket = s.first),
@@ -353,7 +380,8 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: _visibleOrders.isEmpty
+            child: (_bucket == _HallBucket.history ? _history : _visibleOrders)
+                    .isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
@@ -365,7 +393,9 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                             child: Text(
                               _bucket == _HallBucket.active
                                   ? loc.t('pos_department_orders_active_empty')
-                                  : loc.t('pos_department_orders_served_empty'),
+                                  : (_bucket == _HallBucket.served
+                                      ? loc.t('pos_department_orders_served_empty')
+                                      : loc.t('order_history_empty')),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -376,10 +406,16 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                 : ListView.separated(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
-                  itemCount: _visibleOrders.length,
+                  itemCount: (_bucket == _HallBucket.history
+                          ? _history
+                          : _visibleOrders)
+                      .length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) {
-                    final o = _visibleOrders[i];
+                    final source = _bucket == _HallBucket.history
+                        ? _history
+                        : _visibleOrders;
+                    final o = source[i];
                     final tn = o.tableNumber ?? 0;
                     final sub = [
                       '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',

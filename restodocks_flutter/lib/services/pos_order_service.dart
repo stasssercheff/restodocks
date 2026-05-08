@@ -82,12 +82,23 @@ class PosOrderService {
 
   static const _lineSelect = 'id, order_id, tech_card_id, quantity, comment, '
       'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
+      'bar_modifiers, '
+      'marking_codes, '
+      'tech_cards(dish_name, dish_name_localized, selling_price, department, '
+      'category, sections)';
+  static const _lineSelectLegacy =
+      'id, order_id, tech_card_id, quantity, comment, '
+      'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
       'marking_codes, '
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
   /// Упрощённый select строк для аналитики продаж (без course/guest).
-  static const _lineSelectSales = 'id, order_id, tech_card_id, quantity, '
+  static const _lineSelectSales =
+      'id, order_id, tech_card_id, quantity, bar_modifiers, '
+      'tech_cards(dish_name, dish_name_localized, selling_price, department, '
+      'category, sections)';
+  static const _lineSelectSalesLegacy = 'id, order_id, tech_card_id, quantity, '
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
@@ -117,6 +128,22 @@ class PosOrderService {
         (s.contains('column') && s.contains('does not exist'));
   }
 
+  Future<List<dynamic>> _selectOrderLinesWithModifiersFallback(
+    Future<List<dynamic>> Function(String lineFields) run,
+  ) async {
+    try {
+      return await run(_lineSelect);
+    } catch (e, st) {
+      if (!_isMissingColumnError(e)) {
+        devLog('PosOrderService: select lines $e $st');
+        rethrow;
+      }
+      devLog(
+          'PosOrderService: retry pos_order_lines without bar_modifiers (apply migration)');
+      return await run(_lineSelectLegacy);
+    }
+  }
+
   /// Повтор запроса без `discount_amount` / `service_charge_percent` / `tips_amount`.
   Future<List<dynamic>> _selectOrdersWithPricingFallback(
     Future<List<dynamic>> Function(String orderFields) run,
@@ -128,7 +155,8 @@ class PosOrderService {
         devLog('PosOrderService: select orders $e $st');
         rethrow;
       }
-      devLog('PosOrderService: retry pos_orders without pricing columns (apply MANUAL migration)');
+      devLog(
+          'PosOrderService: retry pos_orders without pricing columns (apply MANUAL migration)');
       return await run(_orderCoreWithTable);
     }
   }
@@ -157,15 +185,19 @@ class PosOrderService {
 
   Future<List<PosOrderLine>> fetchLines(String orderId) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_order_lines')
-          .select(_lineSelect)
-          .eq('order_id', orderId)
-          .order('sort_order', ascending: true)
-          .order('created_at', ascending: true);
+      final rows =
+          await _selectOrderLinesWithModifiersFallback((lineFields) async {
+        final r = await _supabase.client
+            .from('pos_order_lines')
+            .select(lineFields)
+            .eq('order_id', orderId)
+            .order('sort_order', ascending: true)
+            .order('created_at', ascending: true);
+        return r as List<dynamic>;
+      });
 
       final list = <PosOrderLine>[];
-      for (final row in rows as List<dynamic>) {
+      for (final row in rows) {
         if (row is! Map<String, dynamic>) continue;
         try {
           list.add(PosOrderLine.fromJson(Map<String, dynamic>.from(row)));
@@ -187,6 +219,7 @@ class PosOrderService {
     String? comment,
     int courseNumber = 1,
     int? guestNumber,
+    List<Map<String, dynamic>> barModifiers = const [],
   }) async {
     if (quantity <= 0) throw ArgumentError.value(quantity, 'quantity');
     await _requireDraftOrSent(orderId);
@@ -202,20 +235,44 @@ class PosOrderService {
       final m = mr.first as Map;
       nextSort = ((m['sort_order'] as num?)?.toInt() ?? 0) + 1;
     }
-    final row = await _supabase.client.from('pos_order_lines').insert({
+    Map<String, dynamic> row;
+    final payload = <String, dynamic>{
       'order_id': orderId,
       'tech_card_id': techCardId,
       'quantity': quantity,
-      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      if (comment != null && comment.trim().isNotEmpty)
+        'comment': comment.trim(),
       'course_number': courseNumber,
       if (guestNumber != null) 'guest_number': guestNumber,
+      if (barModifiers.isNotEmpty) 'bar_modifiers': barModifiers,
       'sort_order': nextSort,
-    }).select(_lineSelect).single();
+    };
+    try {
+      row = Map<String, dynamic>.from(
+        await _supabase.client
+            .from('pos_order_lines')
+            .insert(payload)
+            .select(_lineSelect)
+            .single(),
+      );
+    } catch (e) {
+      if (!_isMissingColumnError(e)) rethrow;
+      final legacyPayload = Map<String, dynamic>.from(payload)
+        ..remove('bar_modifiers');
+      row = Map<String, dynamic>.from(
+        await _supabase.client
+            .from('pos_order_lines')
+            .insert(legacyPayload)
+            .select(_lineSelectLegacy)
+            .single(),
+      );
+    }
     await _touchOrderUpdated(orderId);
-    return PosOrderLine.fromJson(Map<String, dynamic>.from(row));
+    return PosOrderLine.fromJson(row);
   }
 
-  Future<void> updateLineQuantity(String lineId, String orderId, double quantity) async {
+  Future<void> updateLineQuantity(
+      String lineId, String orderId, double quantity) async {
     if (quantity <= 0) return;
     await _requireDraft(orderId);
     await _supabase.client.from('pos_order_lines').update({
@@ -225,7 +282,8 @@ class PosOrderService {
     await _touchOrderUpdated(orderId);
   }
 
-  Future<void> updateLineComment(String lineId, String orderId, String? comment) async {
+  Future<void> updateLineComment(
+      String lineId, String orderId, String? comment) async {
     await _requireDraft(orderId);
     await _supabase.client.from('pos_order_lines').update({
       'comment': comment?.trim().isEmpty == true ? null : comment?.trim(),
@@ -240,7 +298,9 @@ class PosOrderService {
     required int courseNumber,
     int? guestNumber,
   }) async {
-    if (courseNumber < 1) throw ArgumentError.value(courseNumber, 'courseNumber');
+    if (courseNumber < 1) {
+      throw ArgumentError.value(courseNumber, 'courseNumber');
+    }
     await _requireDraft(orderId);
     await _supabase.client.from('pos_order_lines').update({
       'course_number': courseNumber,
@@ -274,10 +334,9 @@ class PosOrderService {
         .eq('order_id', orderId)
         .maybeSingle();
     if (row == null) throw StateError('pos_order_line_missing');
-    final existing = (row['marking_codes'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        <String>[];
+    final existing =
+        (row['marking_codes'] as List?)?.map((e) => e.toString()).toList() ??
+            <String>[];
     if (existing.contains(code)) {
       throw PosOrderLineMarkingDuplicateException();
     }
@@ -285,10 +344,14 @@ class PosOrderService {
       throw PosOrderLineMarkingLimitException();
     }
     final next = [...existing, code];
-    await _supabase.client.from('pos_order_lines').update({
-      'marking_codes': next,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', lineId).eq('order_id', orderId);
+    await _supabase.client
+        .from('pos_order_lines')
+        .update({
+          'marking_codes': next,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', lineId)
+        .eq('order_id', orderId);
     await _touchOrderUpdated(orderId);
   }
 
@@ -306,16 +369,19 @@ class PosOrderService {
         .eq('order_id', orderId)
         .maybeSingle();
     if (row == null) throw StateError('pos_order_line_missing');
-    final existing = (row['marking_codes'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        <String>[];
+    final existing =
+        (row['marking_codes'] as List?)?.map((e) => e.toString()).toList() ??
+            <String>[];
     if (index < 0 || index >= existing.length) return;
     final next = List<String>.from(existing)..removeAt(index);
-    await _supabase.client.from('pos_order_lines').update({
-      'marking_codes': next,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', lineId).eq('order_id', orderId);
+    await _supabase.client
+        .from('pos_order_lines')
+        .update({
+          'marking_codes': next,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', lineId)
+        .eq('order_id', orderId);
     await _touchOrderUpdated(orderId);
   }
 
@@ -326,10 +392,14 @@ class PosOrderService {
     if (o.status != PosOrderStatus.sent) {
       throw PosOrderLineMarkServedException();
     }
-    await _supabase.client.from('pos_order_lines').update({
-      'served_at': DateTime.now().toUtc().toIso8601String(),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', lineId).eq('order_id', orderId);
+    await _supabase.client
+        .from('pos_order_lines')
+        .update({
+          'served_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', lineId)
+        .eq('order_id', orderId);
     await _touchOrderUpdated(orderId);
   }
 
@@ -405,6 +475,41 @@ class PosOrderService {
       );
     } catch (e, st) {
       devLog('PosOrderService: fetchDepartmentOrderBuckets $e $st');
+      rethrow;
+    }
+  }
+
+  /// История заказов зала: закрытые + отменённые.
+  Future<List<PosOrder>> fetchHallOrderHistory(
+    String establishmentId, {
+    int limit = 300,
+  }) async {
+    try {
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('establishment_id', establishmentId)
+            .inFilter('status', [
+              PosOrderStatus.closed.toApi(),
+              PosOrderStatus.cancelled.toApi(),
+            ])
+            .order('updated_at', ascending: false)
+            .limit(limit.clamp(1, 1000));
+        return r as List<dynamic>;
+      });
+      final list = <PosOrder>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          list.add(PosOrder.fromJson(Map<String, dynamic>.from(row)));
+        } catch (e) {
+          devLog('PosOrderService: skip history row $e');
+        }
+      }
+      return list;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchHallOrderHistory $e $st');
       rethrow;
     }
   }
@@ -645,7 +750,8 @@ class PosOrderService {
     required String diningTableId,
     int guestCount = 1,
   }) async {
-    final existing = await fetchActiveOrderForTable(establishmentId, diningTableId);
+    final existing =
+        await fetchActiveOrderForTable(establishmentId, diningTableId);
     if (existing != null) {
       throw PosOrderTableBusyException(existing);
     }
@@ -776,15 +882,33 @@ class PosOrderService {
   }) async {
     try {
       final rows = await _selectOrdersWithPricingFallback((sel) async {
-        final r = await _supabase.client
-            .from('pos_orders')
-            .select('$sel, pos_order_lines($_lineSelectSales)')
-            .eq('establishment_id', establishmentId)
-            .eq('status', PosOrderStatus.closed.toApi())
-            .gte('paid_at', fromUtc.toUtc().toIso8601String())
-            .lte('paid_at', toUtc.toUtc().toIso8601String())
-            .order('paid_at', ascending: false);
-        return r as List<dynamic>;
+        try {
+          final r = await _supabase.client
+              .from('pos_orders')
+              .select('$sel, pos_order_lines($_lineSelectSales)')
+              .eq('establishment_id', establishmentId)
+              .eq('status', PosOrderStatus.closed.toApi())
+              .gte('paid_at', fromUtc.toUtc().toIso8601String())
+              .lte('paid_at', toUtc.toUtc().toIso8601String())
+              .order('paid_at', ascending: false);
+          return r as List<dynamic>;
+        } catch (e, st) {
+          if (!_isMissingColumnError(e)) {
+            devLog('PosOrderService: closed sales with modifiers $e $st');
+            rethrow;
+          }
+          devLog(
+              'PosOrderService: retry closed sales without bar_modifiers (apply migration)');
+          final r = await _supabase.client
+              .from('pos_orders')
+              .select('$sel, pos_order_lines($_lineSelectSalesLegacy)')
+              .eq('establishment_id', establishmentId)
+              .eq('status', PosOrderStatus.closed.toApi())
+              .gte('paid_at', fromUtc.toUtc().toIso8601String())
+              .lte('paid_at', toUtc.toUtc().toIso8601String())
+              .order('paid_at', ascending: false);
+          return r as List<dynamic>;
+        }
       });
 
       final out = <PosClosedOrderSalesBundle>[];
@@ -799,7 +923,8 @@ class PosOrderService {
             for (final item in linesRaw) {
               if (item is! Map<String, dynamic>) continue;
               try {
-                lines.add(PosOrderLine.fromJson(Map<String, dynamic>.from(item)));
+                lines.add(
+                    PosOrderLine.fromJson(Map<String, dynamic>.from(item)));
               } catch (e) {
                 devLog('PosOrderService: skip sales line $e');
               }
@@ -937,7 +1062,10 @@ class PosOrderService {
     } catch (e, st) {
       devLog('PosOrderService: close order update $e $st');
       try {
-        await _supabase.client.from('pos_order_payments').delete().eq('order_id', orderId);
+        await _supabase.client
+            .from('pos_order_payments')
+            .delete()
+            .eq('order_id', orderId);
       } catch (_) {}
       rethrow;
     }
