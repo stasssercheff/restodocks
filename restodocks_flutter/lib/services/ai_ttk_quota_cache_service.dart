@@ -11,8 +11,11 @@ class AiTtkQuotaCacheService {
 
   final Map<String, int> _remainingByEstablishmentAndDepartment = <String, int>{};
 
+  String _scopeDepartment(String department) =>
+      department.trim().toLowerCase().contains('bar') ? 'bar' : 'kitchen';
+
   String _cacheKey(String establishmentId, String department) =>
-      '${establishmentId.trim()}|${department.trim().toLowerCase()}';
+      '${establishmentId.trim()}|${_scopeDepartment(department)}';
 
   int? readCachedRemaining(
     String establishmentId, {
@@ -57,11 +60,12 @@ class AiTtkQuotaCacheService {
       return null;
     }
     try {
+      final scopeDepartment = _scopeDepartment(department);
       final res = await Supabase.instance.client.functions.invoke(
         'ai-create-tech-card',
         body: <String, dynamic>{
           'establishmentId': resolved,
-          'department': department.trim().toLowerCase(),
+          'department': scopeDepartment,
           'checkOnly': true,
         },
       );
@@ -74,7 +78,7 @@ class AiTtkQuotaCacheService {
       final remainingFromServer = (data['remaining'] as num?)?.toInt();
       final remaining = (remainingFromServer ?? (limit - used)).clamp(0, limit);
       _remainingByEstablishmentAndDepartment[
-          _cacheKey(resolved, department)] = remaining;
+          _cacheKey(resolved, scopeDepartment)] = remaining;
       return remaining;
     } catch (e, st) {
       devLog('AiTtkQuotaCacheService.refreshForEstablishment: $e $st');

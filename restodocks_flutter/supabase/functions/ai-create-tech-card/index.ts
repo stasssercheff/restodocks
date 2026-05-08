@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : "";
     const checkOnly = body.checkOnly === true;
     const department =
-      typeof body.department === "string" && body.department.trim().toLowerCase() === "bar"
+      typeof body.department === "string" && body.department.trim().toLowerCase().includes("bar")
         ? "bar"
         : "kitchen";
     const rawLocale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";

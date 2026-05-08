@@ -916,7 +916,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   /// Отдел для категорий: bar или kitchen.
   String get _categoryDepartment {
-    if (widget.department == 'bar') return 'bar';
+    final dep = (widget.department ?? '').trim().toLowerCase();
+    if (dep.contains('bar')) return 'bar';
     if (_techCard != null && _barCategoryOptions.contains(_techCard!.category))
       return 'bar';
     return 'kitchen';
@@ -1177,7 +1178,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     // Для новых ТТК (в т.ч. AI/import) используем общий ключ департамента,
     // чтобы кнопка "завершить создание" всегда находила незавершенный черновик.
     final dept =
-        (widget.department ?? '').trim().toLowerCase() == 'bar' ? 'bar' : 'kitchen';
+        (widget.department ?? '').trim().toLowerCase().contains('bar') ? 'bar' : 'kitchen';
     return 'tech_card_edit_new_$dept';
   }
 
@@ -1663,7 +1664,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
-    if (widget.department == 'bar') {
+    if ((widget.department ?? '').trim().toLowerCase().contains('bar')) {
       if (lower.contains('коктейл') ||
           lower.contains('cocktail') ||
           lower.contains('мохито') ||
@@ -2089,6 +2090,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             _ensurePlaceholderRowAtEnd();
           } else {
             _ensurePlaceholderRowAtEnd();
+          }
+          // После AI/импорта сохраняем черновик сразу,
+          // чтобы при быстром уходе/возврате (Home/Back) кнопка
+          // "завершить создание" оставалась доступной.
+          if (mounted) {
+            if (kIsWeb) {
+              scheduleSave();
+            } else {
+              _scheduleDraftSave();
+            }
           }
           setState(() {
             _loading = false;
@@ -3566,8 +3577,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           dishName: saveName,
           category: category,
           sections: _selectedSections,
-          department: widget.department == 'bar' ||
-                  widget.department == 'banquet-catering-bar'
+          department: (widget.department ?? '')
+                  .trim()
+                  .toLowerCase()
+                  .contains('bar')
               ? 'bar'
               : 'kitchen',
           isSemiFinished: _isSemiFinished,

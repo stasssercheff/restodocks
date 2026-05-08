@@ -42,7 +42,7 @@ async function resolveAiTtkUsageStatus(
   let limit = 0;
   let denyReason = "";
 
-  const scope = department.trim().toLowerCase() === "bar" ? "bar" : "kitchen";
+  const scope = department.trim().toLowerCase().includes("bar") ? "bar" : "kitchen";
 
   if (isPaidActive) {
     const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;

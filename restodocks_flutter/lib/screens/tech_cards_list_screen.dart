@@ -1132,10 +1132,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   List<({String category, List<TechCard> cards})> _groupByCategory(
       List<TechCard> cards) {
-    final order = (widget.department == 'bar' ||
-            widget.department == 'banquet-catering-bar')
-        ? _barCategoryOrder
-        : _kitchenCategoryOrder;
+    final dep = widget.department.trim().toLowerCase();
+    final order = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     final grouped = <String, List<TechCard>>{};
     for (final tc in cards) {
       final cat = tc.category.isNotEmpty ? tc.category : 'misc';
@@ -2684,7 +2682,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   barCategories.contains(tc.category)))
           .toList();
     }
-    if (widget.department == 'bar') {
+    if (widget.department.trim().toLowerCase().contains('bar')) {
       return processedAll.where((tc) {
         final dep = tc.department.trim().toLowerCase();
         if (dep == 'bar') return true;
@@ -3941,8 +3939,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             : null;
         final hasMeta = sig != null && sig.isNotEmpty;
         await _openTechCardEditAndRefresh(
-          path: widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
+          path: widget.department.trim().toLowerCase().contains('bar')
+              ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
               : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
               ? {
@@ -4228,8 +4226,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           }
           if (createdCards.length == 1) {
             await _openTechCardEditAndRefresh(
-              path: widget.department == 'bar'
-                  ? '/tech-cards/new?department=bar'
+              path: widget.department.trim().toLowerCase().contains('bar')
+                  ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
                   : '/tech-cards/new',
               extra: <String, Object?>{
                 'result': createdCards.first,
@@ -4271,8 +4269,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           isSemiFinished: false,
         );
         await _openTechCardEditAndRefresh(
-          path: widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
+          path: widget.department.trim().toLowerCase().contains('bar')
+              ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
               : '/tech-cards/new',
           extra: <String, Object?>{
             'result': fallback,
@@ -4341,8 +4339,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ),
           );
           await _openTechCardEditAndRefresh(
-            path: widget.department == 'bar'
-                ? '/tech-cards/new?department=bar'
+            path: widget.department.trim().toLowerCase().contains('bar')
+                ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
                 : '/tech-cards/new',
             extra: <String, Object?>{
               'result': fallback,
@@ -4366,9 +4364,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         await _openTechCardEditAndRefresh(
-          path: widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
-              : '/tech-cards/new',
+            path: widget.department.trim().toLowerCase().contains('bar')
+                ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
+                : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
               ? {
                   'result': list.single,
@@ -4510,8 +4508,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         await _openTechCardEditAndRefresh(
-          path: widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
+          path: widget.department.trim().toLowerCase().contains('bar')
+              ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
               : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
               ? {
@@ -4833,14 +4831,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             .clearTechCardEditDraftEverywhere(draftKey, draftKey);
       }
     }
-    final path = widget.department == 'bar'
-        ? '/tech-cards/new?department=bar'
+    final dep = widget.department.trim().toLowerCase();
+    final path = dep.contains('bar')
+        ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
         : '/tech-cards/new';
     await _openTechCardEditAndRefresh(path: path);
   }
 
   String _newDraftKeyForDepartment() =>
-      widget.department.trim().toLowerCase() == 'bar'
+      widget.department.trim().toLowerCase().contains('bar')
           ? 'tech_card_edit_new_bar'
           : 'tech_card_edit_new_kitchen';
 
@@ -5300,10 +5299,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     // Разделяем список на ПФ и Блюда, фильтруем по поиску, цеху и категории
     _ensureLowerSearchNameCache(loc);
     final query = _appliedSearchQuery;
-    final catOrder = (widget.department == 'bar' ||
-            widget.department == 'banquet-catering-bar')
-        ? _barCategoryOrder
-        : _kitchenCategoryOrder;
+    final dep = widget.department.trim().toLowerCase();
+    final catOrder = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     final customCatsInList = _list
         .map((tc) => tc.category)
         .where(TechCardServiceSupabase.isCustomCategory)
@@ -5649,10 +5646,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ??
         Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
-    final catOrder = (widget.department == 'bar' ||
-            widget.department == 'banquet-catering-bar')
-        ? _barCategoryOrder
-        : _kitchenCategoryOrder;
+    final dep = widget.department.trim().toLowerCase();
+    final catOrder = dep.contains('bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     List<TechCard> sortCards(List<TechCard> cards, bool bySection) {
       return List.from(cards)
         ..sort((a, b) {
