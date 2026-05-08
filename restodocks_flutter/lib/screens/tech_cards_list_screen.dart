@@ -4853,10 +4853,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           : 'tech_card_edit_new_kitchen';
 
   List<({String storageSuffix, String cloudKey})> _createDraftCandidateKeys() {
-    final deptKey = _newDraftKeyForDepartment();
-    final deptSuffix = deptKey.replaceFirst('tech_card_edit_', '');
     return <({String storageSuffix, String cloudKey})>[
-      (storageSuffix: deptSuffix, cloudKey: deptKey),
+      (
+        storageSuffix: 'new_kitchen',
+        cloudKey: 'tech_card_edit_new_kitchen',
+      ),
+      (
+        storageSuffix: 'new_bar',
+        cloudKey: 'tech_card_edit_new_bar',
+      ),
       // Legacy key used by older builds.
       (storageSuffix: 'new', cloudKey: 'tech_card_edit_new'),
     ];
@@ -5467,6 +5472,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         builder: (context, snapshot) {
           final count = snapshot.data ?? 0;
           if (count <= 0) return const SizedBox.shrink();
+          final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+          final label = isRu ? 'Завершить ($count)' : 'Finish ($count)';
           return Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Align(
@@ -5474,7 +5481,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               child: OutlinedButton.icon(
                 onPressed: _loading ? null : () => _openManualTechCardCreate(loc),
                 icon: const Icon(Icons.edit_note),
-                label: Text('${loc.t('continue_action')} ($count)'),
+                label: Text(label),
               ),
             ),
           );
