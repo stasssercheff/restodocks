@@ -48,6 +48,9 @@ const _barCategories = {
 bool _isBarDish(TechCard tc) =>
     _barCategories.contains(tc.category) || tc.sections.contains('bar');
 
+bool _isArchivedDish(TechCard tc) =>
+    tc.sections.map((s) => s.trim().toLowerCase()).contains('archived');
+
 class _MenuScreenState extends State<MenuScreen> {
   List<TechCard> _dishes = [];
   List<TechCard> _dishesBar = [];
@@ -139,22 +142,25 @@ class _MenuScreenState extends State<MenuScreen> {
         tcs = allTcs
             .where((tc) =>
             !tc.isSemiFinished &&
+                !_isArchivedDish(tc) &&
                 (tc.category == 'banquet' || tc.category == 'catering'))
             .toList();
       } else if (widget.department == 'banquet-catering-bar') {
         tcs = allTcs
             .where((tc) =>
             !tc.isSemiFinished &&
+            !_isArchivedDish(tc) &&
             (tc.category == 'banquet' || tc.category == 'catering') &&
                 (tc.sections.contains('bar') || tc.sections.contains('all')))
             .toList();
       } else if (widget.department == 'hall' ||
           widget.department == 'dining_room') {
-        tcs = allTcs.where((tc) => !tc.isSemiFinished).toList();
+        tcs = allTcs.where((tc) => !tc.isSemiFinished && !_isArchivedDish(tc)).toList();
       } else if (widget.department == 'bar') {
         tcs = allTcs
             .where((tc) {
               if (tc.isSemiFinished) return false;
+              if (_isArchivedDish(tc)) return false;
               final dep = tc.department.trim().toLowerCase();
               if (dep == 'bar') return true;
               // Legacy fallback for historical cards with wrong/missing department.
@@ -167,6 +173,7 @@ class _MenuScreenState extends State<MenuScreen> {
         final byDept = allTcs
             .where((tc) =>
                 !tc.isSemiFinished &&
+                !_isArchivedDish(tc) &&
                 tc.department.trim().toLowerCase() != 'bar')
             .toList();
         tcs = byDept;

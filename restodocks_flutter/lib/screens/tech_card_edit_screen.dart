@@ -4084,6 +4084,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
   }
 
+  Future<bool> _archiveTechCardInsteadOfDelete() async {
+    final svc = context.read<TechCardServiceSupabase>();
+    final tc = _techCard ?? await svc.getTechCardById(widget.techCardId, preferCache: false);
+    if (tc == null) return false;
+    final archived = tc.copyWith(
+      sections: const ['archived'],
+      updatedAt: DateTime.now(),
+    );
+    await svc.saveTechCard(archived, skipHistory: false);
+    return true;
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, LocalizationService loc) async {
     final ok = await showDialog<bool>(
@@ -4115,6 +4127,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     } catch (e) {
       if (!mounted) return;
       if (e is PostgrestException && e.code == '23503') {
+        try {
+          final archived = await _archiveTechCardInsteadOfDelete();
+          if (!mounted) return;
+          if (archived) {
+            final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+            final msg = isRu
+                ? 'ТТК используется в истории заказов и была перемещена в архив.'
+                : 'This tech card is used in order history and was moved to archive.';
+            AppToastService.show(msg);
+            context.pop(true);
+            return;
+          }
+        } catch (_) {}
         final linkedHint = await _linkedOrdersHint(widget.techCardId);
         final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
         final msg = isRu
@@ -4124,8 +4149,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             : (linkedHint == null
                 ? 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.'
                 : 'Cannot delete this tech card: it is used in orders ($linkedHint). Remove or reassign linked order items first.');
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

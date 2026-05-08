@@ -2704,9 +2704,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   List<TechCard> _filterListByDepartment(
       List<TechCard> processedAll, Set<String> customBarIds) {
+    bool isArchived(TechCard tc) =>
+        tc.sections.map((s) => s.trim().toLowerCase()).contains('archived');
     if (widget.department == 'banquet-catering') {
       return processedAll
           .where((tc) => tc.category == 'banquet' || tc.category == 'catering')
+          .where((tc) => !isArchived(tc))
           .toList();
     }
     if (widget.department == 'banquet-catering-bar') {
@@ -2725,10 +2728,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               (tc.sections.contains('bar') ||
                   tc.sections.contains('all') ||
                   barCategories.contains(tc.category)))
+          .where((tc) => !isArchived(tc))
           .toList();
     }
     if (widget.department.trim().toLowerCase().contains('bar')) {
       return processedAll.where((tc) {
+        if (isArchived(tc)) return false;
         final dep = tc.department.trim().toLowerCase();
         if (dep == 'bar') return true;
         if (dep == 'kitchen') {
@@ -2743,6 +2748,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (widget.department == 'hall') return [];
     // Кухня: не отсекаем по «барным» категориям — в БД tech_cards.department = kitchen.
     return processedAll.where((tc) {
+      if (isArchived(tc)) return false;
       final dep = tc.department.trim().toLowerCase();
       if (dep == 'bar') return false;
       if (dep == 'kitchen') return true;
