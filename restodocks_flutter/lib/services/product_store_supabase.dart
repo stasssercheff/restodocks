@@ -289,6 +289,7 @@ class ProductStoreSupabase {
         .trim()
         .toLowerCase()
         .replaceAll(RegExp(r'\s+'), ' ');
+    final variants = _ingredientNameVariants(raw, stripped);
     if (raw.isEmpty && stripped.isEmpty) return null;
     for (final p in _allProducts.where((p) {
       final n = (p.name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
@@ -296,18 +297,14 @@ class ProductStoreSupabase {
           .trim()
           .toLowerCase()
           .replaceAll(RegExp(r'\s+'), ' ');
-      if (n == raw ||
-          n == stripped ||
-          pStripped == raw ||
-          pStripped == stripped) return true;
+      if (variants.contains(n) || variants.contains(pStripped)) return true;
       for (final v in p.names?.values ?? <String>[]) {
         final vn = v.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
         final vs = stripIikoPrefix(v)
             .trim()
             .toLowerCase()
             .replaceAll(RegExp(r'\s+'), ' ');
-        if (vn == raw || vn == stripped || vs == raw || vs == stripped)
-          return true;
+        if (variants.contains(vn) || variants.contains(vs)) return true;
       }
       return false;
     })) {
@@ -338,10 +335,76 @@ class ProductStoreSupabase {
         }
       }
     }
+    // Токенное совпадение для перестановок слов и расширенных названий:
+    // "огурцы маринованные" ~= "маринованные огурцы".
+    if (candidates.isEmpty) {
+      final q = stripped.isNotEmpty ? stripped : raw;
+      final queryTokens = q
+          .split(RegExp(r'[^a-zA-Zа-яА-Я0-9]+'))
+          .map((t) => t.trim().toLowerCase())
+          .where((t) => t.length >= 3)
+          .toSet();
+      for (final v in variants) {
+        queryTokens.addAll(v
+            .split(RegExp(r'[^a-zA-Zа-яА-Я0-9]+'))
+            .map((t) => t.trim().toLowerCase())
+            .where((t) => t.length >= 3));
+      }
+      if (queryTokens.isNotEmpty) {
+        Product? best;
+        var bestScore = 0.0;
+        for (final p in _allProducts) {
+          final blob = _productNameBlobLower(p);
+          final productTokens = blob
+              .split(RegExp(r'[^a-zA-Zа-яА-Я0-9]+'))
+              .map((t) => t.trim().toLowerCase())
+              .where((t) => t.length >= 3)
+              .toSet();
+          if (productTokens.isEmpty) continue;
+          final intersect = queryTokens.intersection(productTokens).length;
+          if (intersect == 0) continue;
+          final score = intersect / queryTokens.length;
+          if (score > bestScore ||
+              (score == bestScore &&
+                  best != null &&
+                  _ingredientProductScore(p) > _ingredientProductScore(best))) {
+            best = p;
+            bestScore = score;
+          }
+        }
+        if (best != null && bestScore >= 0.6) {
+          candidates.add(best);
+        }
+      }
+    }
     if (candidates.isEmpty) return null;
     candidates.sort((a, b) =>
         _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
     return candidates.first;
+  }
+
+  Set<String> _ingredientNameVariants(String raw, String stripped) {
+    final base = <String>{};
+    if (raw.isNotEmpty) base.add(raw);
+    if (stripped.isNotEmpty) base.add(stripped);
+    final out = <String>{...base};
+    for (final v in base) {
+      final n = v.trim().toLowerCase();
+      if (n.isEmpty) continue;
+      if (n.contains('паприка')) out.add(n.replaceAll('паприка', 'перец паприка'));
+      if (n.contains('перец паприка')) out.add(n.replaceAll('перец паприка', 'паприка'));
+      if (n.contains('огур') && n.contains('марин')) {
+        out.add('огурцы маринованные');
+        out.add('маринованные огурцы');
+      }
+      if (n.contains('корнишон')) {
+        out.add(n.replaceAll('корнишон', 'огурец маринованный'));
+      }
+      if (n.contains('пикл') || n.contains('pickle')) {
+        out.add('огурцы маринованные');
+      }
+    }
+    return out;
   }
 
   String _productNameBlobLower(Product p) {

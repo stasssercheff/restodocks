@@ -358,7 +358,139 @@ class CookingProcess extends Equatable {
       weightLossPercentage: 0.0,
       applicableCategories: ['all'],
     ),
+    // Бар: взбивание в шейкере
+    CookingProcess(
+      id: 'shaking',
+      name: 'Shaking',
+      localizedNames: {
+        'ru': 'Шейк',
+        'en': 'Shaking',
+        'es': 'Coctelera',
+        'kk': 'Шейкермен шайқау',
+        'it': 'Shakerare',
+        'tr': 'Shaker ile çalkalama',
+        'vi': 'Lắc shaker',
+        'de': 'Shaken',
+        'fr': 'Shaker',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
+    // Бар: перемешивание барной ложкой
+    CookingProcess(
+      id: 'stirring',
+      name: 'Stirring',
+      localizedNames: {
+        'ru': 'Стир',
+        'en': 'Stirring',
+        'es': 'Mezclado en vaso',
+        'kk': 'Араластыру (стир)',
+        'it': 'Stirring',
+        'tr': 'Karıştırma (stir)',
+        'vi': 'Khuấy (stir)',
+        'de': 'Rühren (Stir)',
+        'fr': 'Mélange au verre (stir)',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
+    // Бар: сборка напитка в бокале
+    CookingProcess(
+      id: 'building',
+      name: 'Building',
+      localizedNames: {
+        'ru': 'Билд',
+        'en': 'Building',
+        'es': 'Montado en vaso',
+        'kk': 'Тікелей жинау (build)',
+        'it': 'Build nel bicchiere',
+        'tr': 'Bardakta hazırlama (build)',
+        'vi': 'Build trực tiếp trong ly',
+        'de': 'Build im Glas',
+        'fr': 'Montage au verre (build)',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
+    // Бар: блендирование
+    CookingProcess(
+      id: 'blending',
+      name: 'Blending',
+      localizedNames: {
+        'ru': 'Бленд',
+        'en': 'Blending',
+        'es': 'Licuado',
+        'kk': 'Блендерлеу',
+        'it': 'Frullatura',
+        'tr': 'Blender ile hazırlama',
+        'vi': 'Xay (blending)',
+        'de': 'Blenden',
+        'fr': 'Mixage (blender)',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
+    // Бар: экстракция эспрессо
+    CookingProcess(
+      id: 'espresso_extraction',
+      name: 'Espresso extraction',
+      localizedNames: {
+        'ru': 'Экстракция эспрессо',
+        'en': 'Espresso extraction',
+        'es': 'Extracción de espresso',
+        'kk': 'Эспрессо экстракциясы',
+        'it': 'Estrazione espresso',
+        'tr': 'Espresso ekstraksiyonu',
+        'vi': 'Chiết xuất espresso',
+        'de': 'Espresso-Extraktion',
+        'fr': 'Extraction espresso',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
   ];
+
+  static const Set<String> _barProcessIds = {
+    'mixing',
+    'shaking',
+    'stirring',
+    'building',
+    'blending',
+    'espresso_extraction',
+    'steaming',
+    'cutting',
+    'boiling',
+  };
+
+  static List<CookingProcess> forDepartment(String department) {
+    final dep = department.trim().toLowerCase();
+    if (dep == 'bar') {
+      return defaultProcesses
+          .where((p) => _barProcessIds.contains(p.id))
+          .toList();
+    }
+    return defaultProcesses;
+  }
 
   /// Найти процесс по ID
   static CookingProcess? findById(String id) {

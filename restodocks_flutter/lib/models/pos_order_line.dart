@@ -19,6 +19,7 @@ class PosOrderLine {
     this.techCardSections = const [],
     this.servedAt,
     this.markingCodes = const [],
+    this.barModifiers = const [],
   });
 
   final String id;
@@ -48,6 +49,10 @@ class PosOrderLine {
   /// Сканированные коды маркировки (ЧЗ Data Matrix, QR и т.д.) — учёт в счёте.
   final List<String> markingCodes;
 
+  /// Выбранные модификаторы бара/кофе по позиции (JSON из `pos_order_lines.bar_modifiers`).
+  /// Формат гибкий: хранит выборы групп и дельты для списания.
+  final List<Map<String, dynamic>> barModifiers;
+
   factory PosOrderLine.fromJson(Map<String, dynamic> json) {
     Map<String, dynamic>? tc;
     final embed = json['tech_cards'];
@@ -64,9 +69,8 @@ class PosOrderLine {
     }
 
     final secRaw = tc?['sections'];
-    final sections = secRaw is List
-        ? secRaw.map((e) => e.toString()).toList()
-        : <String>[];
+    final sections =
+        secRaw is List ? secRaw.map((e) => e.toString()).toList() : <String>[];
 
     final servedRaw = json['served_at'];
     DateTime? servedAt;
@@ -80,6 +84,15 @@ class PosOrderLine {
       markingCodes = mc
           .map((e) => e.toString().trim())
           .where((s) => s.isNotEmpty)
+          .toList();
+    }
+
+    List<Map<String, dynamic>> barModifiers = const [];
+    final mods = json['bar_modifiers'];
+    if (mods is List) {
+      barModifiers = mods
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
           .toList();
     }
 
@@ -102,6 +115,7 @@ class PosOrderLine {
       techCardSections: sections,
       servedAt: servedAt,
       markingCodes: markingCodes,
+      barModifiers: barModifiers,
     );
   }
 

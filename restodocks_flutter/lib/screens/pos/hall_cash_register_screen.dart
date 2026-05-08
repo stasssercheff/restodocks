@@ -13,7 +13,9 @@ import '../../widgets/app_bar_home_button.dart';
 
 /// Виртуальная касса: счета к оплате, выдача, смена.
 class HallCashRegisterScreen extends StatefulWidget {
-  const HallCashRegisterScreen({super.key});
+  const HallCashRegisterScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<HallCashRegisterScreen> createState() => _HallCashRegisterScreenState();
@@ -36,7 +38,11 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       setState(() {});
@@ -104,6 +110,19 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
         _error = e;
         _loading = false;
       });
+    }
+  }
+
+  String _cashRegisterAppBarTitle(LocalizationService loc) {
+    switch (_tabController.index) {
+      case 0:
+        return loc.t('pos_cash_tab_orders');
+      case 1:
+        return loc.t('pos_cash_tab_disbursements');
+      case 2:
+        return loc.t('pos_cash_tab_shift');
+      default:
+        return loc.t('pos_hall_cash_title');
     }
   }
 
@@ -490,7 +509,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('pos_hall_cash_title')),
+        title: Text(_cashRegisterAppBarTitle(loc)),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -527,7 +546,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
                   children: [
                     _ordersTab(loc, timeFmt),
                     _disbursementsTab(loc),
-                    _shiftTab(loc, timeFmt),
+                    _shiftTab(loc, timeFmt, emp),
                   ],
                 ),
       floatingActionButton: _tabController.index == 1 && !_loading && _error == null
@@ -685,7 +704,8 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
     );
   }
 
-  Widget _shiftTab(LocalizationService loc, DateFormat timeFmt) {
+  Widget _shiftTab(
+      LocalizationService loc, DateFormat timeFmt, Employee? emp) {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -703,6 +723,20 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               icon: const Icon(Icons.lock_open),
               label: Text(loc.t('pos_cash_shift_open_action')),
             ),
+            const SizedBox(height: 16),
+            if (posCanConfigureOrdersDisplay(emp))
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/settings/kitchen-display-link'),
+                icon: const Icon(Icons.cast_connected),
+                label: Text(loc.t('pos_kds_link_settings_title')),
+              )
+            else
+              TextButton.icon(
+                onPressed: () => context.push('/pos/kds/kitchen'),
+                icon: const Icon(Icons.restaurant_menu),
+                label: Text(loc.t('pos_kds_title')),
+              ),
           ] else ...[
             Text(
               loc.t('pos_cash_shift_active'),
@@ -737,6 +771,21 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
               icon: const Icon(Icons.lock),
               label: Text(loc.t('pos_cash_shift_close_action')),
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => context.push('/pos/hall/orders'),
+              icon: const Icon(Icons.receipt_long),
+              label: Text(loc.t('pos_cash_tab_orders')),
+            ),
+            if (posCanConfigureOrdersDisplay(emp)) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/settings/kitchen-display-link'),
+                icon: const Icon(Icons.cast_connected),
+                label: Text(loc.t('pos_kds_link_settings_short')),
+              ),
+            ],
             const SizedBox(height: 12),
             Text(
               'Аудитория отчета закрытия: ${_shiftReportAudience.isAll ? 'Весь объект' : 'Только выбранные зоны (${_shiftReportAudience.zones.map((z) => _zoneLabel(loc, z)).join(', ')})'}',

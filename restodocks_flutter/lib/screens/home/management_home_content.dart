@@ -21,9 +21,17 @@ class ManagementHomeContent extends StatelessWidget {
   final Employee employee;
   final SpotlightController? tourController;
 
-  /// Подразделение для роутов (dining_room -> hall, management -> kitchen для шефа)
-  static String _deptForRoute(String d) =>
-      d == 'dining_room' ? 'hall' : (d == 'management' ? 'kitchen' : d);
+  /// Подразделение для роутов с приоритетом фактической роли.
+  /// Важно: для management не сваливаем всех в kitchen.
+  static String _deptForRoute(Employee e) {
+    final d = e.department;
+    if (d == 'dining_room') return 'hall';
+    if (d != 'management') return d;
+    if (e.hasRole('bar_manager')) return 'bar';
+    if (e.hasRole('floor_manager')) return 'hall';
+    if (e.hasRole('executive_chef') || e.hasRole('sous_chef')) return 'kitchen';
+    return 'management';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +47,7 @@ class ManagementHomeContent extends StatelessWidget {
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
     final isFloorManager = roles.contains('floor_manager');
-    final rawDept = ent.kitchenOnlyDepartments
-        ? 'kitchen'
-        : _deptForRoute(employee.department);
+    final rawDept = ent.kitchenOnlyDepartments ? 'kitchen' : _deptForRoute(employee);
     final dept = !ent.hasUltraLevelFeatures && rawDept == 'bar'
         ? 'kitchen'
         : rawDept;

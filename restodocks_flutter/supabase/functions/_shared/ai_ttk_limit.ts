@@ -18,6 +18,7 @@ type AiTtkUsageStatus = {
 async function resolveAiTtkUsageStatus(
   supabase: ReturnType<typeof createClient>,
   establishmentId: string,
+  department: string,
 ): Promise<AiTtkUsageStatus> {
   const { data: est, error: estError } = await supabase
     .from("establishments")
@@ -41,10 +42,12 @@ async function resolveAiTtkUsageStatus(
   let limit = 0;
   let denyReason = "";
 
+  const scope = department.trim().toLowerCase().includes("bar") ? "bar" : "kitchen";
+
   if (isPaidActive) {
     const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
     periodType = "month";
-    periodKey = monthKey;
+    periodKey = `${scope}:${monthKey}`;
     if (ULTRA_TIERS.has(subscriptionType)) {
       limit = ULTRA_MONTH_LIMIT;
       denyReason = "ai_ttk_limit_ultra_month";
@@ -54,7 +57,7 @@ async function resolveAiTtkUsageStatus(
     }
   } else if (isTrialActive) {
     periodType = "trial_total";
-    periodKey = "trial_total";
+    periodKey = `${scope}:trial_total`;
     limit = TRIAL_TOTAL_LIMIT;
     denyReason = "ai_ttk_limit_trial_total";
   } else {
@@ -88,6 +91,7 @@ async function resolveAiTtkUsageStatus(
 
 export async function getAiTtkUsageStatus(
   establishmentId: string,
+  department = "kitchen",
 ): Promise<AiTtkUsageStatus> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -95,11 +99,12 @@ export async function getAiTtkUsageStatus(
     return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
   }
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  return resolveAiTtkUsageStatus(supabase, establishmentId);
+  return resolveAiTtkUsageStatus(supabase, establishmentId, department);
 }
 
 export async function checkAndIncrementAiTtkUsage(
   establishmentId: string,
+  department = "kitchen",
 ): Promise<{ allowed: boolean; count: number; limit: number; reason?: string }> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -107,7 +112,7 @@ export async function checkAndIncrementAiTtkUsage(
     return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
   }
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const status = await resolveAiTtkUsageStatus(supabase, establishmentId);
+  const status = await resolveAiTtkUsageStatus(supabase, establishmentId, department);
   if (!status.allowed) {
     return { allowed: false, count: status.count, limit: status.limit, reason: status.reason };
   }

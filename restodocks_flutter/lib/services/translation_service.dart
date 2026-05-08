@@ -714,7 +714,13 @@ class TranslationService {
   Future<void> saveToDatabase(Translation translation) async {
     final data = translation.toJson();
     data.remove('id'); // Убираем id для insert
-
-    await _supabase.insertData('translations', data);
+    try {
+      await _supabase.insertData('translations', data);
+    } catch (e) {
+      // Duplicate translation row race (409) is benign.
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('translations') && msg.contains('409')) return;
+      rethrow;
+    }
   }
 }

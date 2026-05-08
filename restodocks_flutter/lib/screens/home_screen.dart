@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../config/home_tour_config.dart';
+import '../core/feature_flags.dart';
+import '../core/subscription_entitlements.dart';
 import 'home/owner_home_content.dart';
 import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
@@ -16,6 +18,7 @@ import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/branded_auth_loading.dart';
 import '../widgets/tour_tooltip.dart';
+import '../utils/pos_hall_permissions.dart';
 
 /// Главный экран — контент домашней вкладки по роли.
 /// Нижняя навигация управляется AppShell (ShellRoute).
@@ -414,11 +417,45 @@ class PersonalCabinetScreen extends StatefulWidget {
 class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
   bool _tourCheckDone = false;
   SpotlightController? _tourController;
+  bool _cabinetShiftHintLoaded = false;
+  bool? _cabinetShiftOpen;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTour());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTour();
+      _reloadCabinetShiftHint();
+    });
+  }
+
+  Future<void> _reloadCabinetShiftHint() async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est == null) {
+      if (mounted) {
+        setState(() {
+          _cabinetShiftHintLoaded = true;
+          _cabinetShiftOpen = null;
+        });
+      }
+      return;
+    }
+    try {
+      final shift =
+          await PosCashHallService.instance.fetchActiveShift(est.id);
+      if (!mounted) return;
+      setState(() {
+        _cabinetShiftOpen = shift != null;
+        _cabinetShiftHintLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cabinetShiftOpen = null;
+        _cabinetShiftHintLoaded = true;
+      });
+    }
   }
 
   Future<void> _maybeShowTour() async {
@@ -505,9 +542,17 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
-    final loc = context.watch<LocalizationService>();
-
     if (employee == null) return const Scaffold(body: SizedBox());
+
+    final ent = SubscriptionEntitlements.from(accountManager.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(ent);
+    final canOpenShifts = posOn &&
+        (posCanManageHallTables(employee) ||
+            posCanViewPosShiftReport(employee) ||
+            employee.department == 'kitchen' ||
+            employee.department == 'hall' ||
+            employee.department == 'dining_room');
+    final loc = context.watch<LocalizationService>();
 
     return Scaffold(
       appBar: AppBar(
@@ -538,6 +583,24 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
               ),
               'cabinet-settings',
             ),
+            if (canOpenShifts) ...[
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Экран заказов'),
+                subtitle: _cabinetShiftHintLoaded
+                    ? Text(
+                        _cabinetShiftOpen == true
+                            ? loc.t('pos_cash_shift_active')
+                            : loc.t('pos_cash_shift_closed_short'),
+                      )
+                    : null,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await context.push('/pos/orders-display');
+                  if (mounted) await _reloadCabinetShiftHint();
+                },
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),

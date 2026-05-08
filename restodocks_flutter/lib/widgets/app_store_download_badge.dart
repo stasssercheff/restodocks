@@ -14,9 +14,6 @@ class AppStoreDownloadBadge extends StatelessWidget {
   final String semanticsLabel;
   final double height;
 
-  static const _badgeImageUrl =
-      'https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83';
-
   @override
   Widget build(BuildContext context) {
     final uri = Uri.parse(appStoreListingUriString);
@@ -32,20 +29,14 @@ class AppStoreDownloadBadge extends StatelessWidget {
             }
           },
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            _badgeImageUrl,
-            height: height,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, __, ___) => OutlinedButton.icon(
-              onPressed: () async {
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              icon: const Icon(Icons.apple, size: 22),
-              label: Text(semanticsLabel),
-            ),
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.apple, size: 22),
+            label: Text(semanticsLabel),
           ),
         ),
       ),

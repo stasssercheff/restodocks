@@ -16,7 +16,12 @@ import '../../utils/pos_order_totals.dart';
 import '../../widgets/app_bar_home_button.dart';
 import '../../widgets/pos_marking_scanner_screen.dart';
 
-bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
+bool _isBarDish(TechCard tc) {
+  final dep = tc.department.trim().toLowerCase();
+  if (dep == 'bar') return true;
+  // Legacy cards could have wrong department but bar category/section.
+  return posLineIsBarDish(tc.category, tc.sections);
+}
 
 /// Карточка заказа зала: позиции из меню (ТТК).
 class HallOrderDetailScreen extends StatefulWidget {
@@ -700,6 +705,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   Future<void> _addDish(
     TechCard tc,
     LocalizationService loc, {
+    double quantity = 1,
+    String? comment,
     int courseNumber = 1,
     int? guestNumber,
   }) async {
@@ -707,7 +714,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       await PosOrderService.instance.addLine(
         orderId: widget.orderId,
         techCardId: tc.id,
-        quantity: 1,
+        quantity: quantity,
+        comment: comment,
         courseNumber: courseNumber,
         guestNumber: guestNumber,
       );
@@ -978,25 +986,29 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     final initialGuest = preset != null && preset >= 1 && preset <= guestCount
         ? preset
         : null;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
+      barrierDismissible: true,
       builder: (ctx) {
-        return _AddDishSheet(
-          loc: loc,
-          dishes: _menuDishes,
-          loading: _menuLoading,
-          guestCount: guestCount,
-          initialGuestNumber: initialGuest,
-          onPick: (tc, courseNumber, guestNumber) async {
-            Navigator.pop(ctx);
-            await _addDish(
-              tc,
-              loc,
-              courseNumber: courseNumber,
-              guestNumber: guestNumber,
-            );
-          },
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: _AddDishSheet(
+            loc: loc,
+            dishes: _menuDishes,
+            loading: _menuLoading,
+            guestCount: guestCount,
+            initialGuestNumber: initialGuest,
+            onPick: (tc, quantity, comment, courseNumber, guestNumber) async {
+              await _addDish(
+                tc,
+                loc,
+                quantity: quantity,
+                comment: comment,
+                courseNumber: courseNumber,
+                guestNumber: guestNumber,
+              );
+            },
+          ),
         );
       },
     );
@@ -1523,9 +1535,15 @@ class _LineTile extends StatelessWidget {
   final VoidCallback? onEditCourseGuest;
   final VoidCallback? onMarkServed;
 
+  static const double _kActionIconSize = 20;
+  static const BoxConstraints _kCompactActionConstraints =
+      BoxConstraints(minWidth: 34, minHeight: 34);
+
   @override
   Widget build(BuildContext context) {
     final title = line.dishTitleForLang(lang);
+    // Temporarily disabled in UI; can be re-enabled by changing condition.
+    final showMarkingUi = line.id.startsWith('__enable_marking__');
     final sub = <String>[
       '${loc.t('pos_order_line_qty_short')}: ${_formatPosQty(line.quantity)}',
       if (line.courseNumber > 1)
@@ -1537,9 +1555,9 @@ class _LineTile extends StatelessWidget {
     ].join(' · ');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1549,22 +1567,34 @@ class _LineTile extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
                 if (editable) ...[
                   if (onEditCourseGuest != null)
                     IconButton(
                       onPressed: onEditCourseGuest,
-                      icon: const Icon(Icons.people_alt_outlined),
+                      visualDensity: VisualDensity.compact,
+                      constraints: _kCompactActionConstraints,
+                      padding: const EdgeInsets.all(6),
+                      icon: const Icon(
+                        Icons.people_alt_outlined,
+                        size: _kActionIconSize,
+                      ),
                       tooltip: loc.t('pos_order_line_edit_course_guest_title'),
                     ),
                   IconButton(
                     onPressed: onComment,
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
                     icon: Icon(
                       line.comment != null && line.comment!.trim().isNotEmpty
                           ? Icons.chat
                           : Icons.chat_outlined,
+                      size: _kActionIconSize,
                     ),
                     tooltip: loc.t('pos_order_line_comment'),
                   ),
@@ -1572,22 +1602,26 @@ class _LineTile extends StatelessWidget {
                 if (editable || canVoidLine)
                   IconButton(
                     onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.delete_outline, size: _kActionIconSize),
                     tooltip: canVoidLine && !editable
                         ? loc.t('pos_order_line_void')
                         : loc.t('pos_order_line_delete'),
                   ),
               ],
             ),
-            const SizedBox(height: 4),
             Text(
               sub,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             if (!compactDeptStaff && line.sellingPrice != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -1601,7 +1635,8 @@ class _LineTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (!compactDeptStaff &&
+            if (showMarkingUi &&
+                !compactDeptStaff &&
                 (line.markingCodes.isNotEmpty ||
                     onScanMarking != null)) ...[
               const SizedBox(height: 10),
@@ -1702,20 +1737,26 @@ class _LineTile extends StatelessWidget {
               ),
             ],
             if (editable) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Row(
                 children: [
                   IconButton(
                     onPressed: line.quantity <= 1
                         ? null
                         : () => onQty(line.quantity - 1),
-                    icon: const Icon(Icons.remove_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.remove_circle_outline, size: _kActionIconSize),
                   ),
                   Text(_formatPosQty(line.quantity),
-                      style: Theme.of(context).textTheme.titleMedium),
+                      style: Theme.of(context).textTheme.titleSmall),
                   IconButton(
                     onPressed: () => onQty(line.quantity + 1),
-                    icon: const Icon(Icons.add_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.add_circle_outline, size: _kActionIconSize),
                   ),
                   const Spacer(),
                   TextButton(
@@ -1801,7 +1842,13 @@ class _AddDishSheet extends StatefulWidget {
   final bool loading;
   final int guestCount;
   final int? initialGuestNumber;
-  final Future<void> Function(TechCard tc, int courseNumber, int? guestNumber)
+  final Future<void> Function(
+    TechCard tc,
+    double quantity,
+    String? comment,
+    int courseNumber,
+    int? guestNumber,
+  )
       onPick;
 
   @override
@@ -1810,9 +1857,13 @@ class _AddDishSheet extends StatefulWidget {
 
 class _AddDishSheetState extends State<_AddDishSheet> {
   final _search = TextEditingController();
+  final _qty = TextEditingController(text: '1');
+  final _comment = TextEditingController();
   String _tab = 'kitchen';
   int _course = 1;
   int? _guest;
+  TechCard? _selectedDish;
+  bool _adding = false;
 
   @override
   void initState() {
@@ -1826,6 +1877,8 @@ class _AddDishSheetState extends State<_AddDishSheet> {
   @override
   void dispose() {
     _search.dispose();
+    _qty.dispose();
+    _comment.dispose();
     super.dispose();
   }
 
@@ -1843,23 +1896,70 @@ class _AddDishSheetState extends State<_AddDishSheet> {
     }).toList();
   }
 
+  Future<void> _confirmAdd(LocalizationService loc) async {
+    final tc = _selectedDish;
+    if (tc == null) return;
+    final qtyRaw = _qty.text.replaceAll(',', '.').trim();
+    final qty = double.tryParse(qtyRaw);
+    if (qty == null || qty <= 0) {
+      AppToastService.show(loc.t('pos_order_line_qty_invalid'));
+      return;
+    }
+    if (_adding) return;
+    setState(() => _adding = true);
+    try {
+      final comment = _comment.text.trim();
+      await widget.onPick(
+        tc,
+        qty,
+        comment.isEmpty ? null : comment,
+        _course,
+        _guest,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = widget.loc;
     final lang = loc.currentLanguageCode;
     final h = MediaQuery.sizeOf(context).height * 0.85;
 
-    return SafeArea(
-      child: SizedBox(
-        height: h,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: h,
+            maxWidth: 760,
+          ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                loc.t('pos_order_line_add'),
-                style: Theme.of(context).textTheme.titleLarge,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      loc.t('pos_order_line_add'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: loc.t('close'),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -1890,79 +1990,6 @@ class _AddDishSheetState extends State<_AddDishSheet> {
               ],
               selected: {_tab},
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Text(
-                loc.t('pos_order_add_course_guest_hint'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          loc.t('pos_order_add_course_label'),
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        DropdownButton<int>(
-                          isExpanded: true,
-                          value: _course.clamp(1, 8),
-                          items: [
-                            for (var c = 1; c <= 8; c++)
-                              DropdownMenuItem(value: c, child: Text('$c')),
-                          ],
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() => _course = v);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          loc.t('pos_order_add_guest_label'),
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        DropdownButton<int?>(
-                          isExpanded: true,
-                          value: _guest,
-                          items: [
-                            DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text(loc.t('pos_order_add_guest_any')),
-                            ),
-                            for (var g = 1; g <= widget.guestCount; g++)
-                              DropdownMenuItem(
-                                value: g,
-                                child: Text(
-                                  loc.t('pos_order_line_guest_short',
-                                      args: {'n': '$g'}),
-                                ),
-                              ),
-                          ],
-                          onChanged: (v) => setState(() => _guest = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 4),
             Expanded(
@@ -2008,13 +2035,153 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                                       ),
                                     )
                                   : null,
-                              onTap: () => widget.onPick(tc, _course, _guest),
+                              onTap: () {
+                                setState(() => _selectedDish = tc);
+                              },
                             );
                           },
                         ),
             ),
+            if (_selectedDish != null)
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _selectedDish!.dishNameLocalized?[lang]
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true
+                          ? _selectedDish!.dishNameLocalized![lang]!
+                          : _selectedDish!.dishName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      loc.t('pos_order_add_course_guest_hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                loc.t('pos_order_add_course_label'),
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              DropdownButton<int>(
+                                isExpanded: true,
+                                value: _course.clamp(1, 8),
+                                items: [
+                                  for (var c = 1; c <= 8; c++)
+                                    DropdownMenuItem(value: c, child: Text('$c')),
+                                ],
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() => _course = v);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                loc.t('pos_order_add_guest_label'),
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              DropdownButton<int?>(
+                                isExpanded: true,
+                                value: _guest,
+                                items: [
+                                  DropdownMenuItem<int?>(
+                                    value: null,
+                                    child: Text(loc.t('pos_order_add_guest_any')),
+                                  ),
+                                  for (var g = 1; g <= widget.guestCount; g++)
+                                    DropdownMenuItem(
+                                      value: g,
+                                      child: Text(
+                                        loc.t('pos_order_line_guest_short',
+                                            args: {'n': '$g'}),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (v) => setState(() => _guest = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 130,
+                          child: TextField(
+                            controller: _qty,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                            ],
+                            decoration: InputDecoration(
+                              labelText: loc.t('pos_order_line_qty'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _comment,
+                            maxLines: 1,
+                            decoration: InputDecoration(
+                              labelText: loc.t('pos_order_line_comment'),
+                              hintText: loc.t('pos_order_line_comment_hint'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: _adding ? null : () => _confirmAdd(loc),
+                      icon: _adding
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add_circle_outline),
+                      label: Text(loc.t('pos_order_line_add')),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
+      ),
       ),
     );
   }

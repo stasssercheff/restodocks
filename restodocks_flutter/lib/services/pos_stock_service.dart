@@ -12,6 +12,29 @@ class PosStockService {
   final SupabaseService _supabase = SupabaseService();
   final TechCardServiceSupabase _techCards = TechCardServiceSupabase();
 
+  void _applyBarModifiersStockDelta(
+    PosOrderLine line,
+    Map<String, double> merged,
+  ) {
+    if (line.barModifiers.isEmpty) return;
+    for (final mod in line.barModifiers) {
+      final raw = mod['stock_delta'];
+      if (raw is! List) continue;
+      for (final d in raw) {
+        if (d is! Map) continue;
+        final item = Map<String, dynamic>.from(d);
+        final productId = (item['product_id'] ?? '').toString().trim();
+        if (productId.isEmpty) continue;
+        final gramsRaw = item['delta_net_grams'];
+        if (gramsRaw is! num) continue;
+        // delta_net_grams > 0 => дополнительный расход; < 0 => меньше базового расхода.
+        final delta = -(gramsRaw.toDouble() * line.quantity);
+        if (delta == 0) continue;
+        merged[productId] = (merged[productId] ?? 0) + delta;
+      }
+    }
+  }
+
   /// После закрытия счёта: списываем ингредиенты с привязкой к продукту (`product_id`).
   /// Дельты по одной паре (строка счёта × продукт) суммируются — одна запись в БД.
   Future<void> applySaleDeductionForOrder({
@@ -24,14 +47,19 @@ class PosStockService {
     if (lines.isEmpty) return;
     for (final line in lines) {
       try {
-        final tc = await _techCards.getTechCardById(line.techCardId, preferCache: false);
+        final tc = await _techCards.getTechCardById(line.techCardId,
+            preferCache: false);
         if (tc == null) {
           await SystemErrorService.instance.insert(
             establishmentId: establishmentId,
             message: 'pos_stock: tech_card missing ${line.techCardId}',
             severity: 'warning',
             source: 'pos_stock',
-            context: {'orderId': orderId, 'techCardId': line.techCardId, 'lineId': line.id},
+            context: {
+              'orderId': orderId,
+              'techCardId': line.techCardId,
+              'lineId': line.id
+            },
             employeeId: closedByEmployeeId,
             posOrderId: orderId,
             posOrderLineId: line.id,
@@ -46,7 +74,8 @@ class PosStockService {
         final factor = soldDishGrams / yieldG;
         final merged = <String, double>{};
         for (final ing in tc.ingredients) {
-          if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
+          if (ing.sourceTechCardId != null &&
+              ing.sourceTechCardId!.isNotEmpty) {
             continue;
           }
           final pid = ing.productId;
@@ -55,6 +84,7 @@ class PosStockService {
           if (delta == 0) continue;
           merged[pid] = (merged[pid] ?? 0) + delta;
         }
+        _applyBarModifiersStockDelta(line, merged);
         for (final e in merged.entries) {
           final pid = e.key;
           final delta = e.value;
@@ -107,15 +137,16 @@ class PosStockService {
     }
   }
 
-  Future<List<({String productId, double quantityGrams, DateTime updatedAt})>> fetchBalances(
-      String establishmentId) async {
+  Future<List<({String productId, double quantityGrams, DateTime updatedAt})>>
+      fetchBalances(String establishmentId) async {
     try {
       final rows = await _supabase.client
           .from('establishment_stock_balances')
           .select('product_id, quantity_grams, updated_at')
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
-      final out = <({String productId, double quantityGrams, DateTime updatedAt})>[];
+      final out =
+          <({String productId, double quantityGrams, DateTime updatedAt})>[];
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
         final pid = row['product_id'] as String?;
@@ -133,8 +164,14 @@ class PosStockService {
     }
   }
 
-  Future<List<({DateTime createdAt, String productId, double deltaGrams, String reason})>>
-      fetchMovements({
+  Future<
+      List<
+          ({
+            DateTime createdAt,
+            String productId,
+            double deltaGrams,
+            String reason
+          })>> fetchMovements({
     required String establishmentId,
     required DateTime fromUtc,
     required DateTime toUtc,
@@ -149,7 +186,12 @@ class PosStockService {
           .lte('created_at', toUtc.toUtc().toIso8601String())
           .order('created_at', ascending: false)
           .limit(limit);
-      final out = <({DateTime createdAt, String productId, double deltaGrams, String reason})>[];
+      final out = <({
+        DateTime createdAt,
+        String productId,
+        double deltaGrams,
+        String reason
+      })>[];
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
         out.add((
@@ -169,8 +211,8 @@ class PosStockService {
   /// Сверка: сумма движений vs остаток по каждому продукту (расхождения — дрейф данных).
   Future<List<Map<String, dynamic>>> runWarehouseHealthCheck(
       String establishmentId) async {
-    final raw = await _supabase.client
-        .rpc('warehouse_health_check', params: {'p_establishment_id': establishmentId});
+    final raw = await _supabase.client.rpc('warehouse_health_check',
+        params: {'p_establishment_id': establishmentId});
     if (raw == null) return [];
     final list = raw as List<dynamic>;
     return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();

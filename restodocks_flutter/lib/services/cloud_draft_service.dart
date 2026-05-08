@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../utils/dev_log.dart';
 import 'supabase_service.dart';
 
@@ -16,6 +18,7 @@ class CloudDraftService {
 
   /// Отложенная запись (не дёргать Supabase на каждый символ).
   void scheduleUpsert(String draftKey, Map<String, dynamic> payload) {
+    if (kIsWeb) return;
     if (!_supabase.isAuthenticated) return;
     if (_draftTableUnavailable) return;
     _pendingKey = draftKey;
@@ -30,6 +33,7 @@ class CloudDraftService {
   }
 
   Future<void> flushPending() async {
+    if (kIsWeb) return;
     _throttle?.cancel();
     _throttle = null;
     final k = _pendingKey;
@@ -40,6 +44,7 @@ class CloudDraftService {
   }
 
   Future<Map<String, dynamic>?> fetchPayload(String draftKey) async {
+    if (kIsWeb) return null;
     if (!_supabase.isAuthenticated) return null;
     if (_draftTableUnavailable) return null;
     final uid = _supabase.currentUser?.id;
@@ -64,6 +69,7 @@ class CloudDraftService {
   }
 
   Future<DateTime?> fetchUpdatedAt(String draftKey) async {
+    if (kIsWeb) return null;
     if (!_supabase.isAuthenticated) return null;
     if (_draftTableUnavailable) return null;
     final uid = _supabase.currentUser?.id;
@@ -87,6 +93,7 @@ class CloudDraftService {
 
   Future<void> upsertPayload(
       String draftKey, Map<String, dynamic> payload) async {
+    if (kIsWeb) return;
     if (!_supabase.isAuthenticated) return;
     if (_draftTableUnavailable) return;
     final uid = _supabase.currentUser?.id;
@@ -110,6 +117,7 @@ class CloudDraftService {
   }
 
   Future<void> deleteDraft(String draftKey) async {
+    if (kIsWeb) return;
     if (!_supabase.isAuthenticated) return;
     if (_draftTableUnavailable) return;
     final uid = _supabase.currentUser?.id;
@@ -128,9 +136,16 @@ class CloudDraftService {
 
   bool _isDraftTableUnavailableError(Object e) {
     final msg = e.toString().toLowerCase();
-    return msg.contains('account_form_drafts') &&
+    if (msg.contains('account_form_drafts') &&
         (msg.contains('404') ||
             msg.contains('does not exist') ||
-            msg.contains('pgrst'));
+            msg.contains('pgrst'))) {
+      return true;
+    }
+    // Некоторые PostgREST/браузерные ошибки приходят без имени таблицы в тексте.
+    // Для cloud drafts безопасно отключить удалённый слой после первого 404.
+    return msg.contains('status of 404') ||
+        msg.contains('status: 404') ||
+        msg.contains('404 ()');
   }
 }

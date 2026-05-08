@@ -2200,6 +2200,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
+            if (posOn &&
+                posCanConfigureOrdersDisplay(currentEmployee) &&
+                !accountManager.isLiteTier)
+              ListTile(
+                leading: const Icon(Icons.cast_connected_outlined),
+                title: Text(localization.t('pos_kds_link_settings_title')),
+                subtitle: Text(
+                  localization.t('pos_kds_link_settings_subtitle'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () =>
+                    context.push('/settings/kitchen-display-link'),
+              ),
             if (posOn && !accountManager.isLiteTier)
               SalesFinancialsManagementTile(employee: currentEmployee),
             if (posOn &&

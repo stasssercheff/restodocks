@@ -247,6 +247,7 @@ class _CategoryPickerField extends StatelessWidget {
         : (categoryOptions.isNotEmpty ? categoryOptions.first : 'misc');
     return DropdownButtonFormField<String>(
       value: displayValue,
+      isExpanded: true,
       decoration: InputDecoration(
           labelText: loc.t('category'),
           isDense: true,
@@ -915,7 +916,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   /// Отдел для категорий: bar или kitchen.
   String get _categoryDepartment {
-    if (widget.department == 'bar') return 'bar';
+    final dep = (widget.department ?? '').trim().toLowerCase();
+    if (dep.contains('bar')) return 'bar';
     if (_techCard != null && _barCategoryOptions.contains(_techCard!.category))
       return 'bar';
     return 'kitchen';
@@ -1173,12 +1175,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (widget.techCardId.isNotEmpty && widget.techCardId != 'new') {
       return 'tech_card_edit_${widget.techCardId}';
     }
-    // При открытии из импорта — детерминированный ключ по содержимому карточки (не identityHashCode),
-    // чтобы корректно работало у всех: разные платформы, сессии, браузеры.
-    if (widget.initialFromAi != null) {
-      return 'tech_card_edit_import_${_importDraftKeyHash(widget.initialFromAi!)}';
-    }
-    return 'tech_card_edit_new';
+    // Для новых ТТК (в т.ч. AI/import) используем общий ключ департамента,
+    // чтобы кнопка "завершить создание" всегда находила незавершенный черновик.
+    final dept = (widget.department ?? '').trim().toLowerCase().contains('bar')
+        ? 'bar'
+        : 'kitchen';
+    return 'tech_card_edit_new_$dept';
   }
 
   /// Детерминированный хеш для уникального ключа черновика при открытии из импорта.
@@ -1194,6 +1196,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   @override
   bool get restoreDraftAfterLoad => true;
+
+  @override
+  int get scheduleSaveDebounceMs => kIsWeb ? 900 : 600;
 
   @override
   Map<String, dynamic> getCurrentState() {
@@ -1663,7 +1668,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
-    if (widget.department == 'bar') {
+    if ((widget.department ?? '').trim().toLowerCase().contains('bar')) {
       if (lower.contains('коктейл') ||
           lower.contains('cocktail') ||
           lower.contains('мохито') ||
@@ -1675,9 +1680,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           lower.contains('soda') ||
           lower.contains('juice')) return 'non_alcoholic_drinks';
       if (lower.contains('кофе') ||
+          lower.contains('капучино') ||
+          lower.contains('латте') ||
+          lower.contains('эспрессо') ||
+          lower.contains('раф') ||
           lower.contains('чай') ||
           lower.contains('какао') ||
           lower.contains('coffee') ||
+          lower.contains('cappuccino') ||
+          lower.contains('latte') ||
+          lower.contains('espresso') ||
+          lower.contains('flat white') ||
           lower.contains('tea') ||
           lower.contains('cocoa')) return 'hot_drinks';
       if (lower.contains('виски') ||
@@ -1996,11 +2009,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               _isSemiFinished = ai.isSemiFinished!;
             }
             if (widget.initialCategory != null &&
-                _categoryOptions.contains(widget.initialCategory)) {
+                _categoryOptions.contains(widget.initialCategory) &&
+                widget.department != 'bar') {
               _selectedCategory = widget.initialCategory!;
-            } else if (ai.dishName != null && ai.dishName!.isNotEmpty) {
+            }
+            if (ai.dishName != null && ai.dishName!.isNotEmpty) {
               final cat = _inferCategory(ai.dishName!);
               if (_categoryOptions.contains(cat)) _selectedCategory = cat;
+            } else if (widget.initialCategory != null &&
+                _categoryOptions.contains(widget.initialCategory)) {
+              _selectedCategory = widget.initialCategory!;
             }
             if (widget.initialSections != null &&
                 widget.initialSections!.isNotEmpty) {
@@ -2076,6 +2094,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             _ensurePlaceholderRowAtEnd();
           } else {
             _ensurePlaceholderRowAtEnd();
+          }
+          // После AI/импорта сохраняем черновик сразу,
+          // чтобы при быстром уходе/возврате (Home/Back) кнопка
+          // "завершить создание" оставалась доступной.
+          if (mounted) {
+            if (kIsWeb) {
+              scheduleSave();
+            } else {
+              _scheduleDraftSave();
+            }
           }
           setState(() {
             _loading = false;
@@ -3553,10 +3581,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           dishName: saveName,
           category: category,
           sections: _selectedSections,
-          department: widget.department == 'bar' ||
-                  widget.department == 'banquet-catering-bar'
-              ? 'bar'
-              : 'kitchen',
+          department:
+              (widget.department ?? '').trim().toLowerCase().contains('bar')
+                  ? 'bar'
+                  : 'kitchen',
           isSemiFinished: _isSemiFinished,
           establishmentId: targetEstablishmentId,
           createdBy: emp.id,
@@ -4036,6 +4064,42 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return v.toString();
   }
 
+  Future<String?> _linkedOrdersHint(String techCardId) async {
+    try {
+      final lineRows = await context
+          .read<SupabaseService>()
+          .client
+          .from('pos_order_lines')
+          .select('order_id')
+          .eq('tech_card_id', techCardId)
+          .limit(8);
+      if (lineRows is! List || lineRows.isEmpty) return null;
+      final ids = <String>{
+        for (final row in lineRows)
+          if (row is Map && row['order_id'] != null) row['order_id'].toString(),
+      };
+      if (ids.isEmpty) return null;
+      final shortIds =
+          ids.map((e) => e.length > 8 ? e.substring(0, 8) : e).join(', ');
+      return shortIds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _archiveTechCardInsteadOfDelete() async {
+    final svc = context.read<TechCardServiceSupabase>();
+    final tc = _techCard ??
+        await svc.getTechCardById(widget.techCardId, preferCache: false);
+    if (tc == null) return false;
+    final archived = tc.copyWith(
+      sections: const ['archived'],
+      updatedAt: DateTime.now(),
+    );
+    await svc.saveTechCard(archived, skipHistory: false);
+    return true;
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, LocalizationService loc) async {
     final ok = await showDialog<bool>(
@@ -4065,10 +4129,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         context.pop(true); // Список обновит в фоне
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      if (!mounted) return;
+      if (e is PostgrestException && e.code == '23503') {
+        try {
+          final archived = await _archiveTechCardInsteadOfDelete();
+          if (!mounted) return;
+          if (archived) {
+            final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+            final msg = isRu
+                ? 'ТТК используется в истории заказов и была перемещена в архив.'
+                : 'This tech card is used in order history and was moved to archive.';
+            AppToastService.show(msg);
+            context.pop(true);
+            return;
+          }
+        } catch (_) {}
+        final linkedHint = await _linkedOrdersHint(widget.techCardId);
+        final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+        final msg = isRu
+            ? (linkedHint == null
+                ? 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.'
+                : 'Нельзя удалить ТТК: она используется в заказах ($linkedHint). Сначала удалите или переназначьте связанные позиции.')
+            : (linkedHint == null
+                ? 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.'
+                : 'Cannot delete this tech card: it is used in orders ($linkedHint). Remove or reassign linked order items first.');
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              loc.t('error_with_message').replaceAll('%s', e.toString()))));
     }
   }
 
@@ -5913,7 +6004,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               ),
                                               const SizedBox(width: 8),
                                               SizedBox(
-                                                width: 180,
+                                                width: 280,
                                                 child: _CategoryPickerField(
                                                   selectedCategory:
                                                       _categoryOptions.contains(
@@ -6305,6 +6396,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               hideTechnologyBlock: true,
                                               omitTableHeader: false,
                                               shrinkWrap: true,
+                                              isBarDepartment:
+                                                  _categoryDepartment == 'bar',
                                               onTapPfIngredient: (id) => context
                                                   .push('/tech-cards/$id'),
                                             ),
