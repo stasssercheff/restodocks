@@ -1812,36 +1812,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Widget _buildFinishDraftTab(LocalizationService loc) {
     final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
     final title = isRu ? 'Завершить черновик ТТК' : 'Finish TTK draft';
-    final hint = isRu
-        ? 'Найдено черновиков: $_finishDraftCount'
-        : 'Drafts found: $_finishDraftCount';
-    final cta = isRu ? 'Завершить ($_finishDraftCount)' : 'Finish ($_finishDraftCount)';
     return RefreshIndicator(
       onRefresh: _refreshFinishDraftCount,
-      child: ListView(
-        physics: const ClampingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            hint,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: (_loading || _finishDraftCount <= 0)
-                ? null
-                : () => _openManualTechCardCreate(loc),
-            icon: const Icon(Icons.edit_note),
-            label: Text(cta),
-          ),
-        ],
+      child: FutureBuilder<List<({String storageSuffix, String cloudKey, String title})>>(
+        future: _finishDraftEntries(),
+        builder: (context, snapshot) {
+          final entries = snapshot.data ?? const [];
+          final hint = isRu
+              ? 'Найдено черновиков: ${entries.length}'
+              : 'Drafts found: ${entries.length}';
+          return ListView(
+            physics: const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                hint,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              if (entries.isEmpty)
+                Text(
+                  isRu ? 'Нет незавершённых ТТК' : 'No unfinished TTK drafts',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ...entries.map((e) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.description_outlined),
+                    title: Text(e.title),
+                    subtitle: Text(isRu ? 'Черновик' : 'Draft'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _loading ? null : () => _openDraftEntry(e, loc),
+                  )),
+            ],
+          );
+        },
       ),
     );
   }
@@ -4902,17 +4912,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           : 'tech_card_edit_new_kitchen';
 
   List<({String storageSuffix, String cloudKey})> _createDraftCandidateKeys() {
-    return <({String storageSuffix, String cloudKey})>[
-      (
-        storageSuffix: 'new_kitchen',
-        cloudKey: 'tech_card_edit_new_kitchen',
-      ),
-      (
-        storageSuffix: 'new_bar',
-        cloudKey: 'tech_card_edit_new_bar',
-      ),
-      // Legacy key used by older builds.
-      (storageSuffix: 'new', cloudKey: 'tech_card_edit_new'),
+    final dep = widget.department.trim().toLowerCase();
+    if (dep.contains('bar')) {
+      return const <({String storageSuffix, String cloudKey})>[
+        (storageSuffix: 'new_bar', cloudKey: 'tech_card_edit_new_bar'),
+      ];
+    }
+    return const <({String storageSuffix, String cloudKey})>[
+      (storageSuffix: 'new_kitchen', cloudKey: 'tech_card_edit_new_kitchen'),
     ];
   }
 
@@ -4950,6 +4957,56 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final count = await _unsavedCreateDraftCount();
     if (!mounted) return;
     setState(() => _finishDraftCount = count);
+  }
+
+  String _draftDisplayTitle(Map<String, dynamic> data, bool isRu) {
+    final name = (data['name'] as String? ?? '').trim();
+    if (name.isNotEmpty) return name;
+    final tech = (data['technology'] as String? ?? '').trim();
+    if (tech.isNotEmpty) return tech.split('\n').first.trim();
+    return isRu ? 'Без названия' : 'Untitled';
+  }
+
+  Future<List<({String storageSuffix, String cloudKey, String title})>>
+      _finishDraftEntries() async {
+    final isRu = context
+        .read<LocalizationService>()
+        .currentLanguageCode
+        .toLowerCase()
+        .startsWith('ru');
+    final out = <({String storageSuffix, String cloudKey, String title})>[];
+    for (final key in _createDraftCandidateKeys()) {
+      final localDraft =
+          await DraftStorageService().loadTechCardEditDraft(key.storageSuffix);
+      if (localDraft == null ||
+          !DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
+        continue;
+      }
+      out.add((
+        storageSuffix: key.storageSuffix,
+        cloudKey: key.cloudKey,
+        title: _draftDisplayTitle(localDraft, isRu),
+      ));
+    }
+    return out;
+  }
+
+  Future<void> _openDraftEntry(
+      ({String storageSuffix, String cloudKey, String title}) entry,
+      LocalizationService loc) async {
+    final active = _newDraftKeyForDepartment().replaceFirst('tech_card_edit_', '');
+    if (entry.storageSuffix != active) {
+      final d = await DraftStorageService().loadTechCardEditDraft(entry.storageSuffix);
+      if (d != null) {
+        await DraftStorageService().saveTechCardEditDraft(active, d);
+      }
+    }
+    final dep = widget.department.trim().toLowerCase();
+    final path = dep.contains('bar')
+        ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
+        : '/tech-cards/new';
+    await _openTechCardEditAndRefresh(path: path);
+    await _refreshFinishDraftCount();
   }
 
   Future<void> _openTechCardEditAndRefresh({
