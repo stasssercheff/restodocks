@@ -4806,7 +4806,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
     final draftKey = await _resolveCreateDraftKeyForContinue();
-    final localDraft = await DraftStorageService().loadTechCardEditDraft(draftKey);
+    final localDraft =
+        await DraftStorageService().loadTechCardEditDraft(draftKey.storageSuffix);
     if (localDraft != null &&
         DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
       final choice = await showDialog<_TtkNewDraftChoice>(
@@ -4835,7 +4836,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (choice == null || choice == _TtkNewDraftChoice.cancel) return;
       if (choice == _TtkNewDraftChoice.startNew) {
         await DraftStorageService()
-            .clearTechCardEditDraftEverywhere(draftKey, draftKey);
+            .clearTechCardEditDraftEverywhere(
+                draftKey.storageSuffix, draftKey.cloudKey);
       }
     }
     final dep = widget.department.trim().toLowerCase();
@@ -4850,29 +4852,38 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ? 'tech_card_edit_new_bar'
           : 'tech_card_edit_new_kitchen';
 
-  List<String> _createDraftCandidateKeys() {
-    final out = <String>{};
-    out.add(_newDraftKeyForDepartment());
-    // Legacy key used by older builds.
-    out.add('new');
-    return out.toList(growable: false);
+  List<({String storageSuffix, String cloudKey})> _createDraftCandidateKeys() {
+    final deptKey = _newDraftKeyForDepartment();
+    final deptSuffix = deptKey.replaceFirst('tech_card_edit_', '');
+    return <({String storageSuffix, String cloudKey})>[
+      (storageSuffix: deptSuffix, cloudKey: deptKey),
+      // Legacy key used by older builds.
+      (storageSuffix: 'new', cloudKey: 'tech_card_edit_new'),
+    ];
   }
 
-  Future<String> _resolveCreateDraftKeyForContinue() async {
+  Future<({String storageSuffix, String cloudKey})>
+      _resolveCreateDraftKeyForContinue() async {
     for (final key in _createDraftCandidateKeys()) {
-      final localDraft = await DraftStorageService().loadTechCardEditDraft(key);
+      final localDraft =
+          await DraftStorageService().loadTechCardEditDraft(key.storageSuffix);
       if (localDraft != null &&
           DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
         return key;
       }
     }
-    return _newDraftKeyForDepartment();
+    final fallback = _newDraftKeyForDepartment();
+    return (
+      storageSuffix: fallback.replaceFirst('tech_card_edit_', ''),
+      cloudKey: fallback,
+    );
   }
 
   Future<int> _unsavedCreateDraftCount() async {
     var count = 0;
     for (final key in _createDraftCandidateKeys()) {
-      final localDraft = await DraftStorageService().loadTechCardEditDraft(key);
+      final localDraft =
+          await DraftStorageService().loadTechCardEditDraft(key.storageSuffix);
       if (localDraft != null &&
           DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
         count++;

@@ -4062,6 +4062,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return v.toString();
   }
 
+  Future<String?> _linkedOrdersHint(String techCardId) async {
+    try {
+      final lineRows = await context
+          .read<SupabaseService>()
+          .client
+          .from('pos_order_lines')
+          .select('order_id')
+          .eq('tech_card_id', techCardId)
+          .limit(8);
+      if (lineRows is! List || lineRows.isEmpty) return null;
+      final ids = <String>{
+        for (final row in lineRows)
+          if (row is Map && row['order_id'] != null) row['order_id'].toString(),
+      };
+      if (ids.isEmpty) return null;
+      final shortIds = ids.map((e) => e.length > 8 ? e.substring(0, 8) : e).join(', ');
+      return shortIds;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, LocalizationService loc) async {
     final ok = await showDialog<bool>(
@@ -4093,10 +4115,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     } catch (e) {
       if (!mounted) return;
       if (e is PostgrestException && e.code == '23503') {
+        final linkedHint = await _linkedOrdersHint(widget.techCardId);
         final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
         final msg = isRu
-            ? 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.'
-            : 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.';
+            ? (linkedHint == null
+                ? 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.'
+                : 'Нельзя удалить ТТК: она используется в заказах ($linkedHint). Сначала удалите или переназначьте связанные позиции.')
+            : (linkedHint == null
+                ? 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.'
+                : 'Cannot delete this tech card: it is used in orders ($linkedHint). Remove or reassign linked order items first.');
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(msg)));
         return;

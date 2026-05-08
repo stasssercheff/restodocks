@@ -128,9 +128,16 @@ class CloudDraftService {
 
   bool _isDraftTableUnavailableError(Object e) {
     final msg = e.toString().toLowerCase();
-    return msg.contains('account_form_drafts') &&
+    if (msg.contains('account_form_drafts') &&
         (msg.contains('404') ||
             msg.contains('does not exist') ||
-            msg.contains('pgrst'));
+            msg.contains('pgrst'))) {
+      return true;
+    }
+    // Некоторые PostgREST/браузерные ошибки приходят без имени таблицы в тексте.
+    // Для cloud drafts безопасно отключить удалённый слой после первого 404.
+    return msg.contains('status of 404') ||
+        msg.contains('status: 404') ||
+        msg.contains('404 ()');
   }
 }
