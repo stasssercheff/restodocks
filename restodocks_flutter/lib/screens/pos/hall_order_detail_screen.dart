@@ -19,7 +19,7 @@ import '../../widgets/pos_marking_scanner_screen.dart';
 bool _isBarDish(TechCard tc) {
   final dep = tc.department.trim().toLowerCase();
   if (dep == 'bar') return true;
-  if (dep == 'kitchen') return false;
+  // Legacy cards could have wrong department but bar category/section.
   return posLineIsBarDish(tc.category, tc.sections);
 }
 

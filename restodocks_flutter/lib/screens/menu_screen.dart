@@ -157,8 +157,7 @@ class _MenuScreenState extends State<MenuScreen> {
               if (tc.isSemiFinished) return false;
               final dep = tc.department.trim().toLowerCase();
               if (dep == 'bar') return true;
-              if (dep == 'kitchen') return false;
-              // Legacy fallback only for cards without explicit department.
+              // Legacy fallback for historical cards with wrong/missing department.
               return _barCategories.contains(tc.category) ||
                   tc.sections.contains('bar');
             })
@@ -187,8 +186,6 @@ class _MenuScreenState extends State<MenuScreen> {
         bool isBarCard(TechCard tc) {
           final dep = tc.department.trim().toLowerCase();
           if (dep == 'bar') return true;
-          if (dep == 'kitchen') return false;
-          if (dep.isNotEmpty) return false;
           return _barCategories.contains(tc.category) || tc.sections.contains('bar');
         }
         final barOnly = enriched

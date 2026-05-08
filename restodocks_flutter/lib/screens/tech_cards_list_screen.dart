@@ -2688,9 +2688,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return processedAll.where((tc) {
         final dep = tc.department.trim().toLowerCase();
         if (dep == 'bar') return true;
-        if (dep == 'kitchen') return false;
-        // Старые карточки без явного department=bar — по категории и цеху.
-        if (dep.isNotEmpty) return false;
+        // Исторические карточки могли сохраниться с неверным отделом.
         return _legacyBarCardMatch(tc, customBarIds);
       }).toList();
     }
@@ -2700,7 +2698,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final dep = tc.department.trim().toLowerCase();
       if (dep == 'bar') return false;
       if (dep == 'kitchen') return true;
-      if (dep.isNotEmpty) return true;
       return !_legacyBarCardMatch(tc, customBarIds);
     }).toList();
   }
@@ -4804,7 +4801,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (_loading) return;
     final draftKey = _newDraftKeyForDepartment();
     final merged = await DraftStorageService()
-        .loadTechCardEditDraftMerged('new', draftKey);
+        .loadTechCardEditDraftMerged(draftKey, draftKey);
     if (merged != null &&
         DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
       final choice = await showDialog<_TtkNewDraftChoice>(
@@ -4833,7 +4830,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       if (choice == null || choice == _TtkNewDraftChoice.cancel) return;
       if (choice == _TtkNewDraftChoice.startNew) {
         await DraftStorageService()
-            .clearTechCardEditDraftEverywhere('new', draftKey);
+            .clearTechCardEditDraftEverywhere(draftKey, draftKey);
       }
     }
     final path = widget.department == 'bar'
@@ -4848,8 +4845,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           : 'tech_card_edit_new_kitchen';
 
   Future<bool> _hasUnsavedCreateDraft() async {
+    final draftKey = _newDraftKeyForDepartment();
     final merged = await DraftStorageService()
-        .loadTechCardEditDraftMerged('new', _newDraftKeyForDepartment());
+        .loadTechCardEditDraftMerged(draftKey, draftKey);
     return merged != null &&
         DraftStorageService.techCardDraftLooksNonEmpty(merged);
   }

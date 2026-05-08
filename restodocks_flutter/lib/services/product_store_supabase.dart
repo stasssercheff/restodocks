@@ -338,6 +338,42 @@ class ProductStoreSupabase {
         }
       }
     }
+    // Токенное совпадение для перестановок слов и расширенных названий:
+    // "огурцы маринованные" ~= "маринованные огурцы".
+    if (candidates.isEmpty) {
+      final q = stripped.isNotEmpty ? stripped : raw;
+      final queryTokens = q
+          .split(RegExp(r'[^a-zA-Zа-яА-Я0-9]+'))
+          .map((t) => t.trim().toLowerCase())
+          .where((t) => t.length >= 3)
+          .toSet();
+      if (queryTokens.isNotEmpty) {
+        Product? best;
+        var bestScore = 0.0;
+        for (final p in _allProducts) {
+          final blob = _productNameBlobLower(p);
+          final productTokens = blob
+              .split(RegExp(r'[^a-zA-Zа-яА-Я0-9]+'))
+              .map((t) => t.trim().toLowerCase())
+              .where((t) => t.length >= 3)
+              .toSet();
+          if (productTokens.isEmpty) continue;
+          final intersect = queryTokens.intersection(productTokens).length;
+          if (intersect == 0) continue;
+          final score = intersect / queryTokens.length;
+          if (score > bestScore ||
+              (score == bestScore &&
+                  best != null &&
+                  _ingredientProductScore(p) > _ingredientProductScore(best))) {
+            best = p;
+            bestScore = score;
+          }
+        }
+        if (best != null && bestScore >= 0.6) {
+          candidates.add(best);
+        }
+      }
+    }
     if (candidates.isEmpty) return null;
     candidates.sort((a, b) =>
         _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
