@@ -5471,7 +5471,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         future: _unsavedCreateDraftCount(),
         builder: (context, snapshot) {
           final count = snapshot.data ?? 0;
-          if (count <= 0) return const SizedBox.shrink();
           final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
           final label = isRu ? 'Завершить ($count)' : 'Finish ($count)';
           return Padding(
@@ -5479,7 +5478,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             child: Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
-                onPressed: _loading ? null : () => _openManualTechCardCreate(loc),
+                onPressed: (_loading || count <= 0)
+                    ? null
+                    : () => _openManualTechCardCreate(loc),
                 icon: const Icon(Icons.edit_note),
                 label: Text(label),
               ),
