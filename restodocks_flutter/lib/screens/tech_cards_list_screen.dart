@@ -340,6 +340,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   int? _aiTtkRemainingQuota;
   bool _aiQuotaServerUnavailable = false;
   int? _trialTtkImportRemainingQuota;
+  int _finishDraftCount = 0;
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
   bool _ttkInitialBootstrapDone = false;
@@ -354,7 +355,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
       initialIndex: 0,
     );
@@ -371,9 +372,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           _lastReviewCacheKey = null;
           unawaited(_warmUpReviewIngredients());
         }
+        if (idx == 3) {
+          unawaited(_refreshFinishDraftCount());
+        }
         setState(() {});
       }
     });
+    unawaited(_refreshFinishDraftCount());
     _prefetchListenerLang = LocalizationService().currentLanguageCode;
     _localizationPrefetchListener = () {
       if (!mounted || _loading || _techCardsById.isEmpty) return;
@@ -823,7 +828,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _tabIndexResolvedFromUrl = true;
     _tabIndexFromUrl = _readTabIndexFromUrl();
     final idx = _tabIndexFromUrl;
-    if (idx != null && idx >= 0 && idx <= 2 && _tabController.index != idx) {
+    if (idx != null && idx >= 0 && idx <= 3 && _tabController.index != idx) {
       _tabController.index = idx;
       _tabIndex = idx;
     }
@@ -1800,6 +1805,43 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             onTap: () => _showReviewBottomSheet(tc, loc),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFinishDraftTab(LocalizationService loc) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final title = isRu ? 'Завершить черновик ТТК' : 'Finish TTK draft';
+    final hint = isRu
+        ? 'Найдено черновиков: $_finishDraftCount'
+        : 'Drafts found: $_finishDraftCount';
+    final cta = isRu ? 'Завершить ($_finishDraftCount)' : 'Finish ($_finishDraftCount)';
+    return RefreshIndicator(
+      onRefresh: _refreshFinishDraftCount,
+      child: ListView(
+        physics: const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            hint,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: (_loading || _finishDraftCount <= 0)
+                ? null
+                : () => _openManualTechCardCreate(loc),
+            icon: const Icon(Icons.edit_note),
+            label: Text(cta),
+          ),
+        ],
       ),
     );
   }
@@ -4845,6 +4887,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ? '/tech-cards/new?department=${Uri.encodeComponent(widget.department)}'
         : '/tech-cards/new';
     await _openTechCardEditAndRefresh(path: path);
+    await _refreshFinishDraftCount();
   }
 
   String _newDraftKeyForDepartment() =>
@@ -4897,6 +4940,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return count;
   }
 
+  Future<void> _refreshFinishDraftCount() async {
+    final count = await _unsavedCreateDraftCount();
+    if (!mounted) return;
+    setState(() => _finishDraftCount = count);
+  }
+
   Future<void> _openTechCardEditAndRefresh({
     required String path,
     Object? extra,
@@ -4921,6 +4970,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       } catch (_) {}
     }
     await _load(showLoading: false);
+    await _refreshFinishDraftCount();
   }
 
   List<Widget> _buildAppBarActions(
@@ -5237,6 +5287,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           selected: selectedIndex == 2,
           badgeCount: reviewCount,
         );
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    Widget chipFinish() => _ttkTabChip(
+          isRu ? 'Завершить' : 'Finish',
+          selected: selectedIndex == 3,
+          badgeCount: _finishDraftCount,
+        );
 
     if (ctrl != null) {
       return [
@@ -5261,12 +5317,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             child: chipReview(),
           ),
         ),
+        Tab(child: chipFinish()),
       ];
     }
     return [
       Tab(child: chipPf()),
       Tab(child: chipDishes()),
       Tab(child: chipReview()),
+      Tab(child: chipFinish()),
     ];
   }
 
@@ -5441,6 +5499,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               _filterCategory != null,
         ),
         _buildReviewList(loc, canEdit),
+        _buildFinishDraftTab(loc),
       ],
     );
 
@@ -5466,27 +5525,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             selectedIndex: _tabController.index,
           ),
         ),
-      ),
-      FutureBuilder<int>(
-        future: _unsavedCreateDraftCount(),
-        builder: (context, snapshot) {
-          final count = snapshot.data ?? 0;
-          final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
-          final label = isRu ? 'Завершить ($count)' : 'Finish ($count)';
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: (_loading || count <= 0)
-                    ? null
-                    : () => _openManualTechCardCreate(loc),
-                icon: const Icon(Icons.edit_note),
-                label: Text(label),
-              ),
-            ),
-          );
-        },
       ),
       if (_listDetailsHydrating)
         LinearProgressIndicator(
