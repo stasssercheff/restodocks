@@ -4276,13 +4276,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final aiService = context.read<AiService>();
       if (allowPromptFallback && aiService is AiServiceSupabase) {
         final unitPrefs = context.read<UnitSystemPreferenceService>();
-        final createdCards = await aiService.createTechCardsFromPrompt(
+        final createdCardsRaw = await aiService.createTechCardsFromPrompt(
           result,
           establishmentId: establishmentId,
           department: widget.department,
           unitSystem: unitPrefs.isImperial ? 'imperial' : 'metric',
           outputLocale: loc.currentLanguageCode,
         );
+        final createdCards = _dedupeAiCreateCards(createdCardsRaw);
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
           await _refreshAiTtkRemainingQuota();
@@ -4967,6 +4968,54 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return isRu ? 'Без названия' : 'Untitled';
   }
 
+  bool _draftBelongsToCurrentDepartment(Map<String, dynamic> data) {
+    final dep = widget.department.trim().toLowerCase();
+    final category = (data['category'] as String? ?? '').trim().toLowerCase();
+    final sections = (data['sections'] is List)
+        ? (data['sections'] as List)
+            .map((e) => e.toString().trim().toLowerCase())
+            .toList()
+        : const <String>[];
+    const barCategories = {
+      'beverages',
+      'alcoholic_cocktails',
+      'non_alcoholic_drinks',
+      'hot_drinks',
+      'drinks_pure',
+      'snacks',
+      'zakuska',
+    };
+    final isBar = sections.contains('bar') || barCategories.contains(category);
+    return dep.contains('bar') ? isBar : !isBar;
+  }
+
+  String _aiCardDedupSignature(TechCardRecognitionResult c) {
+    final name = (c.dishName ?? '').trim().toLowerCase();
+    final ingredients = c.ingredients
+        .map((i) =>
+            '${i.productName.trim().toLowerCase()}|${(i.grossGrams ?? 0).toStringAsFixed(2)}|${(i.netGrams ?? 0).toStringAsFixed(2)}')
+        .join(';');
+    return '$name::$ingredients';
+  }
+
+  List<TechCardRecognitionResult> _dedupeAiCreateCards(
+      List<TechCardRecognitionResult> cards) {
+    final map = <String, TechCardRecognitionResult>{};
+    for (final c in cards) {
+      final sig = _aiCardDedupSignature(c);
+      final prev = map[sig];
+      if (prev == null) {
+        map[sig] = c;
+        continue;
+      }
+      // Если ИИ вернул дубликат ПФ/Блюдо с одним составом, оставляем блюдо.
+      if (prev.isSemiFinished && !c.isSemiFinished) {
+        map[sig] = c;
+      }
+    }
+    return map.values.toList(growable: false);
+  }
+
   Future<List<({String storageSuffix, String cloudKey, String title})>>
       _finishDraftEntries() async {
     final isRu = context
@@ -4982,6 +5031,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           !DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
         continue;
       }
+      if (!_draftBelongsToCurrentDepartment(localDraft)) continue;
       out.add((
         storageSuffix: key.storageSuffix,
         cloudKey: key.cloudKey,
@@ -4999,6 +5049,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final d = await DraftStorageService().loadTechCardEditDraft(entry.storageSuffix);
       if (d != null) {
         await DraftStorageService().saveTechCardEditDraft(active, d);
+        await DraftStorageService().clearTechCardEditDraft(entry.storageSuffix);
       }
     }
     final dep = widget.department.trim().toLowerCase();
