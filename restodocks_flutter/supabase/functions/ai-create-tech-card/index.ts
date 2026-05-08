@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
         : `All natural-language fields (dishName, each productName, technologyText) MUST be written in the primary language for UI locale "${localeTag}". Avoid mixing languages.`;
     const departmentRule =
       department === "bar"
-        ? "Department is BAR. Prefer beverage/snack categories by meaning: coffee/cappuccino/latte/tea/cocoa -> non_alcoholic or hot drinks, NEVER alcoholic cocktails."
+        ? "Department is BAR. Choose category and cookingProcessId strictly by drink type and ingredient role. Category rules: cappuccino/latte/espresso/raf/tea/cocoa -> hot_drinks (never alcoholic_cocktails); cocktail with spirits -> alcoholic_cocktails; non-alcoholic mixed drinks/lemonades -> non_alcoholic_drinks; neat spirits/wine/beer -> drinks_pure. Process rules per ingredient: espresso coffee -> espresso_extraction; milk for cappuccino/latte -> steaming; cocktail assembly in shaker -> shaking; stirred cocktail in mixing glass -> stirring; build in serving glass -> building; blender drinks -> blending; boiling water/syrup -> boiling; simple slicing/garnish -> cutting."
         : "Department is KITCHEN. Avoid bar-only drink classification unless explicitly a beverage card.";
 
     const content = await chatText({

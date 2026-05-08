@@ -1174,11 +1174,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (widget.techCardId.isNotEmpty && widget.techCardId != 'new') {
       return 'tech_card_edit_${widget.techCardId}';
     }
-    // При открытии из импорта — детерминированный ключ по содержимому карточки (не identityHashCode),
-    // чтобы корректно работало у всех: разные платформы, сессии, браузеры.
-    if (widget.initialFromAi != null) {
-      return 'tech_card_edit_import_${_importDraftKeyHash(widget.initialFromAi!)}';
-    }
+    // Для новых ТТК (в т.ч. AI/import) используем общий ключ департамента,
+    // чтобы кнопка "завершить создание" всегда находила незавершенный черновик.
     final dept =
         (widget.department ?? '').trim().toLowerCase() == 'bar' ? 'bar' : 'kitchen';
     return 'tech_card_edit_new_$dept';
