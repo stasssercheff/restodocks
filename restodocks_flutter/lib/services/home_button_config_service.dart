@@ -6,9 +6,18 @@ import '../models/models.dart';
 
 const _keyHomeButton = 'restodocks_home_button_action';
 
-/// Подразделение для роута (dining_room -> hall, management -> kitchen)
-String _deptForRoute(String? d) =>
-    d == 'dining_room' ? 'hall' : (d == 'management' ? 'kitchen' : (d ?? 'kitchen'));
+/// Подразделение для роута с приоритетом роли сотрудника.
+String _deptForRoute(Employee? e) {
+  final d = e?.department;
+  if (d == 'dining_room') return 'hall';
+  if (d != 'management') return d ?? 'kitchen';
+  if (e?.hasRole('bar_manager') == true) return 'bar';
+  if (e?.hasRole('floor_manager') == true) return 'hall';
+  if (e?.hasRole('executive_chef') == true || e?.hasRole('sous_chef') == true) {
+    return 'kitchen';
+  }
+  return 'management';
+}
 
 /// Действия для средней кнопки на главном экране
 enum HomeButtonAction {
@@ -27,7 +36,7 @@ enum HomeButtonAction {
 extension HomeButtonActionExt on HomeButtonAction {
   /// [kitchenOnlySchedule]: Lite — график только кухня (`/schedule/kitchen`), не «все подразделения».
   String routeFor(Employee? emp, {bool kitchenOnlySchedule = false}) {
-    final dept = _deptForRoute(emp?.department);
+    final dept = _deptForRoute(emp);
     final isOwner = emp?.hasRole('owner') ?? false;
     switch (this) {
       case HomeButtonAction.inbox:
