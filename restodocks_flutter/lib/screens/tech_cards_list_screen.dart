@@ -38,6 +38,35 @@ enum _TtkImportMode { single, multi }
 
 enum _TtkNewDraftChoice { continueDraft, startNew, cancel }
 
+class _BarModifierDef {
+  const _BarModifierDef({
+    required this.id,
+    required this.name,
+    required this.options,
+  });
+
+  final String id;
+  final String name;
+  final List<String> options;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'options': options,
+      };
+
+  factory _BarModifierDef.fromJson(Map<String, dynamic> json) {
+    final opts = json['options'];
+    return _BarModifierDef(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      options: opts is List
+          ? opts.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
+          : const [],
+    );
+  }
+}
+
 /// Снимок списка ТТК между заходами (заведение + department).
 class _TtkListMemoryCache {
   _TtkListMemoryCache._();
@@ -341,6 +370,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _aiQuotaServerUnavailable = false;
   int? _trialTtkImportRemainingQuota;
   int _finishDraftCount = 0;
+  List<_BarModifierDef> _modifierDefs = const [];
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
   bool _ttkInitialBootstrapDone = false;
@@ -355,7 +385,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 4,
+      length: 5,
       vsync: this,
       initialIndex: 0,
     );
@@ -375,10 +405,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         if (idx == 3) {
           unawaited(_refreshFinishDraftCount());
         }
+        if (idx == 4) {
+          unawaited(_loadModifierDefs());
+        }
         setState(() {});
       }
     });
     unawaited(_refreshFinishDraftCount());
+    unawaited(_loadModifierDefs());
     _prefetchListenerLang = LocalizationService().currentLanguageCode;
     _localizationPrefetchListener = () {
       if (!mounted || _loading || _techCardsById.isEmpty) return;
@@ -828,7 +862,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _tabIndexResolvedFromUrl = true;
     _tabIndexFromUrl = _readTabIndexFromUrl();
     final idx = _tabIndexFromUrl;
-    if (idx != null && idx >= 0 && idx <= 3 && _tabController.index != idx) {
+    if (idx != null && idx >= 0 && idx <= 4 && _tabController.index != idx) {
       _tabController.index = idx;
       _tabIndex = idx;
     }
@@ -1852,6 +1886,82 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildModifiersTab(LocalizationService loc) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final dep = widget.department.trim().toLowerCase();
+    if (!dep.contains('bar')) {
+      return Center(
+        child: Text(
+          isRu
+              ? 'Модификаторы доступны в разделе бара.'
+              : 'Modifiers are available in bar section.',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadModifierDefs,
+      child: ListView(
+        physics: const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  isRu ? 'Модификаторы бара' : 'Bar modifiers',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _openModifierEditorDialog(loc),
+                icon: const Icon(Icons.add),
+                label: Text(isRu ? 'Добавить' : 'Add'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_modifierDefs.isEmpty)
+            Text(
+              isRu ? 'Пока нет модификаторов.' : 'No modifiers yet.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ..._modifierDefs.map((m) => Card(
+                child: ListTile(
+                  title: Text(m.name),
+                  subtitle: Text(m.options.isEmpty
+                      ? (isRu ? 'Без опций' : 'No options')
+                      : m.options.join(', ')),
+                  trailing: Wrap(
+                    spacing: 4,
+                    children: [
+                      IconButton(
+                        tooltip: isRu ? 'Редактировать' : 'Edit',
+                        onPressed: () => _openModifierEditorDialog(loc, initial: m),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: isRu ? 'Удалить' : 'Delete',
+                        onPressed: () => _deleteModifier(m),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+        ],
       ),
     );
   }
@@ -4960,6 +5070,129 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     setState(() => _finishDraftCount = count);
   }
 
+  String? _modifierPrefsKey() {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return null;
+    return 'bar_modifiers_${est.dataEstablishmentId}';
+  }
+
+  Future<void> _loadModifierDefs() async {
+    final key = _modifierPrefsKey();
+    if (key == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null || raw.trim().isEmpty) {
+        if (!mounted) return;
+        setState(() => _modifierDefs = const []);
+        return;
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      final list = decoded
+          .whereType<Map>()
+          .map((e) => _BarModifierDef.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.name.trim().isNotEmpty)
+          .toList();
+      if (!mounted) return;
+      setState(() => _modifierDefs = list);
+    } catch (_) {}
+  }
+
+  Future<void> _saveModifierDefs() async {
+    final key = _modifierPrefsKey();
+    if (key == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final payload = _modifierDefs.map((e) => e.toJson()).toList();
+    await prefs.setString(key, jsonEncode(payload));
+  }
+
+  Future<void> _openModifierEditorDialog(LocalizationService loc,
+      {_BarModifierDef? initial}) async {
+    final nameCtrl = TextEditingController(text: initial?.name ?? '');
+    final optionsCtrl =
+        TextEditingController(text: (initial?.options ?? const []).join(', '));
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final out = await showDialog<_BarModifierDef>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(initial == null
+            ? (isRu ? 'Новый модификатор' : 'New modifier')
+            : (isRu ? 'Редактировать модификатор' : 'Edit modifier')),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: isRu ? 'Название' : 'Name',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: optionsCtrl,
+                decoration: InputDecoration(
+                  labelText: isRu
+                      ? 'Опции (через запятую)'
+                      : 'Options (comma separated)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isRu ? 'Отмена' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              final options = optionsCtrl.text
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              if (name.isEmpty) return;
+              Navigator.pop(
+                ctx,
+                _BarModifierDef(
+                  id: initial?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+                  name: name,
+                  options: options,
+                ),
+              );
+            },
+            child: Text(isRu ? 'Сохранить' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    optionsCtrl.dispose();
+    if (!mounted || out == null) return;
+    setState(() {
+      final idx = _modifierDefs.indexWhere((m) => m.id == out.id);
+      if (idx == -1) {
+        _modifierDefs = [..._modifierDefs, out];
+      } else {
+        final copy = [..._modifierDefs];
+        copy[idx] = out;
+        _modifierDefs = copy;
+      }
+    });
+    await _saveModifierDefs();
+  }
+
+  Future<void> _deleteModifier(_BarModifierDef m) async {
+    setState(() {
+      _modifierDefs = _modifierDefs.where((e) => e.id != m.id).toList();
+    });
+    await _saveModifierDefs();
+  }
+
   String _draftDisplayTitle(Map<String, dynamic> data, bool isRu) {
     final name = (data['name'] as String? ?? '').trim();
     if (name.isNotEmpty) return name;
@@ -5407,6 +5640,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           selected: selectedIndex == 3,
           badgeCount: _finishDraftCount,
         );
+    Widget chipModifiers() => _ttkTabChip(
+          isRu ? 'Модиф.' : 'Modifiers',
+          selected: selectedIndex == 4,
+          badgeCount: _modifierDefs.length,
+        );
 
     if (ctrl != null) {
       return [
@@ -5432,6 +5670,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ),
         ),
         Tab(child: chipFinish()),
+        Tab(child: chipModifiers()),
       ];
     }
     return [
@@ -5439,6 +5678,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       Tab(child: chipDishes()),
       Tab(child: chipReview()),
       Tab(child: chipFinish()),
+      Tab(child: chipModifiers()),
     ];
   }
 
@@ -5614,6 +5854,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ),
         _buildReviewList(loc, canEdit),
         _buildFinishDraftTab(loc),
+        _buildModifiersTab(loc),
       ],
     );
 
