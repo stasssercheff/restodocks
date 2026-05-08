@@ -4806,10 +4806,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
     final draftKey = await _resolveCreateDraftKeyForContinue();
-    final merged = await DraftStorageService()
-        .loadTechCardEditDraftMerged(draftKey, draftKey);
-    if (merged != null &&
-        DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+    final localDraft = await DraftStorageService().loadTechCardEditDraft(draftKey);
+    if (localDraft != null &&
+        DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
       final choice = await showDialog<_TtkNewDraftChoice>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -4861,9 +4860,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<String> _resolveCreateDraftKeyForContinue() async {
     for (final key in _createDraftCandidateKeys()) {
-      final merged =
-          await DraftStorageService().loadTechCardEditDraftMerged(key, key);
-      if (merged != null && DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+      final localDraft = await DraftStorageService().loadTechCardEditDraft(key);
+      if (localDraft != null &&
+          DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
         return key;
       }
     }
@@ -4873,9 +4872,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<int> _unsavedCreateDraftCount() async {
     var count = 0;
     for (final key in _createDraftCandidateKeys()) {
-      final merged =
-          await DraftStorageService().loadTechCardEditDraftMerged(key, key);
-      if (merged != null && DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+      final localDraft = await DraftStorageService().loadTechCardEditDraft(key);
+      if (localDraft != null &&
+          DraftStorageService.techCardDraftLooksNonEmpty(localDraft)) {
         count++;
       }
     }
