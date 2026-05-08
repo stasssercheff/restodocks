@@ -4073,10 +4073,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         context.pop(true); // Список обновит в фоне
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      if (!mounted) return;
+      if (e is PostgrestException && e.code == '23503') {
+        final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+        final msg = isRu
+            ? 'Нельзя удалить ТТК: она уже используется в заказах. Сначала удалите или переназначьте связанные позиции.'
+            : 'Cannot delete this tech card: it is already used in orders. Remove or reassign linked order items first.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              loc.t('error_with_message').replaceAll('%s', e.toString()))));
     }
   }
 

@@ -2688,16 +2688,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return processedAll.where((tc) {
         final dep = tc.department.trim().toLowerCase();
         if (dep == 'bar') return true;
-        // Старые карточки без department=bar — по категории и цеху.
-        if (dep.isNotEmpty && dep != 'kitchen') return false;
+        if (dep == 'kitchen') return false;
+        // Старые карточки без явного department=bar — по категории и цеху.
+        if (dep.isNotEmpty) return false;
         return _legacyBarCardMatch(tc, customBarIds);
       }).toList();
     }
     if (widget.department == 'hall') return [];
     // Кухня: не отсекаем по «барным» категориям — в БД tech_cards.department = kitchen.
-    return processedAll
-        .where((tc) => tc.department.trim().toLowerCase() != 'bar')
-        .toList();
+    return processedAll.where((tc) {
+      final dep = tc.department.trim().toLowerCase();
+      if (dep == 'bar') return false;
+      if (dep == 'kitchen') return true;
+      if (dep.isNotEmpty) return true;
+      return !_legacyBarCardMatch(tc, customBarIds);
+    }).toList();
   }
 
   /// Санация, фильтр по цеху и подтягивание карточек по ссылкам из состава (без сети).

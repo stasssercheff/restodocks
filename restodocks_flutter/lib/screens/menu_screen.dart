@@ -153,11 +153,15 @@ class _MenuScreenState extends State<MenuScreen> {
         tcs = allTcs.where((tc) => !tc.isSemiFinished).toList();
       } else if (widget.department == 'bar') {
         tcs = allTcs
-            .where((tc) =>
-                !tc.isSemiFinished &&
-                (tc.department.trim().toLowerCase() == 'bar' ||
-                    _barCategories.contains(tc.category) ||
-                    tc.sections.contains('bar')))
+            .where((tc) {
+              if (tc.isSemiFinished) return false;
+              final dep = tc.department.trim().toLowerCase();
+              if (dep == 'bar') return true;
+              if (dep == 'kitchen') return false;
+              // Legacy fallback only for cards without explicit department.
+              return _barCategories.contains(tc.category) ||
+                  tc.sections.contains('bar');
+            })
             .toList();
       } else {
         // Кухня: строго без барного отдела.
@@ -184,6 +188,7 @@ class _MenuScreenState extends State<MenuScreen> {
           final dep = tc.department.trim().toLowerCase();
           if (dep == 'bar') return true;
           if (dep == 'kitchen') return false;
+          if (dep.isNotEmpty) return false;
           return _barCategories.contains(tc.category) || tc.sections.contains('bar');
         }
         final barOnly = enriched

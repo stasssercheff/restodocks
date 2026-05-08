@@ -1535,6 +1535,10 @@ class _LineTile extends StatelessWidget {
   final VoidCallback? onEditCourseGuest;
   final VoidCallback? onMarkServed;
 
+  static const double _kActionIconSize = 20;
+  static const BoxConstraints _kCompactActionConstraints =
+      BoxConstraints(minWidth: 34, minHeight: 34);
+
   @override
   Widget build(BuildContext context) {
     final title = line.dishTitleForLang(lang);
@@ -1551,9 +1555,9 @@ class _LineTile extends StatelessWidget {
     ].join(' · ');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1563,22 +1567,34 @@ class _LineTile extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
                 if (editable) ...[
                   if (onEditCourseGuest != null)
                     IconButton(
                       onPressed: onEditCourseGuest,
-                      icon: const Icon(Icons.people_alt_outlined),
+                      visualDensity: VisualDensity.compact,
+                      constraints: _kCompactActionConstraints,
+                      padding: const EdgeInsets.all(6),
+                      icon: const Icon(
+                        Icons.people_alt_outlined,
+                        size: _kActionIconSize,
+                      ),
                       tooltip: loc.t('pos_order_line_edit_course_guest_title'),
                     ),
                   IconButton(
                     onPressed: onComment,
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
                     icon: Icon(
                       line.comment != null && line.comment!.trim().isNotEmpty
                           ? Icons.chat
                           : Icons.chat_outlined,
+                      size: _kActionIconSize,
                     ),
                     tooltip: loc.t('pos_order_line_comment'),
                   ),
@@ -1586,22 +1602,26 @@ class _LineTile extends StatelessWidget {
                 if (editable || canVoidLine)
                   IconButton(
                     onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.delete_outline, size: _kActionIconSize),
                     tooltip: canVoidLine && !editable
                         ? loc.t('pos_order_line_void')
                         : loc.t('pos_order_line_delete'),
                   ),
               ],
             ),
-            const SizedBox(height: 4),
             Text(
               sub,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             if (!compactDeptStaff && line.sellingPrice != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -1717,20 +1737,26 @@ class _LineTile extends StatelessWidget {
               ),
             ],
             if (editable) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Row(
                 children: [
                   IconButton(
                     onPressed: line.quantity <= 1
                         ? null
                         : () => onQty(line.quantity - 1),
-                    icon: const Icon(Icons.remove_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.remove_circle_outline, size: _kActionIconSize),
                   ),
                   Text(_formatPosQty(line.quantity),
-                      style: Theme.of(context).textTheme.titleMedium),
+                      style: Theme.of(context).textTheme.titleSmall),
                   IconButton(
                     onPressed: () => onQty(line.quantity + 1),
-                    icon: const Icon(Icons.add_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                    constraints: _kCompactActionConstraints,
+                    padding: const EdgeInsets.all(6),
+                    icon: const Icon(Icons.add_circle_outline, size: _kActionIconSize),
                   ),
                   const Spacer(),
                   TextButton(
